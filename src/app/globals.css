@@ -28,15 +28,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Hide store chrome in admin */
+/* Hide store chrome when in admin */
+body.admin-mode .announcement-bar,
 body.admin-mode > header,
 body.admin-mode > footer,
-nav.bottom-nav-safe,
-body.admin-mode .announcement-bar {
+body.admin-mode nav.bottom-nav-safe {
   display: none !important;
 }
 
-body.admin-mode main {
+body.admin-mode > main {
   padding-bottom: 0 !important;
   min-height: 100vh;
 }

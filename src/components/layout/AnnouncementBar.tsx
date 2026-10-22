@@ -11,7 +11,7 @@ export function AnnouncementBar() {
 
   return (
     <div
-      className="bg-ink text-page text-sm h-[37px] overflow-hidden flex items-center"
+      className="announcement-bar bg-ink text-page text-sm h-[37px] overflow-hidden flex items-center"
       role="region"
       aria-label="إعلان"
     >
