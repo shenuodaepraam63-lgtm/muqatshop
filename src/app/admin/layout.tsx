@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import {
   LogOut,
   Package,
@@ -110,8 +111,8 @@ export default function AdminLayout({
   const sidebar = (
     <>
       <div className="p-5 border-b border-[#e8e2d9]">
-        <Link href="/admin" className="text-lg font-bold text-ink" onClick={() => setMenuOpen(false)}>
-          MUQAT Admin
+        <Link href="/admin" className="inline-flex" onClick={() => setMenuOpen(false)} aria-label="Muqatshop — لوحة الإدارة">
+          <BrandLogo size="sm" />
         </Link>
         <p className="text-xs text-muted mt-1 truncate">{userEmail}</p>
       </div>
@@ -142,7 +143,7 @@ export default function AdminLayout({
         <button type="button" onClick={() => setMenuOpen(true)} className="p-2 -mr-2 rounded-lg hover:bg-[#f8f5f0]" aria-label="فتح القائمة">
           <Menu className="w-6 h-6 text-ink" />
         </button>
-        <Link href="/admin" className="font-bold text-ink text-sm">MUQAT Admin</Link>
+        <Link href="/admin" aria-label="Muqatshop — لوحة الإدارة" className="inline-flex"><BrandLogo size="sm" /></Link>
         <div className="w-10" />
       </div>
       {menuOpen && <div className="fixed inset-0 bg-black/40 z-50 md:hidden" onClick={() => setMenuOpen(false)} />}

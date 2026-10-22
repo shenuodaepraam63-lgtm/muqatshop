@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Search, ShoppingBag } from "lucide-react";
 import { useCartStore } from "@/lib/store";
-import { LOGO_DATA_URI } from "@/lib/logo";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 
 export function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
@@ -11,15 +11,8 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 bg-page/95 backdrop-blur-sm shadow-header">
       <div className="max-w-page mx-auto px-4 md:px-8 h-[73px] flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={LOGO_DATA_URI}
-            alt="Muqatshop"
-            width={140}
-            height={48}
-            className="h-11 w-auto object-contain"
-          />
+        <Link href="/" className="shrink-0" aria-label="Muqatshop — الصفحة الرئيسية">
+          <BrandLogo size="sm" />
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium">

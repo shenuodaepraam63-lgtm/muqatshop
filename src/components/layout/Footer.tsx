@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LOGO_DATA_URI } from "@/lib/logo";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 
 export function Footer() {
   return (
@@ -7,17 +7,9 @@ export function Footer() {
       <div className="max-w-page mx-auto px-4 md:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={LOGO_DATA_URI}
-              alt="Muqatshop"
-              width={160}
-              height={56}
-              className="h-14 w-auto object-contain mb-4"
-            />
-            <p className="text-muted text-sm leading-relaxed">
-              Your Style. Your Choice.
-            </p>
+            <Link href="/" aria-label="Muqatshop — الصفحة الرئيسية" className="inline-flex mb-4">
+              <BrandLogo size="md" layout="stacked" showTagline />
+            </Link>
           </div>
 
           <div>
