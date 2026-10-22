@@ -2,30 +2,22 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase, type Product, productMainImage } from "@/lib/supabase";
+import Image from "next/image";
+import { supabase, type Product } from "@/lib/supabase";
 import { formatPrice } from "@/lib/utils";
+import { Plus, Pencil, Trash2, Package } from "lucide-react";
 
-const ADMIN_KEY = "muqat_admin_ok";
+function mainImage(p: Product): string | null {
+  if (!p.images?.length) return null;
+  const idx = Math.min(p.main_image_index ?? 0, p.images.length - 1);
+  return p.images[idx] || p.images[0] || null;
+}
 
-export default function AdminPage() {
-  const [authed, setAuthed] = useState(false);
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+export default function AdminDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && localStorage.getItem(ADMIN_KEY) === "1") {
-      setAuthed(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!authed) return;
-    loadProducts();
-  }, [authed]);
-
-  async function loadProducts() {
+  const load = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("products")
@@ -33,130 +25,134 @@ export default function AdminPage() {
       .order("created_at", { ascending: false });
     if (!error && data) setProducts(data as Product[]);
     setLoading(false);
-  }
+  };
 
-  function login(e: React.FormEvent) {
-    e.preventDefault();
-    // Simple client gate — replace with real auth later
-    if (password === "muqat2026") {
-      localStorage.setItem(ADMIN_KEY, "1");
-      setAuthed(true);
-      setError("");
-    } else {
-      setError("كلمة المرور غير صحيحة");
-    }
-  }
+  useEffect(() => {
+    load();
+  }, []);
 
-  async function toggleActive(p: Product) {
-    await supabase.from("products").update({ is_active: !p.is_active }).eq("id", p.id);
-    loadProducts();
-  }
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`حذف المنتج "${name}"؟`)) return;
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (!error) setProducts((p) => p.filter((x) => x.id !== id));
+    else alert("فشل الحذف");
+  };
 
-  async function deleteProduct(id: string) {
-    if (!confirm("حذف المنتج نهائياً؟")) return;
-    await supabase.from("products").delete().eq("id", id);
-    loadProducts();
-  }
-
-  if (!authed) {
-    return (
-      <div className="max-w-sm mx-auto mt-16">
-        <h1 className="text-2xl font-bold mb-6 text-center">دخول لوحة التحكم</h1>
-        <form onSubmit={login} className="bg-page border border-border rounded-media p-6 space-y-4">
-          <div>
-            <label className="block text-sm mb-1">كلمة المرور</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-ink/20"
-              autoFocus
-            />
-          </div>
-          {error && <p className="text-sale text-sm">{error}</p>}
-          <button
-            type="submit"
-            className="w-full bg-ink text-page py-2.5 rounded-btn font-semibold hover:opacity-90"
-          >
-            دخول
-          </button>
-        </form>
-      </div>
-    );
-  }
+  const toggleActive = async (p: Product) => {
+    await supabase
+      .from("products")
+      .update({ is_active: !p.is_active })
+      .eq("id", p.id);
+    load();
+  };
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-        <h1 className="text-2xl font-bold">المنتجات</h1>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-ink">المنتجات</h1>
+          <p className="text-sm text-muted mt-1">{products.length} منتج</p>
+        </div>
         <Link
           href="/admin/products/new"
-          className="bg-ink text-page px-5 py-2.5 rounded-btn text-sm font-semibold hover:opacity-90"
+          className="inline-flex items-center gap-2 bg-ink text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition"
         >
-          + إضافة منتج
+          <Plus className="w-4 h-4" />
+          إضافة منتج
         </Link>
       </div>
 
       {loading ? (
-        <p className="text-muted">جاري التحميل...</p>
+        <div className="text-center py-16 text-muted">جاري التحميل...</div>
       ) : products.length === 0 ? (
-        <div className="bg-page border border-border rounded-media p-10 text-center">
+        <div className="bg-white rounded-2xl border border-[#e8e2d9] py-16 text-center">
+          <Package className="w-12 h-12 text-muted mx-auto mb-3 opacity-50" />
           <p className="text-muted mb-4">لا توجد منتجات بعد</p>
-          <Link href="/admin/products/new" className="text-sm font-semibold underline">
+          <Link
+            href="/admin/products/new"
+            className="inline-flex items-center gap-2 bg-ink text-white px-5 py-2.5 rounded-xl text-sm font-semibold"
+          >
+            <Plus className="w-4 h-4" />
             أضف أول منتج
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
-          {products.map((p) => {
-            const img = productMainImage(p);
-            return (
-              <div
-                key={p.id}
-                className="bg-page border border-border rounded-media p-4 flex gap-4 items-center"
-              >
-                <div className="w-16 h-16 rounded-lg bg-card overflow-hidden shrink-0">
-                  {img ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-muted">
-                      لا صورة
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold truncate">{p.name}</div>
-                  <div className="text-sm text-muted">
-                    {formatPrice(Number(p.price))}
-                    {!p.is_active && (
-                      <span className="mr-2 text-sale">· مخفي</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <Link
-                    href={`/admin/products/${p.id}`}
-                    className="text-sm px-3 py-1.5 border border-border rounded-lg hover:bg-card"
-                  >
-                    تعديل
-                  </Link>
-                  <button
-                    onClick={() => toggleActive(p)}
-                    className="text-sm px-3 py-1.5 border border-border rounded-lg hover:bg-card"
-                  >
-                    {p.is_active ? "إخفاء" : "إظهار"}
-                  </button>
-                  <button
-                    onClick={() => deleteProduct(p.id)}
-                    className="text-sm px-3 py-1.5 text-sale border border-sale/30 rounded-lg hover:bg-sale/5"
-                  >
-                    حذف
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+        <div className="bg-white rounded-2xl border border-[#e8e2d9] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[#faf8f5] border-b border-[#e8e2d9]">
+                <tr>
+                  <th className="text-right px-4 py-3 font-medium text-muted">المنتج</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted">السعر</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted">المخزون</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted">الحالة</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e8e2d9]">
+                {products.map((p) => {
+                  const img = mainImage(p);
+                  return (
+                    <tr key={p.id} className="hover:bg-[#faf8f5]/80">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-[#f0ebe3] shrink-0">
+                            {img ? (
+                              <Image src={img} alt="" fill className="object-cover" sizes="48px" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[10px] text-muted">
+                                —
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-ink truncate max-w-[200px]">{p.name}</div>
+                            {p.is_featured && (
+                              <span className="text-[10px] text-amber-600">مميز</span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">{formatPrice(Number(p.price))}</td>
+                      <td className="px-4 py-3">{p.stock}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleActive(p)}
+                          className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                            p.is_active
+                              ? "bg-green-50 text-green-700"
+                              : "bg-gray-100 text-muted"
+                          }`}
+                        >
+                          {p.is_active ? "نشط" : "مخفي"}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <Link
+                            href={`/admin/products/${p.id}`}
+                            className="p-2 text-muted hover:text-ink hover:bg-gray-50 rounded-lg"
+                            title="تعديل"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(p.id, p.name)}
+                            className="p-2 text-muted hover:text-sale hover:bg-sale/10 rounded-lg"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
