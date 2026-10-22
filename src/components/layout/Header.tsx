@@ -46,9 +46,9 @@ export function Header() {
             aria-label="السلة"
           >
             <ShoppingBag className="w-6 h-6" strokeWidth={1.5} />
-            {totalItems() > 0 && (
+            {totalItems > 0 && (
               <span className="absolute -top-0.5 -right-0.5 bg-accent text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center">
-                {totalItems()}
+                {totalItems}
               </span>
             )}
           </Link>
