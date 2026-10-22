@@ -4,7 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { LogOut, Package, Plus, LayoutDashboard, Menu, X } from "lucide-react";
+import {
+  LogOut,
+  Package,
+  Plus,
+  LayoutDashboard,
+  Menu,
+  X,
+  ShoppingBag,
+  Tags,
+} from "lucide-react";
 
 const ADMIN_EMAIL = "muqatshop@gmail.com";
 
@@ -26,7 +35,6 @@ export default function AdminLayout({
     return () => document.body.classList.remove("admin-mode");
   }, []);
 
-  // Close menu on route change
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
@@ -86,7 +94,12 @@ export default function AdminLayout({
     );
   }
 
-  const navLink = (href: string, label: string, icon: React.ReactNode, active?: boolean) => (
+  const navLink = (
+    href: string,
+    label: string,
+    icon: React.ReactNode,
+    active?: boolean
+  ) => (
     <Link
       href={href}
       onClick={() => setMenuOpen(false)}
@@ -102,24 +115,44 @@ export default function AdminLayout({
   const sidebar = (
     <>
       <div className="p-5 border-b border-[#e8e2d9]">
-        <Link href="/admin" className="text-lg font-bold text-ink" onClick={() => setMenuOpen(false)}>
+        <Link
+          href="/admin"
+          className="text-lg font-bold text-ink"
+          onClick={() => setMenuOpen(false)}
+        >
           MUQAT Admin
         </Link>
         <p className="text-xs text-muted mt-1 truncate">{userEmail}</p>
       </div>
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {navLink("/admin", "لوحة التحكم", <LayoutDashboard className="w-4 h-4" />, pathname === "/admin")}
+        {navLink(
+          "/admin",
+          "لوحة التحكم",
+          <LayoutDashboard className="w-4 h-4" />,
+          pathname === "/admin"
+        )}
+        {navLink(
+          "/admin/orders",
+          "الطلبات",
+          <ShoppingBag className="w-4 h-4" />,
+          pathname?.startsWith("/admin/orders")
+        )}
         {navLink(
           "/admin/products/new",
           "إضافة منتج",
           <Plus className="w-4 h-4" />,
-          pathname?.includes("/products")
+          pathname === "/admin/products/new"
         )}
-        {navLink("/admin", "المنتجات", <Package className="w-4 h-4" />, false)}
+        {navLink(
+          "/admin",
+          "المنتجات",
+          <Package className="w-4 h-4" />,
+          pathname === "/admin"
+        )}
         {navLink(
           "/admin/categories",
           "التصنيفات",
-          <Package className="w-4 h-4" />,
+          <Tags className="w-4 h-4" />,
           pathname?.includes("/categories")
         )}
       </nav>
@@ -144,7 +177,6 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen bg-[#f8f5f0]">
-      {/* Mobile top bar */}
       <div className="md:hidden sticky top-0 z-40 bg-white border-b border-[#e8e2d9] h-14 flex items-center justify-between px-4">
         <button
           type="button"
@@ -160,7 +192,6 @@ export default function AdminLayout({
         <div className="w-10" />
       </div>
 
-      {/* Mobile overlay */}
       {menuOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-50 md:hidden"
@@ -168,7 +199,6 @@ export default function AdminLayout({
         />
       )}
 
-      {/* Sidebar: desktop fixed, mobile drawer */}
       <aside
         className={`
           w-64 bg-white border-l border-[#e8e2d9] flex flex-col fixed h-full z-[60]
@@ -179,7 +209,6 @@ export default function AdminLayout({
           }
         `}
       >
-        {/* Close on mobile */}
         <button
           type="button"
           onClick={() => setMenuOpen(false)}
