@@ -10,7 +10,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 bg-page/95 backdrop-blur-sm shadow-header">
-      <div className="max-w-page mx-auto px-4 md:px-8 h-[73px] flex items-center justify-between">
+      <div className="max-w-page mx-auto px-4 md:px-8 h-20 sm:h-24 flex items-center justify-between">
         <Link href="/" className="shrink-0" aria-label="Muqatshop — الصفحة الرئيسية">
           <BrandLogo size="sm" />
         </Link>

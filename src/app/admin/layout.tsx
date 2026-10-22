@@ -139,7 +139,7 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen bg-[#f8f5f0]">
-      <div className="md:hidden sticky top-0 z-40 bg-white border-b border-[#e8e2d9] h-14 flex items-center justify-between px-4">
+      <div className="md:hidden sticky top-0 z-40 bg-white border-b border-[#e8e2d9] h-20 flex items-center justify-between px-4">
         <button type="button" onClick={() => setMenuOpen(true)} className="p-2 -mr-2 rounded-lg hover:bg-[#f8f5f0]" aria-label="فتح القائمة">
           <Menu className="w-6 h-6 text-ink" />
         </button>

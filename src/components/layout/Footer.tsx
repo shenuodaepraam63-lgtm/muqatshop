@@ -8,7 +8,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <div>
             <Link href="/" aria-label="Muqatshop — الصفحة الرئيسية" className="inline-flex mb-4">
-              <BrandLogo size="md" layout="stacked" showTagline />
+              <BrandLogo size="md" />
             </Link>
           </div>
 

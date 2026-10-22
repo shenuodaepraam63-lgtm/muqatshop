@@ -43,7 +43,7 @@ export default function AdminLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FFFCEE] px-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8 border border-border">
         <div className="text-center mb-8">
-          <BrandLogo size="md" layout="stacked" showTagline className="mb-5" />
+          <BrandLogo size="md" className="mb-5" />
           <h1 className="text-2xl font-bold text-ink">لوحة التحكم</h1>
         </div>
 
