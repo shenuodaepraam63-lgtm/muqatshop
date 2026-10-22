@@ -23,30 +23,19 @@ export function Header() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
-          <Link href="/collections" className="hover:opacity-70 transition">
-            المجموعات
+          <Link href="/#products" className="hover:opacity-70 transition">
+            المنتجات
           </Link>
-          <Link href="/collections/new" className="hover:opacity-70 transition">
-            جديد
-          </Link>
-          <Link href="/collections/bags" className="hover:opacity-70 transition">
-            مقاطف
+          <Link href="/search" className="hover:opacity-70 transition">
+            بحث
           </Link>
         </nav>
 
         <div className="flex items-center gap-4">
-          <Link
-            href="/search"
-            className="p-2 hover:opacity-70 transition"
-            aria-label="بحث"
-          >
+          <Link href="/search" className="p-2 hover:opacity-70 transition" aria-label="بحث">
             <Search className="w-6 h-6" strokeWidth={1.5} />
           </Link>
-          <Link
-            href="/cart"
-            className="relative p-2 hover:opacity-70 transition"
-            aria-label="السلة"
-          >
+          <Link href="/cart" className="relative p-2 hover:opacity-70 transition" aria-label="السلة">
             <ShoppingBag className="w-6 h-6" strokeWidth={1.5} />
             {totalItems > 0 && (
               <span className="absolute -top-0.5 -right-0.5 bg-accent text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center">

@@ -1,29 +1,44 @@
-import Link from "next/link";
-import { LOGO_DATA_URI } from "@/lib/logo";
+import { supabase } from "@/lib/supabase";
+import { GalleryCarousel, type GallerySlide } from "./GalleryCarousel";
 
-export function Hero() {
-  return (
-    <section className="relative w-full px-4 md:px-8 pt-4 md:pt-6">
-      <div className="relative max-w-page mx-auto overflow-hidden rounded-media bg-card aspect-[16/9] md:aspect-[21/9] flex items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#e8e4d4] via-[#ede9d9] to-[#d9d4c4]" />
+async function getGallery() {
+  const [{ data: slides }, { data: settingsRow }] = await Promise.all([
+    supabase
+      .from("gallery_slides")
+      .select("id, title, subtitle, image_url, link_url, sort_order")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true }),
+    supabase.from("site_settings").select("value").eq("key", "gallery").maybeSingle(),
+  ]);
 
-        <div className="relative z-10 text-center px-6 py-12 flex flex-col items-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={LOGO_DATA_URI}
-            alt="Muqatshop"
-            width={280}
-            height={120}
-            className="h-24 md:h-36 w-auto object-contain mb-2"
-          />
-          <Link
-            href="/collections"
-            className="inline-block border border-ink text-ink px-8 py-3 rounded-btn text-sm font-semibold tracking-wide hover:bg-ink hover:text-page transition-colors duration-300 mt-4"
-          >
-            اكتشف المجموعة
-          </Link>
+  return {
+    slides: (slides as GallerySlide[]) || [],
+    settings: (settingsRow?.value as Record<string, unknown>) || {},
+  };
+}
+
+export async function Hero() {
+  const { slides, settings } = await getGallery();
+
+  if (slides.length === 0) {
+    return (
+      <section className="w-full px-4 md:px-8 pt-4">
+        <div className="max-w-page mx-auto rounded-2xl bg-[#ebe6dc] aspect-[16/9] flex items-center justify-center text-muted text-sm">
+          أضف صور المعرض من لوحة التحكم ← معرض الصور
         </div>
-      </div>
-    </section>
+      </section>
+    );
+  }
+
+  return (
+    <GalleryCarousel
+      slides={slides}
+      settings={{
+        enabled: settings.enabled !== false,
+        template: (settings.template as "rounded_carousel" | "fade" | "peek" | "full") || "rounded_carousel",
+        autoplay: settings.autoplay !== false,
+        interval_ms: Number(settings.interval_ms) || 4000,
+      }}
+    />
   );
 }

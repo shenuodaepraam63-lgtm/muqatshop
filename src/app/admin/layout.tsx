@@ -14,6 +14,7 @@ import {
   ShoppingBag,
   Tags,
   Megaphone,
+  Images,
 } from "lucide-react";
 
 const ADMIN_EMAIL = "muqatshop@gmail.com";
@@ -80,9 +81,7 @@ export default function AdminLayout({
     router.replace("/admin/login");
   };
 
-  if (isLoginPage) {
-    return <>{children}</>;
-  }
+  if (isLoginPage) return <>{children}</>;
 
   if (loading) {
     return (
@@ -95,12 +94,7 @@ export default function AdminLayout({
     );
   }
 
-  const navLink = (
-    href: string,
-    label: string,
-    icon: React.ReactNode,
-    active?: boolean
-  ) => (
+  const navLink = (href: string, label: string, icon: React.ReactNode, active?: boolean) => (
     <Link
       href={href}
       onClick={() => setMenuOpen(false)}
@@ -124,6 +118,7 @@ export default function AdminLayout({
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navLink("/admin", "لوحة التحكم", <LayoutDashboard className="w-4 h-4" />, pathname === "/admin")}
         {navLink("/admin/orders", "الطلبات", <ShoppingBag className="w-4 h-4" />, pathname?.startsWith("/admin/orders"))}
+        {navLink("/admin/gallery", "معرض الصور", <Images className="w-4 h-4" />, pathname?.includes("/gallery"))}
         {navLink("/admin/products/new", "إضافة منتج", <Plus className="w-4 h-4" />, pathname === "/admin/products/new")}
         {navLink("/admin", "المنتجات", <Package className="w-4 h-4" />, pathname === "/admin")}
         {navLink("/admin/categories", "التصنيفات", <Tags className="w-4 h-4" />, pathname?.includes("/categories"))}

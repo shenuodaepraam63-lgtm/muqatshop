@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, LayoutGrid, Search, ShoppingBag } from "lucide-react";
+import { Home, Search, ShoppingBag, LayoutGrid } from "lucide-react";
 import { useCartStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "الرئيسية", icon: Home },
-  { href: "/collections", label: "المنتجات", icon: LayoutGrid },
+  { href: "/#products", label: "المنتجات", icon: LayoutGrid },
   { href: "/search", label: "بحث", icon: Search },
   { href: "/cart", label: "السلة", icon: ShoppingBag },
 ];
@@ -22,7 +22,11 @@ export function BottomNav() {
       <div className="flex items-center justify-around h-16">
         {links.map(({ href, label, icon: Icon }) => {
           const active =
-            pathname === href || (href !== "/" && pathname.startsWith(href));
+            href === "/"
+              ? pathname === "/"
+              : href.startsWith("/#")
+                ? pathname === "/"
+                : pathname === href || pathname.startsWith(href);
           return (
             <Link
               key={href}

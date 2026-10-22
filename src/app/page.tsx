@@ -11,7 +11,7 @@ async function getProducts(): Promise<Product[]> {
       .select("*")
       .eq("is_active", true)
       .order("created_at", { ascending: false })
-      .limit(12);
+      .limit(24);
     if (error) {
       console.error("products fetch:", error.message);
       return [];
@@ -30,19 +30,16 @@ export default async function HomePage() {
     <div>
       <Hero />
 
-      <section className="max-w-page mx-auto px-4 md:px-8 mt-12 md:mt-16 mb-16">
+      <section id="products" className="max-w-page mx-auto px-4 md:px-8 mt-10 md:mt-14 mb-16 scroll-mt-24">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl md:text-2xl font-bold">وصل حديثاً</h2>
-          <a href="/collections" className="text-sm text-muted hover:text-ink transition">
-            عرض الكل ←
-          </a>
+          <h2 className="text-xl md:text-2xl font-bold">المنتجات</h2>
         </div>
 
         {products.length === 0 ? (
           <div className="rounded-media bg-card py-16 px-6 text-center">
             <h2 className="text-xl md:text-2xl font-bold mb-3">قريباً</h2>
             <p className="text-muted max-w-md mx-auto text-sm">
-              جاري تجهيز المنتجات. أضف منتجات من لوحة التحكم على /admin
+              جاري تجهيز المنتجات من لوحة التحكم
             </p>
           </div>
         ) : (
