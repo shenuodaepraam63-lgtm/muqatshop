@@ -28,7 +28,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Hide store chrome when in admin */
 body.admin-mode .announcement-bar,
 body.admin-mode > header,
 body.admin-mode > footer,
@@ -63,6 +62,15 @@ body.admin-mode > main {
 
 .animate-fade-in-up {
   animation: fadeInUp 0.6s ease-out forwards;
+}
+
+@keyframes storyProgress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.story-progress-active {
+  animation: storyProgress 4s linear forwards;
 }
 
 .product-card-image {

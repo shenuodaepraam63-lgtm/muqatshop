@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ProductCard } from "@/components/home/ProductCard";
-import { supabase, productMainImage, type Product, type Category } from "@/lib/supabase";
+import { supabase, productMainImage, type Product } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,6 @@ export default async function CollectionSlugPage({
     .eq("slug", decoded)
     .maybeSingle();
 
-  // Special virtual collections
   let products: Product[] = [];
   let title = category?.name || decoded;
 
@@ -90,6 +89,7 @@ export default async function CollectionSlugPage({
               compareAtPrice={
                 p.compare_at_price != null ? Number(p.compare_at_price) : null
               }
+              saleEndsAt={p.sale_ends_at}
               image={productMainImage(p) || ""}
             />
           ))}

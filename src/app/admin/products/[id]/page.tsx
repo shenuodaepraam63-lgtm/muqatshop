@@ -68,6 +68,7 @@ export default function EditProductPage() {
           dimensions: product.dimensions,
           origin_country: product.origin_country,
           care_instructions: product.care_instructions,
+          sale_ends_at: product.sale_ends_at,
         }}
       />
     </div>

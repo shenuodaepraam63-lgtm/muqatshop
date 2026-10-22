@@ -36,7 +36,6 @@ export function ProductGallery({ images, name }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [storyOpen, next, prev]);
 
-  // Story progress auto-advance like WhatsApp (optional light version)
   useEffect(() => {
     if (!storyOpen || list.length < 2) return;
     const t = setTimeout(() => next(), 4000);
@@ -76,7 +75,7 @@ export function ProductGallery({ images, name }: Props) {
                 e.stopPropagation();
                 prev();
               }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center opacity-80 md:opacity-0 md:group-hover:opacity-100 transition"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center opacity-90 md:opacity-0 md:group-hover:opacity-100 transition z-10"
               aria-label="السابق"
             >
               <ChevronRight className="w-5 h-5" />
@@ -87,12 +86,12 @@ export function ProductGallery({ images, name }: Props) {
                 e.stopPropagation();
                 next();
               }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center opacity-80 md:opacity-0 md:group-hover:opacity-100 transition"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center opacity-90 md:opacity-0 md:group-hover:opacity-100 transition z-10"
               aria-label="التالي"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5">
+            <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5 z-10 pointer-events-none">
               {list.map((_, i) => (
                 <span
                   key={i}
@@ -125,19 +124,20 @@ export function ProductGallery({ images, name }: Props) {
         </div>
       )}
 
-      {/* Story / WhatsApp-style fullscreen */}
       {storyOpen && current && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col">
-          {/* Progress bars */}
           {list.length > 1 && (
             <div className="flex gap-1 px-3 pt-3 pb-2">
               {list.map((_, i) => (
                 <div key={i} className="h-0.5 flex-1 rounded-full bg-white/30 overflow-hidden">
                   <div
-                    className={`h-full bg-white transition-all ${
-                      i < active ? "w-full" : i === active ? "w-full animate-none" : "w-0"
+                    className={`h-full bg-white ${
+                      i < active
+                        ? "w-full"
+                        : i === active
+                          ? "story-progress-active"
+                          : "w-0"
                     }`}
-                    style={i === active ? { animation: "storyProgress 4s linear" } : undefined}
                   />
                 </div>
               ))}
@@ -152,7 +152,6 @@ export function ProductGallery({ images, name }: Props) {
           </div>
 
           <div className="relative flex-1 flex items-center justify-center">
-            {/* Tap zones like stories */}
             <button
               type="button"
               className="absolute inset-y-0 right-0 w-1/3 z-10"
@@ -172,13 +171,6 @@ export function ProductGallery({ images, name }: Props) {
               className="max-h-full max-w-full object-contain"
             />
           </div>
-
-          <style jsx global>{`
-            @keyframes storyProgress {
-              from { width: 0%; }
-              to { width: 100%; }
-            }
-          `}</style>
         </div>
       )}
     </div>
