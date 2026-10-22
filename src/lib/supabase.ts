@@ -14,6 +14,7 @@ export type Product = {
   description: string | null;
   price: number;
   compare_at_price: number | null;
+  sale_ends_at?: string | null;
   category_id: string | null;
   brand: string | null;
   material: string | null;

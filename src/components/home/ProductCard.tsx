@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
-import { formatPrice } from "@/lib/utils";
+import { useState } from "react";
+import { formatPrice, isSaleActive, salePercent } from "@/lib/utils";
+import { useCartStore } from "@/lib/store";
 
 type ProductCardProps = {
   id: string;
@@ -8,19 +12,39 @@ type ProductCardProps = {
   slug: string;
   price: number;
   compareAtPrice?: number | null;
+  saleEndsAt?: string | null;
   image: string;
   category?: string | null;
 };
 
 export function ProductCard({
+  id,
   name,
   slug,
   price,
   compareAtPrice,
+  saleEndsAt,
   image,
   category,
 }: ProductCardProps) {
-  const onSale = compareAtPrice != null && compareAtPrice > price;
+  const addItem = useCartStore((s) => s.addItem);
+  const [added, setAdded] = useState(false);
+  const onSale = isSaleActive(price, compareAtPrice, saleEndsAt);
+  const percent =
+    onSale && compareAtPrice ? salePercent(price, compareAtPrice) : 0;
+
+  const onAdd = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem({
+      productId: id,
+      name,
+      price,
+      image: image || "",
+    });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  };
 
   return (
     <Link
@@ -33,7 +57,7 @@ export function ProductCard({
             src={image}
             alt={name}
             fill
-            className="object-cover product-card-image"
+            className="object-cover product-card-image transition duration-300 group-hover:scale-105"
             sizes="(max-width: 768px) 50vw, 25vw"
           />
         ) : (
@@ -41,11 +65,23 @@ export function ProductCard({
             صورة قادمة
           </div>
         )}
-        {onSale && (
-          <span className="absolute top-3 left-3 bg-ink text-page text-[10px] font-bold tracking-wide px-2.5 py-1 rounded-full">
-            SAVE
+
+        {onSale && percent > 0 && (
+          <span className="absolute top-3 right-3 z-10 bg-sale text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow">
+            خصم {percent}%
           </span>
         )}
+
+        {/* إضافة للسلة عند المرور / اللمس */}
+        <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-active:translate-y-0 group-active:opacity-100 transition duration-200 bg-gradient-to-t from-black/50 to-transparent">
+          <button
+            type="button"
+            onClick={onAdd}
+            className="w-full bg-white text-ink text-sm font-semibold py-2.5 rounded-full shadow hover:bg-ink hover:text-white transition"
+          >
+            {added ? "تمت الإضافة ✓" : "أضف إلى السلة"}
+          </button>
+        </div>
       </div>
       <div className="px-3 pt-3 pb-4">
         {category && (
@@ -58,9 +94,9 @@ export function ProductCard({
         </h3>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-bold text-ink">{formatPrice(price)}</span>
-          {onSale && (
-            <span className="text-xs text-muted line-through">
-              {formatPrice(compareAtPrice!)}
+          {onSale && compareAtPrice != null && (
+            <span className="text-xs text-muted line-through decoration-sale/80">
+              {formatPrice(compareAtPrice)}
             </span>
           )}
         </div>

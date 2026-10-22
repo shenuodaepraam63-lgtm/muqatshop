@@ -57,6 +57,7 @@ export default async function HomePage() {
                 compareAtPrice={
                   p.compare_at_price != null ? Number(p.compare_at_price) : null
                 }
+                saleEndsAt={p.sale_ends_at}
                 image={productMainImage(p) || ""}
               />
             ))}
