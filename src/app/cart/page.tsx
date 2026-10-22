@@ -33,7 +33,6 @@ export default function CartPage() {
       <h1 className="text-2xl font-bold mb-8">سلة التسوق وإتمام الطلب</h1>
 
       <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-        {/* Cart items */}
         <div>
           <ul className="space-y-4 mb-6">
             {items.map((item) => (
@@ -74,7 +73,8 @@ export default function CartPage() {
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      type="button"usc onClick={() => removeItem(item.id)}
+                      type="button"
+                      onClick={() => removeItem(item.id)}
                       className="mr-auto p-2 text-muted hover:text-sale"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -90,7 +90,6 @@ export default function CartPage() {
           </div>
         </div>
 
-        {/* Checkout */}
         <CheckoutForm />
       </div>
     </div>
