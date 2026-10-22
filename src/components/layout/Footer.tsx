@@ -11,6 +11,8 @@ export function Footer() {
             <img
               src={LOGO_DATA_URI}
               alt="Muqatshop"
+              width={160}
+              height={56}
               className="h-14 w-auto object-contain mb-4"
             />
             <p className="text-muted text-sm leading-relaxed">

@@ -16,6 +16,8 @@ export function Header() {
           <img
             src={LOGO_DATA_URI}
             alt="Muqatshop"
+            width={140}
+            height={48}
             className="h-11 w-auto object-contain"
           />
         </Link>

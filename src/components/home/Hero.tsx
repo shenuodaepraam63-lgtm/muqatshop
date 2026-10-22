@@ -12,6 +12,8 @@ export function Hero() {
           <img
             src={LOGO_DATA_URI}
             alt="Muqatshop"
+            width={280}
+            height={120}
             className="h-24 md:h-36 w-auto object-contain mb-2"
           />
           <Link
