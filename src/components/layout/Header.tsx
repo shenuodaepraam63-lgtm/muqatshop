@@ -13,7 +13,7 @@ export function Header() {
       <div className="max-w-page mx-auto px-4 md:px-8 h-[73px] flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <Image
-            src="/logo.webp"
+            src="/logo.svg"
             alt="Muqatshop"
             width={140}
             height={48}

@@ -9,7 +9,7 @@ export function Hero() {
 
         <div className="relative z-10 text-center px-6 py-12 flex flex-col items-center">
           <Image
-            src="/logo.webp"
+            src="/logo.svg"
             alt="Muqatshop"
             width={280}
             height={120}

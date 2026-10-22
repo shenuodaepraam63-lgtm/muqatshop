@@ -8,7 +8,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <div>
             <Image
-              src="/logo.webp"
+              src="/logo.svg"
               alt="Muqatshop"
               width={160}
               height={56}
