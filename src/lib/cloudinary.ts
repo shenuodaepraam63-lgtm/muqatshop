@@ -2,7 +2,6 @@
  * Client-side helper: get signed params then upload file to Cloudinary.
  */
 export async function uploadToCloudinary(file: File): Promise<string> {
-  // 1. Get signature from our API
   const signRes = await fetch("/api/cloudinary/sign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -16,7 +15,6 @@ export async function uploadToCloudinary(file: File): Promise<string> {
 
   const { signature, timestamp, apiKey, cloudName, folder } = await signRes.json();
 
-  // 2. Upload to Cloudinary
   const formData = new FormData();
   formData.append("file", file);
   formData.append("api_key", apiKey);
@@ -26,10 +24,7 @@ export async function uploadToCloudinary(file: File): Promise<string> {
 
   const uploadRes = await fetch(
     `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-    {
-      method: "POST",
-      body: formData,
-    }
+    { method: "POST", body: formData }
   );
 
   if (!uploadRes.ok) {
