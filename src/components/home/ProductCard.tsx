@@ -9,6 +9,7 @@ type ProductCardProps = {
   price: number;
   compareAtPrice?: number | null;
   image: string;
+  category?: string | null;
 };
 
 export function ProductCard({
@@ -17,12 +18,16 @@ export function ProductCard({
   price,
   compareAtPrice,
   image,
+  category,
 }: ProductCardProps) {
-  const onSale = compareAtPrice && compareAtPrice > price;
+  const onSale = compareAtPrice != null && compareAtPrice > price;
 
   return (
-    <Link href={`/product/${slug}`} className="product-card group block">
-      <div className="relative aspect-[3/4] overflow-hidden rounded-media bg-card mb-3">
+    <Link
+      href={`/products/${encodeURIComponent(slug)}`}
+      className="product-card group block rounded-2xl overflow-hidden bg-[#f5f1e8] transition hover:shadow-md"
+    >
+      <div className="relative aspect-square overflow-hidden bg-[#ebe6dc]">
         {image ? (
           <Image
             src={image}
@@ -37,19 +42,24 @@ export function ProductCard({
           </div>
         )}
         {onSale && (
-          <span className="absolute top-3 right-3 bg-sale text-white text-xs font-bold px-2.5 py-1 rounded-full">
-            خصم
+          <span className="absolute top-3 left-3 bg-ink text-page text-[10px] font-bold tracking-wide px-2.5 py-1 rounded-full">
+            SAVE
           </span>
         )}
       </div>
-      <div className="px-1">
-        <h3 className="text-sm font-medium text-ink line-clamp-2 mb-1 group-hover:opacity-70 transition">
+      <div className="px-3 pt-3 pb-4">
+        {category && (
+          <p className="text-[10px] tracking-widest uppercase text-muted mb-1">
+            {category}
+          </p>
+        )}
+        <h3 className="text-sm font-semibold text-ink line-clamp-2 mb-1.5 leading-snug group-hover:opacity-80 transition">
           {name}
         </h3>
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-ink">{formatPrice(price)}</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-bold text-ink">{formatPrice(price)}</span>
           {onSale && (
-            <span className="text-sm text-muted line-through">
+            <span className="text-xs text-muted line-through">
               {formatPrice(compareAtPrice!)}
             </span>
           )}
