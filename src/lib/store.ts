@@ -13,9 +13,13 @@ export type CartItem = {
   variant?: string;
 };
 
+export type AddCartItemInput = Omit<CartItem, "id" | "quantity"> & {
+  quantity?: number;
+};
+
 type CartState = {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "quantity"> & { quantity?: number }) => void;
+  addItem: (item: AddCartItemInput) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
