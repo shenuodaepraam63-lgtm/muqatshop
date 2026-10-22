@@ -31,7 +31,7 @@ export default function EditProductPage() {
           colors: data.colors || [],
           main_image_index: data.main_image_index || 0,
           stock: data.stock ?? 0,
-        });
+        } as Product);
       }
       setLoading(false);
     };
@@ -45,7 +45,31 @@ export default function EditProductPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-ink mb-6">تعديل المنتج</h1>
-      <ProductForm initial={product} />
+      <ProductForm
+        initial={{
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          description: product.description,
+          price: product.price,
+          compare_at_price: product.compare_at_price,
+          images: product.images || [],
+          main_image_index: product.main_image_index ?? 0,
+          stock: product.stock ?? 0,
+          is_featured: product.is_featured,
+          is_active: product.is_active,
+          category_id: product.category_id,
+          brand: product.brand,
+          material: product.material,
+          colors: product.colors || [],
+          features: product.features,
+          specs: product.specs,
+          weight: product.weight,
+          dimensions: product.dimensions,
+          origin_country: product.origin_country,
+          care_instructions: product.care_instructions,
+        }}
+      />
     </div>
   );
 }
