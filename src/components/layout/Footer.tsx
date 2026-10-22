@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export function Footer() {
   return (
@@ -6,11 +7,18 @@ export function Footer() {
       <div className="max-w-page mx-auto px-4 md:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <div>
-            <h3 className="text-xl font-bold mb-3">MUQAT SHOP</h3>
+            <Image
+              src="/logo.webp"
+              alt="Muqatshop"
+              width={160}
+              height={56}
+              className="h-12 w-auto object-contain mb-4"
+            />
             <p className="text-muted text-sm leading-relaxed">
-              متجر متخصص في المقاطف والحقائب والمنتجات الأنيقة. نصمم ونختار لك قطعاً تدوم.
+              Your Style. Your Choice.
             </p>
           </div>
+
           <div>
             <h4 className="font-semibold mb-4">روابط سريعة</h4>
             <ul className="space-y-2 text-sm text-muted">
@@ -36,6 +44,7 @@ export function Footer() {
               </li>
             </ul>
           </div>
+
           <div>
             <h4 className="font-semibold mb-4">خدمة العملاء</h4>
             <ul className="space-y-2 text-sm text-muted">
@@ -45,8 +54,9 @@ export function Footer() {
             </ul>
           </div>
         </div>
+
         <div className="mt-10 pt-6 border-t border-border text-center text-xs text-muted">
-          © {new Date().getFullYear()} Muqat Shop. جميع الحقوق محفوظة.
+          © {new Date().getFullYear()} Muqatshop. جميع الحقوق محفوظة.
         </div>
       </div>
     </footer>

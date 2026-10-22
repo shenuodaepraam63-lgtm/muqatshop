@@ -14,13 +14,16 @@ const changa = Changa({
 });
 
 export const metadata: Metadata = {
-  title: "Muqat Shop | متجر المقاطف الأنيق",
+  title: "Muqatshop | Your Style. Your Choice.",
   description:
     "متجر متخصص في المقاطف والحقائب والمنتجات الأنيقة. جودة عالية، تصميم فريد، وشحن لكل مصر.",
   openGraph: {
-    title: "Muqat Shop",
-    description: "متجر المقاطف والمنتجات الأنيقة",
+    title: "Muqatshop",
+    description: "Your Style. Your Choice.",
     type: "website",
+  },
+  icons: {
+    icon: "/logo.webp",
   },
 };
 

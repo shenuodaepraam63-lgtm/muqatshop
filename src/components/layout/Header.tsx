@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Search, ShoppingBag } from "lucide-react";
 import { useCartStore } from "@/lib/store";
 
@@ -10,15 +11,17 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 bg-page/95 backdrop-blur-sm shadow-header">
       <div className="max-w-page mx-auto px-4 md:px-8 h-[73px] flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-2xl font-bold tracking-tight text-ink">
-            MUQAT
-          </span>
-          <span className="text-xs text-muted hidden sm:inline">SHOP</span>
+        <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Image
+            src="/logo.webp"
+            alt="Muqatshop"
+            width={140}
+            height={48}
+            className="h-10 w-auto object-contain"
+            priority
+          />
         </Link>
 
-        {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
           <Link href="/collections" className="hover:opacity-70 transition">
             المجموعات
@@ -31,7 +34,6 @@ export function Header() {
           </Link>
         </nav>
 
-        {/* Actions */}
         <div className="flex items-center gap-4">
           <Link
             href="/search"
