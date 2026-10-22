@@ -45,3 +45,16 @@ export type Category = {
   sort_order?: number;
   is_active?: boolean;
 };
+
+/** Returns the main product image URL, or null if none. */
+export function productMainImage(p: {
+  images?: string[] | null;
+  main_image_index?: number | null;
+}): string | null {
+  if (!p.images?.length) return null;
+  const idx = Math.min(
+    Math.max(0, p.main_image_index ?? 0),
+    p.images.length - 1
+  );
+  return p.images[idx] || p.images[0] || null;
+}
