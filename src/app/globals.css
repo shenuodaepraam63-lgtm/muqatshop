@@ -28,7 +28,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Announcement marquee */
+/* Hide store chrome in admin */
+body.admin-mode > header,
+body.admin-mode > footer,
+nav.bottom-nav-safe,
+body.admin-mode .announcement-bar {
+  display: none !important;
+}
+
+body.admin-mode main {
+  padding-bottom: 0 !important;
+  min-height: 100vh;
+}
+
 @keyframes marquee {
   0% { transform: translate3d(0, 0, 0); }
   100% { transform: translate3d(-50%, 0, 0); }
@@ -38,7 +50,6 @@ body {
   animation: marquee 25s linear infinite;
 }
 
-/* Fade in up for sections */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -54,7 +65,6 @@ body {
   animation: fadeInUp 0.6s ease-out forwards;
 }
 
-/* Product card hover */
 .product-card-image {
   transition: transform 0.4s ease;
 }
@@ -63,7 +73,6 @@ body {
   transform: scale(1.04);
 }
 
-/* Hide scrollbar for horizontal scroll */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -72,7 +81,6 @@ body {
   scrollbar-width: none;
 }
 
-/* Bottom nav safe area */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .bottom-nav-safe {
     padding-bottom: env(safe-area-inset-bottom);

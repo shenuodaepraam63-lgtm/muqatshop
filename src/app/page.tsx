@@ -2,15 +2,25 @@ import { Hero } from "@/components/home/Hero";
 import { ProductCard } from "@/components/home/ProductCard";
 import { supabase, productMainImage, type Product } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 async function getProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(12);
-  if (error || !data) return [];
-  return data as Product[];
+  try {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(12);
+    if (error) {
+      console.error("products fetch:", error.message);
+      return [];
+    }
+    return (data as Product[]) || [];
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 export default async function HomePage() {
@@ -23,6 +33,9 @@ export default async function HomePage() {
       <section className="max-w-page mx-auto px-4 md:px-8 mt-12 md:mt-16 mb-16">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl md:text-2xl font-bold">وصل حديثاً</h2>
+          <a href="/collections" className="text-sm text-muted hover:text-ink transition">
+            عرض الكل ←
+          </a>
         </div>
 
         {products.length === 0 ? (
