@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Search, ShoppingBag } from "lucide-react";
 import { useCartStore } from "@/lib/store";
 
@@ -12,13 +11,11 @@ export function Header() {
     <header className="sticky top-0 z-40 bg-page/95 backdrop-blur-sm shadow-header">
       <div className="max-w-page mx-auto px-4 md:px-8 h-[73px] flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src="/logo.svg"
             alt="Muqatshop"
-            width={140}
-            height={48}
             className="h-10 w-auto object-contain"
-            priority
           />
         </Link>
 

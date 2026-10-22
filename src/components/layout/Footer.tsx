@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 
 export function Footer() {
   return (
@@ -7,11 +6,10 @@ export function Footer() {
       <div className="max-w-page mx-auto px-4 md:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <div>
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/logo.svg"
               alt="Muqatshop"
-              width={160}
-              height={56}
               className="h-12 w-auto object-contain mb-4"
             />
             <p className="text-muted text-sm leading-relaxed">

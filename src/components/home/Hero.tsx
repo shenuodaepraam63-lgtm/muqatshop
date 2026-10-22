@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 
 export function Hero() {
   return (
@@ -8,13 +7,11 @@ export function Hero() {
         <div className="absolute inset-0 bg-gradient-to-br from-[#e8e4d4] via-[#ede9d9] to-[#d9d4c4]" />
 
         <div className="relative z-10 text-center px-6 py-12 flex flex-col items-center">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src="/logo.svg"
             alt="Muqatshop"
-            width={280}
-            height={120}
             className="h-20 md:h-28 w-auto object-contain mb-4"
-            priority
           />
           <p className="text-sm md:text-base tracking-[0.15em] text-muted mb-8">
             Your Style. Your Choice.
