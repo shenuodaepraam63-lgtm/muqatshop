@@ -30,6 +30,7 @@ type ProductFormProps = {
     dimensions?: string | null;
     origin_country?: string | null;
     care_instructions?: string | null;
+    sale_ends_at?: string | null;
   };
 };
 
@@ -40,6 +41,18 @@ function slugify(text: string) {
     .replace(/[^\u0600-\u06FFa-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
+}
+
+function toLocalInput(iso?: string | null) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return "";
+  }
 }
 
 const PRESET_COLORS: ProductColor[] = [
@@ -63,6 +76,7 @@ export function ProductForm({ initial }: ProductFormProps) {
   const [description, setDescription] = useState(initial?.description || "");
   const [price, setPrice] = useState(initial?.price?.toString() || "");
   const [compareAt, setCompareAt] = useState(initial?.compare_at_price?.toString() || "");
+  const [saleEndsAt, setSaleEndsAt] = useState(toLocalInput(initial?.sale_ends_at));
   const [categoryId, setCategoryId] = useState(initial?.category_id || "");
   const [brand, setBrand] = useState(initial?.brand || "");
   const [material, setMaterial] = useState(initial?.material || "");
@@ -78,7 +92,9 @@ export function ProductForm({ initial }: ProductFormProps) {
   const [dimensions, setDimensions] = useState(initial?.dimensions || "");
   const [origin, setOrigin] = useState(initial?.origin_country || "");
   const [care, setCare] = useState(initial?.care_instructions || "");
-  const [showExtras, setShowExtras] = useState(!!(initial?.weight || initial?.dimensions || initial?.origin_country || initial?.care_instructions));
+  const [showExtras, setShowExtras] = useState(
+    !!(initial?.weight || initial?.dimensions || initial?.origin_country || initial?.care_instructions)
+  );
   const [colorName, setColorName] = useState("");
   const [colorHex, setColorHex] = useState("#8B4513");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -146,6 +162,14 @@ export function ProductForm({ initial }: ProductFormProps) {
 
   const removeColor = (idx: number) => setColors((prev) => prev.filter((_, i) => i !== idx));
 
+  const resolveSaleEnds = (): string | null => {
+    if (!compareAt || !saleEndsAt) return null;
+    const end = new Date(saleEndsAt);
+    if (Number.isNaN(end.getTime())) return null;
+    if (end.getTime() <= Date.now()) return null;
+    return end.toISOString();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -162,6 +186,7 @@ export function ProductForm({ initial }: ProductFormProps) {
       description: description.trim() || null,
       price: Number(price),
       compare_at_price: compareAt ? Number(compareAt) : null,
+      sale_ends_at: resolveSaleEnds(),
       category_id: categoryId || null,
       brand: brand.trim() || null,
       material: material.trim() || null,
@@ -197,6 +222,9 @@ export function ProductForm({ initial }: ProductFormProps) {
     }
   };
 
+  const field =
+    "w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15";
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {error && <div className="text-sm text-sale bg-sale/10 rounded-xl px-4 py-3">{error}</div>}
@@ -205,37 +233,56 @@ export function ProductForm({ initial }: ProductFormProps) {
       <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
         <h2 className="font-semibold text-ink flex items-center gap-2">
           <Upload className="w-4 h-4" /> الصور
-          <span className="text-xs font-normal text-muted">(رفع مباشر — بدون روابط)</span>
+          <span className="text-xs font-normal text-muted">(رفع مباشر)</span>
         </h2>
         <div
           onClick={() => fileInputRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleFiles(e.dataTransfer.files);
+          }}
           className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-ink/40 transition bg-[#FFFCEE]/50"
         >
           {uploading ? (
             <div className="flex flex-col items-center gap-2 text-muted">
               <Loader2 className="w-8 h-8 animate-spin" />
-              <span className="text-sm">جاري الرفع إلى Cloudinary...</span>
+              <span className="text-sm">جاري الرفع...</span>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2 text-muted">
               <Upload className="w-8 h-8" />
               <span className="text-sm">اضغط أو اسحب الصور هنا</span>
-              <span className="text-xs">PNG, JPG حتى 8 ميجا</span>
             </div>
           )}
-          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
         </div>
         {images.length > 0 && (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
             {images.map((url, idx) => (
               <div key={url + idx} className="relative aspect-square rounded-xl overflow-hidden bg-card group">
                 <Image src={url} alt="" fill className="object-cover" sizes="120px" />
-                <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 left-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition">
+                <button
+                  type="button"
+                  onClick={() => removeImage(idx)}
+                  className="absolute top-1 left-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100"
+                >
                   <X className="w-3.5 h-3.5" />
                 </button>
-                <button type="button" onClick={() => setMainIndex(idx)} title="الصورة الرئيسية" className={`absolute bottom-1 right-1 rounded-full p-1 transition ${mainIndex === idx ? "bg-amber-400 text-white" : "bg-black/50 text-white opacity-0 group-hover:opacity-100"}`}>
+                <button
+                  type="button"
+                  onClick={() => setMainIndex(idx)}
+                  className={`absolute bottom-1 right-1 rounded-full p-1 ${
+                    mainIndex === idx ? "bg-amber-400 text-white" : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
+                  }`}
+                >
                   <Star className="w-3.5 h-3.5" fill={mainIndex === idx ? "currentColor" : "none"} />
                 </button>
               </div>
@@ -249,72 +296,90 @@ export function ProductForm({ initial }: ProductFormProps) {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium mb-1.5">العنوان *</label>
-            <input value={name} onChange={(e) => handleNameChange(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" required placeholder="مثال: مقطف جلد طبيعي كلاسيك" />
+            <input value={name} onChange={(e) => handleNameChange(e.target.value)} className={field} required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">الرابط (Slug)</label>
-            <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" dir="ltr" />
+            <input value={slug} onChange={(e) => setSlug(e.target.value)} className={field} dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">التصنيف</label>
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 bg-white">
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={`${field} bg-white`}>
               <option value="">بدون تصنيف</option>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
-            <p className="text-xs text-muted mt-1">أضف تصنيفات من <a href="/admin/categories" className="underline">إدارة التصنيفات</a></p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">السعر (ج.م) *</label>
-            <input type="number" min="0" step="1" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" required />
+            <input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} className={field} required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">السعر قبل الخصم</label>
-            <input type="number" min="0" step="1" value={compareAt} onChange={(e) => setCompareAt(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" placeholder="اختياري" />
+            <input type="number" min="0" value={compareAt} onChange={(e) => setCompareAt(e.target.value)} className={field} placeholder="مثال: 500" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium mb-1.5">مدة الخصم (تاريخ ووقت الانتهاء)</label>
+            <input type="datetime-local" value={saleEndsAt} onChange={(e) => setSaleEndsAt(e.target.value)} className={field} />
+            <p className="text-xs text-muted mt-1">
+              الخصم يظهر للعميل فقط لو السعر قبل الخصم أكبر من السعر، والمدة لسه سارية. بعد الانتهاء يختفي تلقائياً — مفيش تلاعب من طرف العميل.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">العلامة التجارية</label>
-            <input value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" placeholder="مثال: Muqat" />
+            <input value={brand} onChange={(e) => setBrand(e.target.value)} className={field} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">الخامة</label>
-            <input value={material} onChange={(e) => setMaterial(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" placeholder="مثال: جلد طبيعي" />
+            <input value={material} onChange={(e) => setMaterial(e.target.value)} className={field} />
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium mb-1.5">الوصف</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 resize-y" placeholder="وصف المنتج..." />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={`${field} resize-y`} />
           </div>
         </div>
       </section>
 
       <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
-        <h2 className="font-semibold text-ink flex items-center gap-2"><Palette className="w-4 h-4" /> الألوان</h2>
+        <h2 className="font-semibold text-ink flex items-center gap-2">
+          <Palette className="w-4 h-4" /> الألوان
+        </h2>
         <div className="flex flex-wrap gap-2">
           {PRESET_COLORS.map((c) => (
-            <button key={c.hex} type="button" onClick={() => addPreset(c)} title={c.name} className="w-8 h-8 rounded-full border-2 border-white shadow ring-1 ring-black/10 hover:scale-110 transition" style={{ backgroundColor: c.hex }} />
+            <button
+              key={c.hex}
+              type="button"
+              onClick={() => addPreset(c)}
+              title={c.name}
+              className="w-8 h-8 rounded-full border-2 border-white shadow ring-1 ring-black/10"
+              style={{ backgroundColor: c.hex }}
+            />
           ))}
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-xs text-muted mb-1">اللون</label>
-            <input type="color" value={colorHex} onChange={(e) => setColorHex(e.target.value)} className="w-12 h-10 rounded-lg cursor-pointer border border-border p-0.5" />
-          </div>
-          <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs text-muted mb-1">اسم اللون</label>
-            <input value={colorName} onChange={(e) => setColorName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addColor())} className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" placeholder="مثال: بني داكن" />
-          </div>
-          <button type="button" onClick={addColor} className="flex items-center gap-1.5 bg-ink text-white text-sm px-4 py-2 rounded-xl hover:opacity-90">
+          <input type="color" value={colorHex} onChange={(e) => setColorHex(e.target.value)} className="w-12 h-10 rounded-lg border border-border" />
+          <input
+            value={colorName}
+            onChange={(e) => setColorName(e.target.value)}
+            className={`${field} flex-1 min-w-[140px]`}
+            placeholder="اسم اللون"
+          />
+          <button type="button" onClick={addColor} className="flex items-center gap-1.5 bg-ink text-white text-sm px-4 py-2 rounded-xl">
             <Plus className="w-4 h-4" /> إضافة
           </button>
         </div>
         {colors.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="flex flex-wrap gap-2">
             {colors.map((c, i) => (
               <span key={c.hex + c.name} className="inline-flex items-center gap-2 bg-[#f5f3eb] rounded-full pl-1 pr-3 py-1 text-sm">
-                <span className="w-6 h-6 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c.hex }} />
+                <span className="w-6 h-6 rounded-full border" style={{ backgroundColor: c.hex }} />
                 {c.name}
-                <button type="button" onClick={() => removeColor(i)} className="text-muted hover:text-sale"><X className="w-3.5 h-3.5" /></button>
+                <button type="button" onClick={() => removeColor(i)}>
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </span>
             ))}
           </div>
@@ -323,74 +388,49 @@ export function ProductForm({ initial }: ProductFormProps) {
 
       <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
         <h2 className="font-semibold text-ink">المميزات والمواصفات</h2>
-        <div>
-          <label className="block text-sm font-medium mb-1.5">المميزات</label>
-          <textarea value={features} onChange={(e) => setFeatures(e.target.value)} rows={3} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 resize-y" placeholder="سطر لكل ميزة" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1.5">المواصفات</label>
-          <textarea value={specs} onChange={(e) => setSpecs(e.target.value)} rows={3} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15 resize-y" placeholder="مواصفات تقنية..." />
-        </div>
+        <textarea value={features} onChange={(e) => setFeatures(e.target.value)} rows={3} className={`${field} resize-y`} placeholder="المميزات (سطر لكل ميزة)" />
+        <textarea value={specs} onChange={(e) => setSpecs(e.target.value)} rows={3} className={`${field} resize-y`} placeholder="المواصفات" />
       </section>
 
       <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
         <h2 className="font-semibold text-ink">المخزون والحالة</h2>
-        <p className="text-xs text-muted -mt-2">الكمية تظهر للعميل فقط عند نفاد المخزون (0).</p>
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1.5">الكمية في المخزون</label>
-            <input type="number" min="0" value={stock} onChange={(e) => setStock(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" />
+            <label className="block text-sm font-medium mb-1.5">الكمية</label>
+            <input type="number" min="0" value={stock} onChange={(e) => setStock(e.target.value)} className={field} />
           </div>
-          <div className="flex items-center gap-3 pt-6">
-            <label className="flex items-center gap-2 cursor-pointer text-sm">
-              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="w-4 h-4 rounded accent-ink" />
-              نشط
-            </label>
-          </div>
-          <div className="flex items-center gap-3 pt-6">
-            <label className="flex items-center gap-2 cursor-pointer text-sm">
-              <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} className="w-4 h-4 rounded accent-ink" />
-              مميز
-            </label>
-          </div>
+          <label className="flex items-center gap-2 text-sm pt-6">
+            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="w-4 h-4 accent-ink" />
+            نشط
+          </label>
+          <label className="flex items-center gap-2 text-sm pt-6">
+            <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} className="w-4 h-4 accent-ink" />
+            مميز
+          </label>
         </div>
       </section>
 
       <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
-        <button type="button" onClick={() => setShowExtras(!showExtras)} className="font-semibold text-ink flex items-center gap-2 w-full text-right">
-          حقول إضافية اختيارية
-          <span className="text-xs font-normal text-muted">(وزن، أبعاد، بلد المنشأ، عناية)</span>
-          <span className="mr-auto text-muted text-sm">{showExtras ? "▲" : "▼"}</span>
+        <button type="button" onClick={() => setShowExtras(!showExtras)} className="font-semibold text-ink">
+          حقول إضافية {showExtras ? "▲" : "▼"}
         </button>
         {showExtras && (
-          <div className="grid sm:grid-cols-2 gap-4 pt-2">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">الوزن</label>
-              <input value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" placeholder="450 جرام" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">الأبعاد</label>
-              <input value={dimensions} onChange={(e) => setDimensions(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" placeholder="30 × 25 × 12 سم" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">بلد المنشأ</label>
-              <input value={origin} onChange={(e) => setOrigin(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" placeholder="مصر" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">تعليمات العناية</label>
-              <input value={care} onChange={(e) => setCare(e.target.value)} className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15" placeholder="قطعة قماش ناعمة" />
-            </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <input value={weight} onChange={(e) => setWeight(e.target.value)} className={field} placeholder="الوزن" />
+            <input value={dimensions} onChange={(e) => setDimensions(e.target.value)} className={field} placeholder="الأبعاد" />
+            <input value={origin} onChange={(e) => setOrigin(e.target.value)} className={field} placeholder="بلد المنشأ" />
+            <input value={care} onChange={(e) => setCare(e.target.value)} className={field} placeholder="تعليمات العناية" />
           </div>
         )}
       </section>
 
-      <div className="flex flex-wrap gap-3 sticky bottom-4 bg-[#f5f3eb]/90 backdrop-blur py-3 rounded-xl">
-        <button type="submit" disabled={saving || uploading} className="flex items-center gap-2 bg-ink text-white px-8 py-3 rounded-xl text-sm font-semibold hover:opacity-90 disabled:opacity-60">
-          {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-          {initial?.id ? "حفظ التعديلات" : "إضافة المنتج"}
-        </button>
-        <button type="button" onClick={() => router.push("/admin")} className="px-6 py-3 rounded-xl text-sm border border-border bg-white hover:bg-white/80">إلغاء</button>
-      </div>
+      <button
+        type="submit"
+        disabled={saving || uploading}
+        className="w-full sm:w-auto min-w-[200px] bg-ink text-page px-8 py-3.5 rounded-xl text-sm font-semibold disabled:opacity-50"
+      >
+        {saving ? "جاري الحفظ..." : initial?.id ? "تحديث المنتج" : "إضافة المنتج"}
+      </button>
     </form>
   );
 }
