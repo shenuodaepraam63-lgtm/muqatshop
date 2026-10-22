@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Search, ShoppingBag } from "lucide-react";
 import { useCartStore } from "@/lib/store";
+import { LOGO_DATA_URI } from "@/lib/logo";
 
 export function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
@@ -13,9 +14,9 @@ export function Header() {
         <Link href="/" className="flex items-center gap-2 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.svg"
+            src={LOGO_DATA_URI}
             alt="Muqatshop"
-            className="h-10 w-auto object-contain"
+            className="h-11 w-auto object-contain"
           />
         </Link>
 

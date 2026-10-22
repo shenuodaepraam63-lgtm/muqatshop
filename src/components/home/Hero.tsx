@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LOGO_DATA_URI } from "@/lib/logo";
 
 export function Hero() {
   return (
@@ -9,16 +10,13 @@ export function Hero() {
         <div className="relative z-10 text-center px-6 py-12 flex flex-col items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.svg"
+            src={LOGO_DATA_URI}
             alt="Muqatshop"
-            className="h-20 md:h-28 w-auto object-contain mb-4"
+            className="h-24 md:h-36 w-auto object-contain mb-2"
           />
-          <p className="text-sm md:text-base tracking-[0.15em] text-muted mb-8">
-            Your Style. Your Choice.
-          </p>
           <Link
             href="/collections"
-            className="inline-block border border-ink text-ink px-8 py-3 rounded-btn text-sm font-semibold tracking-wide hover:bg-ink hover:text-page transition-colors duration-300"
+            className="inline-block border border-ink text-ink px-8 py-3 rounded-btn text-sm font-semibold tracking-wide hover:bg-ink hover:text-page transition-colors duration-300 mt-4"
           >
             اكتشف المجموعة
           </Link>

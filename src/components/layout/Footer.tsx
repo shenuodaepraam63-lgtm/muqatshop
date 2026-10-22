@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LOGO_DATA_URI } from "@/lib/logo";
 
 export function Footer() {
   return (
@@ -8,9 +9,9 @@ export function Footer() {
           <div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo.svg"
+              src={LOGO_DATA_URI}
               alt="Muqatshop"
-              className="h-12 w-auto object-contain mb-4"
+              className="h-14 w-auto object-contain mb-4"
             />
             <p className="text-muted text-sm leading-relaxed">
               Your Style. Your Choice.
