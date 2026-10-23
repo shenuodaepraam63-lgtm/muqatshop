@@ -165,10 +165,12 @@ export default async function ProductPage({
       </div>
 
       <div className="max-w-page mx-auto px-4 md:px-8 py-5 md:py-10">
-        <div className="grid md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-start">
-          <ProductGallery images={images} name={product.name} />
+        <div className="grid min-w-0 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-start">
+          <div className="min-w-0">
+            <ProductGallery images={images} name={product.name} />
+          </div>
 
-          <div className="md:sticky md:top-28">
+          <div className="min-w-0 md:sticky md:top-28">
             {product.brand?.trim() && (
               <p className="text-[11px] tracking-widest uppercase text-muted mb-2">
                 {product.brand.trim()}

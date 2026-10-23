@@ -56,7 +56,7 @@ export function ProductGallery({ images, name }: Props) {
   }, [lightbox, next, prev]);
 
   return (
-    <div>
+    <div className="min-w-0 w-full">
       {/* Main image */}
       <div
         className="relative aspect-square md:aspect-[4/5] rounded-2xl overflow-hidden bg-[#ebe6dc] mb-3 select-none"
@@ -126,7 +126,7 @@ export function ProductGallery({ images, name }: Props) {
 
       {/* Thumbnails */}
       {list.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex min-w-0 w-full max-w-full gap-2 overflow-x-auto pb-1 scrollbar-none">
           {list.map((url, i) => (
             <button
               key={url + i}
