@@ -70,6 +70,11 @@ async function getReturnPolicy(): Promise<string | null> {
   return null;
 }
 
+function looksLikeMug(product: Product): boolean {
+  const t = `${product.name} ${product.description || ""} ${product.slug}`.toLowerCase();
+  return /مج|كوب|كباية|mug|cup|كبايه/.test(t);
+}
+
 export default async function ProductPage({
   params,
 }: {
@@ -103,8 +108,8 @@ export default async function ProductPage({
     (saleEndsAt == null || saleActive);
 
   const outOfStock = (product.stock ?? 0) <= 0;
+  const showTryMug = looksLikeMug(product);
 
-  // Only sections that have real data from admin
   const accordionItems: { title: string; content: React.ReactNode }[] = [];
 
   if (product.description?.trim()) {
@@ -196,6 +201,15 @@ export default async function ProductPage({
               <p className="text-sm text-muted leading-relaxed mb-6 line-clamp-3">
                 {product.description.trim()}
               </p>
+            )}
+
+            {showTryMug && (
+              <Link
+                href={`/try-mug?product=${encodeURIComponent(product.slug)}&name=${encodeURIComponent(product.name)}`}
+                className="mb-5 flex items-center justify-center gap-2 w-full border-2 border-ink text-ink py-3 rounded-full text-sm font-semibold hover:bg-ink hover:text-page transition"
+              >
+                ☕ جرّب المج قبل الشراء
+              </Link>
             )}
 
             <ProductBuyBox
