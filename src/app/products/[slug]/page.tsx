@@ -6,6 +6,7 @@ import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductBuyBox } from "@/components/product/ProductBuyBox";
 import { ProductAccordion } from "@/components/product/ProductAccordion";
 import { SimilarProducts } from "@/components/product/SimilarProducts";
+import { SaleCountdown } from "@/components/product/SaleCountdown";
 
 export const dynamic = "force-dynamic";
 
@@ -45,14 +46,13 @@ async function getSimilar(product: Product): Promise<Product[]> {
   const { data } = await q;
   if (data && data.length > 0) return data as Product[];
 
-  // fallback: any other products
-  const { data: any } = await supabase
+  const { data: fallback } = await supabase
     .from("products")
     .select("*")
     .eq("is_active", true)
     .neq("id", product.id)
     .limit(8);
-  return (any as Product[]) || [];
+  return (fallback as Product[]) || [];
 }
 
 const DEFAULT_RETURN_POLICY = `سياسة الاستبدال والاسترجاع:
@@ -76,18 +76,24 @@ export default async function ProductPage({
   const features = product.features
     ? product.features.split("\n").map((s) => s.trim()).filter(Boolean)
     : [];
+
+  const saleEndsAt = product.sale_ends_at || null;
+  const saleActive =
+    saleEndsAt != null &&
+    !Number.isNaN(new Date(saleEndsAt).getTime()) &&
+    new Date(saleEndsAt).getTime() > Date.now();
+
   const onSale =
     product.compare_at_price != null &&
-    Number(product.compare_at_price) > Number(product.price);
+    Number(product.compare_at_price) > Number(product.price) &&
+    (saleEndsAt == null || saleActive);
+
   const outOfStock = (product.stock ?? 0) <= 0;
 
   const accordionItems: { title: string; content: React.ReactNode }[] = [];
 
   if (product.description) {
-    accordionItems.push({
-      title: "الوصف",
-      content: product.description,
-    });
+    accordionItems.push({ title: "الوصف", content: product.description });
   }
   if (features.length) {
     accordionItems.push({
@@ -116,7 +122,6 @@ export default async function ProductPage({
 
   return (
     <div className="bg-page min-h-screen">
-      {/* Breadcrumb */}
       <div className="bg-[#e8e2d4] text-[11px] tracking-wide uppercase text-muted">
         <div className="max-w-page mx-auto px-4 md:px-8 py-2.5 flex flex-wrap gap-1 items-center">
           <Link href="/" className="hover:text-ink">
@@ -154,7 +159,14 @@ export default async function ProductPage({
                   {formatPrice(Number(product.compare_at_price))}
                 </span>
               )}
+              {onSale && saleActive && (
+                <span className="text-[11px] font-bold bg-sale/10 text-sale px-2 py-0.5 rounded-full">
+                  عرض محدود
+                </span>
+              )}
             </div>
+
+            {saleActive && saleEndsAt && <SaleCountdown endsAt={saleEndsAt} />}
 
             {product.description && (
               <p className="text-sm text-muted leading-relaxed mb-6 line-clamp-3">
@@ -172,6 +184,7 @@ export default async function ProductPage({
                     ? Number(product.compare_at_price)
                     : null,
                 image: main,
+                slug: product.slug,
               }}
               colors={colors}
               outOfStock={outOfStock}
