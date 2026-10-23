@@ -8,7 +8,7 @@ type BrandLogoProps = {
 const logoSizeClasses = {
   sm: "w-24 sm:w-28",
   md: "w-52",
-  lg: "w-[min(92vw,600px)]",
+  lg: "w-[min(82vw,520px)]",
 };
 
 export function BrandLogo({ size = "md", className = "" }: BrandLogoProps) {
