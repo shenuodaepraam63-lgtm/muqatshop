@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase, type ProductColor, type Category } from "@/lib/supabase";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { ImageCropModal } from "@/components/admin/ImageCropModal";
 import { X, Upload, Star, Loader2, Plus, Palette } from "lucide-react";
 import Image from "next/image";
 
@@ -102,6 +103,8 @@ export function ProductForm({ initial }: ProductFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [cropQueue, setCropQueue] = useState<File[]>([]);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   useEffect(() => {
     supabase.from("categories").select("id, name, slug").order("sort_order").then(({ data }) => {
@@ -109,32 +112,56 @@ export function ProductForm({ initial }: ProductFormProps) {
     });
   }, []);
 
+  useEffect(() => {
+    if (!cropFile && cropQueue.length > 0) {
+      setCropFile(cropQueue[0]);
+      setCropQueue((q) => q.slice(1));
+    }
+  }, [cropFile, cropQueue]);
+
   const handleNameChange = (v: string) => {
     setName(v);
     if (!initial?.id) setSlug(slugify(v));
   };
 
-  const handleFiles = async (files: FileList | null) => {
+  const queueFilesForCrop = (files: FileList | null) => {
     if (!files?.length) return;
+    const list: File[] = [];
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/")) continue;
+      if (file.size > 12 * 1024 * 1024) {
+        setError("حجم الصورة أكبر من 12 ميجا");
+        continue;
+      }
+      list.push(file);
+    }
+    if (!list.length) return;
+    setError("");
+    if (cropFile) {
+      setCropQueue((q) => [...q, ...list]);
+    } else {
+      setCropFile(list[0]);
+      if (list.length > 1) setCropQueue(list.slice(1));
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const uploadCropped = async (file: File) => {
+    setCropFile(null);
     setUploading(true);
     setError("");
     try {
-      const urls: string[] = [];
-      for (const file of Array.from(files)) {
-        if (!file.type.startsWith("image/")) continue;
-        if (file.size > 8 * 1024 * 1024) {
-          setError("حجم الصورة أكبر من 8 ميجا");
-          continue;
-        }
-        urls.push(await uploadToCloudinary(file));
-      }
-      if (urls.length) setImages((prev) => [...prev, ...urls]);
+      const url = await uploadToCloudinary(file);
+      setImages((prev) => [...prev, url]);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "فشل رفع الصورة");
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const cancelCrop = () => {
+    setCropFile(null);
   };
 
   const removeImage = (idx: number) => {
@@ -227,20 +254,28 @@ export function ProductForm({ initial }: ProductFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {cropFile && (
+        <ImageCropModal
+          file={cropFile}
+          onCancel={cancelCrop}
+          onDone={uploadCropped}
+        />
+      )}
+
       {error && <div className="text-sm text-sale bg-sale/10 rounded-xl px-4 py-3">{error}</div>}
       {success && <div className="text-sm text-green-700 bg-green-50 rounded-xl px-4 py-3">{success}</div>}
 
       <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
         <h2 className="font-semibold text-ink flex items-center gap-2">
           <Upload className="w-4 h-4" /> الصور
-          <span className="text-xs font-normal text-muted">(رفع مباشر)</span>
+          <span className="text-xs font-normal text-muted">(قص وتعديل الحجم قبل الرفع)</span>
         </h2>
         <div
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => !uploading && fileInputRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
-            handleFiles(e.dataTransfer.files);
+            queueFilesForCrop(e.dataTransfer.files);
           }}
           className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-ink/40 transition bg-[#FFFCEE]/50"
         >
@@ -252,7 +287,7 @@ export function ProductForm({ initial }: ProductFormProps) {
           ) : (
             <div className="flex flex-col items-center gap-2 text-muted">
               <Upload className="w-8 h-8" />
-              <span className="text-sm">اضغط أو اسحب الصور هنا</span>
+              <span className="text-sm">اضغط أو اسحب الصور — هتفتح أداة القص</span>
             </div>
           )}
           <input
@@ -261,7 +296,7 @@ export function ProductForm({ initial }: ProductFormProps) {
             accept="image/*"
             multiple
             className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
+            onChange={(e) => queueFilesForCrop(e.target.files)}
           />
         </div>
         {images.length > 0 && (
@@ -280,7 +315,9 @@ export function ProductForm({ initial }: ProductFormProps) {
                   type="button"
                   onClick={() => setMainIndex(idx)}
                   className={`absolute bottom-1 right-1 rounded-full p-1 ${
-                    mainIndex === idx ? "bg-amber-400 text-white" : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
+                    mainIndex === idx
+                      ? "bg-amber-400 text-white"
+                      : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
                   }`}
                 >
                   <Star className="w-3.5 h-3.5" fill={mainIndex === idx ? "currentColor" : "none"} />
@@ -324,9 +361,6 @@ export function ProductForm({ initial }: ProductFormProps) {
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium mb-1.5">مدة الخصم (تاريخ ووقت الانتهاء)</label>
             <input type="datetime-local" value={saleEndsAt} onChange={(e) => setSaleEndsAt(e.target.value)} className={field} />
-            <p className="text-xs text-muted mt-1">
-              الخصم يظهر للعميل فقط لو السعر قبل الخصم أكبر من السعر، والمدة لسه سارية. بعد الانتهاء يختفي تلقائياً — مفيش تلاعب من طرف العميل.
-            </p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">العلامة التجارية</label>
@@ -426,10 +460,10 @@ export function ProductForm({ initial }: ProductFormProps) {
 
       <button
         type="submit"
-        disabled={saving || uploading}
-        className="w-full sm:w-auto min-w-[200px] bg-ink text-page px-8 py-3.5 rounded-xl text-sm font-semibold disabled:opacity-50"
+        disabled={saving || uploading || !!cropFile}
+        className="w-full sm:w-auto min-w-[200px] bg-ink text-page px-8 py-3.5 rounded-full text-sm font-semibold disabled:opacity-50"
       >
-        {saving ? "جاري الحفظ..." : initial?.id ? "تحديث المنتج" : "إضافة المنتج"}
+        {saving ? "جاري الحفظ..." : initial?.id ? "حفظ التعديلات" : "إضافة المنتج"}
       </button>
     </form>
   );
