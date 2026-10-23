@@ -20,7 +20,6 @@ type Props = {
   };
   colors: ProductColor[];
   outOfStock?: boolean;
-  allowNote?: boolean;
 };
 
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -31,11 +30,10 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-export function ProductBuyBox({ product, colors, outOfStock, allowNote }: Props) {
+export function ProductBuyBox({ product, colors, outOfStock }: Props) {
   const addItem = useCartStore((s) => s.addItem);
   const [qty, setQty] = useState(1);
   const [colorIdx, setColorIdx] = useState(0);
-  const [note, setNote] = useState("");
   const [done, setDone] = useState(false);
 
   const selectedColor = colors[colorIdx];
@@ -54,16 +52,13 @@ export function ProductBuyBox({ product, colors, outOfStock, allowNote }: Props)
 
   const onAdd = () => {
     if (outOfStock) return;
-    const parts = [product.name];
-    if (selectedColor) parts.push(selectedColor.name);
-    if (note.trim()) parts.push(note.trim());
     addItem({
       productId: product.id,
-      name: parts.join(" — "),
+      name: selectedColor ? `${product.name} — ${selectedColor.name}` : product.name,
       price: product.price,
       image: product.image,
       quantity: qty,
-      variant: [selectedColor?.name, note.trim()].filter(Boolean).join(" / ") || undefined,
+      variant: selectedColor?.name,
     });
     setDone(true);
     setTimeout(() => setDone(false), 2200);
@@ -96,18 +91,6 @@ export function ProductBuyBox({ product, colors, outOfStock, allowNote }: Props)
           </div>
         )}
 
-        {allowNote && (
-          <div>
-            <p className="text-sm mb-2">التخصيص / الاسم المطلوب</p>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="اكتب الاسم أو أي ملاحظة للتخصيص"
-              className="w-full border border-[#e8e2d9] rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-ink"
-            />
-          </div>
-        )}
-
         {outOfStock ? (
           <p className="text-sale font-medium">نفد من المخزون</p>
         ) : (
@@ -133,7 +116,6 @@ export function ProductBuyBox({ product, colors, outOfStock, allowNote }: Props)
           </div>
         )}
 
-        {/* Desktop actions */}
         <div className="hidden md:grid grid-cols-2 gap-3">
           <button
             type="button"
@@ -165,7 +147,6 @@ export function ProductBuyBox({ product, colors, outOfStock, allowNote }: Props)
         )}
       </div>
 
-      {/* Mobile sticky bar */}
       <div className="md:hidden fixed bottom-16 inset-x-0 z-40 px-3 pb-2 pointer-events-none">
         <div className="pointer-events-auto bg-white border border-[#e8e2d9] shadow-lg rounded-2xl p-2.5 flex items-center gap-2">
           <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-[#ebe6dc] shrink-0">

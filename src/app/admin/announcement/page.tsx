@@ -2,70 +2,69 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Save } from "lucide-react";
 
 export default function AdminAnnouncementPage() {
-  const [enabled, setEnabled] = useState(true);
   const [text, setText] = useState("");
+  const [enabled, setEnabled] = useState(true);
+  const [returnPolicy, setReturnPolicy] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    supabase
-      .from("site_settings")
-      .select("value")
-      .eq("key", "announcement")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value) {
-          const v = data.value as {
-            enabled?: boolean;
-            text?: string;
-            messages?: string[];
-          };
-          if (typeof v.enabled === "boolean") setEnabled(v.enabled);
-          if (Array.isArray(v.messages) && v.messages.length) {
-            setText(v.messages.join(" · "));
-          } else if (v.text) {
-            setText(v.text);
-          }
+    (async () => {
+      const [{ data: ann }, { data: pol }] = await Promise.all([
+        supabase.from("site_settings").select("value").eq("key", "announcement").maybeSingle(),
+        supabase.from("site_settings").select("value").eq("key", "return_policy").maybeSingle(),
+      ]);
+      if (ann?.value) {
+        const v = ann.value as { text?: string; enabled?: boolean };
+        if (typeof v.text === "string") setText(v.text);
+        if (typeof v.enabled === "boolean") setEnabled(v.enabled);
+      }
+      if (pol?.value) {
+        if (typeof pol.value === "string") setReturnPolicy(pol.value);
+        else if (typeof pol.value === "object" && pol.value && "text" in pol.value) {
+          setReturnPolicy(String((pol.value as { text?: string }).text || ""));
         }
-        setLoading(false);
-      });
+      }
+      setLoading(false);
+    })();
   }, []);
 
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = async () => {
     setSaving(true);
     setMsg("");
-    const messages = text
-      .split(/[|·\n]/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const value = {
-      enabled,
-      text: text.trim(),
-      messages: messages.length ? messages : [text.trim()].filter(Boolean),
-    };
-    const { error } = await supabase.from("site_settings").upsert({
-      key: "announcement",
-      value,
-      updated_at: new Date().toISOString(),
-    });
+    const updates = [
+      supabase.from("site_settings").upsert({
+        key: "announcement",
+        value: { text, enabled },
+        updated_at: new Date().toISOString(),
+      }),
+      supabase.from("site_settings").upsert({
+        key: "return_policy",
+        value: { text: returnPolicy.trim() },
+        updated_at: new Date().toISOString(),
+      }),
+    ];
+    const results = await Promise.all(updates);
     setSaving(false);
-    setMsg(error ? error.message : "تم الحفظ بنجاح");
+    const err = results.find((r) => r.error)?.error;
+    setMsg(err ? err.message : "تم الحفظ");
   };
 
-  if (loading) return <p className="text-muted text-sm">جاري التحميل...</p>;
+  if (loading) return <p className="text-sm text-muted">جاري التحميل...</p>;
 
   return (
-    <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-2">الشريط الإعلاني</h1>
-      <p className="text-sm text-muted mb-6">
-        العبارة اللي بتتحرك فوق الموقع. افصل بين الرسائل بـ · أو سطر جديد.
-      </p>
+    <div className="max-w-2xl space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold">إعدادات المتجر</h1>
+        <p className="text-sm text-muted mt-1">الشريط الإعلاني وسياسة الاسترجاع — تظهر ديناميكيًا في الموقع</p>
+      </div>
 
-      <form onSubmit={save} className="bg-white border border-[#e8e2d9] rounded-2xl p-6 space-y-4">
+      <section className="bg-white border border-[#e8e2d9] rounded-2xl p-5 space-y-4">
+        <h2 className="font-semibold">الشريط الإعلاني</h2>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input
             type="checkbox"
@@ -75,32 +74,39 @@ export default function AdminAnnouncementPage() {
           />
           إظهار الشريط
         </label>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={3}
+          className="w-full border border-[#e8e2d9] rounded-xl px-4 py-3 text-sm"
+          placeholder="نص الشريط المتحرك..."
+        />
+      </section>
 
-        <div>
-          <label className="block text-sm font-medium mb-1.5">نص الإعلان</label>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={4}
-            className="w-full border border-[#e8e2d9] rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ink/15"
-            placeholder="توصيل مجاني فوق 1000 ج · تصميمك قصتك"
-          />
-        </div>
+      <section className="bg-white border border-[#e8e2d9] rounded-2xl p-5 space-y-4">
+        <h2 className="font-semibold">سياسة الاستبدال والاسترجاع</h2>
+        <p className="text-xs text-muted">
+          تظهر في صفحة المنتج داخل قسم قابل للطي — اتركها فارغة لإخفاء القسم
+        </p>
+        <textarea
+          value={returnPolicy}
+          onChange={(e) => setReturnPolicy(e.target.value)}
+          rows={6}
+          className="w-full border border-[#e8e2d9] rounded-xl px-4 py-3 text-sm"
+          placeholder="اكتب سياسة الاستبدال والاسترجاع..."
+        />
+      </section>
 
-        {msg && (
-          <p className={`text-sm ${msg.includes("نجاح") ? "text-green-700" : "text-red-600"}`}>
-            {msg}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="bg-ink text-white px-6 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50"
-        >
-          {saving ? "جاري الحفظ..." : "حفظ"}
-        </button>
-      </form>
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving}
+        className="inline-flex items-center gap-2 bg-ink text-white text-sm font-semibold px-6 py-3 rounded-xl disabled:opacity-50"
+      >
+        <Save className="w-4 h-4" />
+        {saving ? "جاري الحفظ..." : "حفظ"}
+      </button>
+      {msg && <p className="text-sm text-muted">{msg}</p>}
     </div>
   );
 }

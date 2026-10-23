@@ -55,10 +55,20 @@ async function getSimilar(product: Product): Promise<Product[]> {
   return (fallback as Product[]) || [];
 }
 
-const DEFAULT_RETURN_POLICY = `سياسة الاستبدال والاسترجاع:
-• يمكن استبدال أو استرجاع المنتج خلال 14 يومًا من الاستلام بشرط أن يكون بحالته الأصلية.
-• المنتجات المخصصة (مثل نقش الاسم) غير قابلة للاسترجاع إلا في حال وجود عيب تصنيع.
-• تواصل معنا عبر واتساب لفتح طلب استبدال أو استرجاع.`;
+async function getReturnPolicy(): Promise<string | null> {
+  const { data } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "return_policy")
+    .maybeSingle();
+  if (!data?.value) return null;
+  if (typeof data.value === "string") return data.value.trim() || null;
+  if (typeof data.value === "object" && data.value !== null && "text" in data.value) {
+    const t = (data.value as { text?: string }).text;
+    return t?.trim() || null;
+  }
+  return null;
+}
 
 export default async function ProductPage({
   params,
@@ -69,7 +79,11 @@ export default async function ProductPage({
   const product = await getProduct(slug);
   if (!product) notFound();
 
-  const similar = await getSimilar(product);
+  const [similar, returnPolicy] = await Promise.all([
+    getSimilar(product),
+    getReturnPolicy(),
+  ]);
+
   const images = product.images?.length ? product.images : [];
   const main = productMainImage(product) || "";
   const colors = (product.colors || []) as ProductColor[];
@@ -90,10 +104,11 @@ export default async function ProductPage({
 
   const outOfStock = (product.stock ?? 0) <= 0;
 
+  // Only sections that have real data from admin
   const accordionItems: { title: string; content: React.ReactNode }[] = [];
 
-  if (product.description) {
-    accordionItems.push({ title: "الوصف", content: product.description });
+  if (product.description?.trim()) {
+    accordionItems.push({ title: "الوصف", content: product.description.trim() });
   }
   if (features.length) {
     accordionItems.push({
@@ -101,24 +116,32 @@ export default async function ProductPage({
       content: features.map((f) => `• ${f}`).join("\n"),
     });
   }
-  if (product.specs) {
-    accordionItems.push({ title: "المواصفات", content: product.specs });
+  if (product.specs?.trim()) {
+    accordionItems.push({ title: "المواصفات", content: product.specs.trim() });
   }
-  if (product.care_instructions) {
-    accordionItems.push({ title: "تعليمات العناية", content: product.care_instructions });
+  if (product.care_instructions?.trim()) {
+    accordionItems.push({
+      title: "تعليمات العناية",
+      content: product.care_instructions.trim(),
+    });
   }
+
   const extra: string[] = [];
-  if (product.material) extra.push(`الخامة: ${product.material}`);
-  if (product.weight) extra.push(`الوزن: ${product.weight}`);
-  if (product.dimensions) extra.push(`الأبعاد: ${product.dimensions}`);
-  if (product.origin_country) extra.push(`بلد المنشأ: ${product.origin_country}`);
+  if (product.material?.trim()) extra.push(`الخامة: ${product.material.trim()}`);
+  if (product.weight?.trim()) extra.push(`الوزن: ${product.weight.trim()}`);
+  if (product.dimensions?.trim()) extra.push(`الأبعاد: ${product.dimensions.trim()}`);
+  if (product.origin_country?.trim())
+    extra.push(`بلد المنشأ: ${product.origin_country.trim()}`);
   if (extra.length) {
     accordionItems.push({ title: "تفاصيل إضافية", content: extra.join("\n") });
   }
-  accordionItems.push({
-    title: "سياسة الاستبدال والاسترجاع",
-    content: DEFAULT_RETURN_POLICY,
-  });
+
+  if (returnPolicy) {
+    accordionItems.push({
+      title: "سياسة الاستبدال والاسترجاع",
+      content: returnPolicy,
+    });
+  }
 
   return (
     <div className="bg-page min-h-screen">
@@ -141,16 +164,17 @@ export default async function ProductPage({
           <ProductGallery images={images} name={product.name} />
 
           <div className="md:sticky md:top-28">
-            {product.brand && (
+            {product.brand?.trim() && (
               <p className="text-[11px] tracking-widest uppercase text-muted mb-2">
-                {product.brand}
+                {product.brand.trim()}
               </p>
             )}
+
             <h1 className="text-2xl md:text-3xl font-bold text-ink leading-tight mb-3">
               {product.name}
             </h1>
 
-            <div className="flex items-baseline gap-3 mb-4">
+            <div className="flex items-baseline gap-3 mb-4 flex-wrap">
               <span className="text-xl md:text-2xl font-bold text-ink">
                 {formatPrice(Number(product.price))}
               </span>
@@ -168,9 +192,9 @@ export default async function ProductPage({
 
             {saleActive && saleEndsAt && <SaleCountdown endsAt={saleEndsAt} />}
 
-            {product.description && (
+            {product.description?.trim() && (
               <p className="text-sm text-muted leading-relaxed mb-6 line-clamp-3">
-                {product.description}
+                {product.description.trim()}
               </p>
             )}
 
@@ -188,10 +212,11 @@ export default async function ProductPage({
               }}
               colors={colors}
               outOfStock={outOfStock}
-              allowNote
             />
 
-            <ProductAccordion items={accordionItems} />
+            {accordionItems.length > 0 && (
+              <ProductAccordion items={accordionItems} />
+            )}
           </div>
         </div>
       </div>
