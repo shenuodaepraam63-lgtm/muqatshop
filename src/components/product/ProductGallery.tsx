@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 
 type Props = {
   images: string[];
@@ -12,7 +12,8 @@ type Props = {
 export function ProductGallery({ images, name }: Props) {
   const list = images.length ? images : [];
   const [active, setActive] = useState(0);
-  const [storyOpen, setStoryOpen] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
+  const touchX = useRef<number | null>(null);
   const current = list[active] || list[0];
 
   const prev = useCallback(() => {
@@ -25,78 +26,96 @@ export function ProductGallery({ images, name }: Props) {
     setActive((i) => (i + 1) % list.length);
   }, [list.length]);
 
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchX.current = e.touches[0].clientX;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchX.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchX.current;
+    // RTL: swipe left (negative) → next, swipe right → prev
+    if (Math.abs(dx) > 45) {
+      if (dx < 0) next();
+      else prev();
+    }
+    touchX.current = null;
+  };
+
   useEffect(() => {
-    if (!storyOpen) return;
+    if (!lightbox) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setStoryOpen(false);
+      if (e.key === "Escape") setLightbox(false);
       if (e.key === "ArrowLeft") next();
       if (e.key === "ArrowRight") prev();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [storyOpen, next, prev]);
-
-  useEffect(() => {
-    if (!storyOpen || list.length < 2) return;
-    const t = setTimeout(() => next(), 4000);
-    return () => clearTimeout(t);
-  }, [storyOpen, active, list.length, next]);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [lightbox, next, prev]);
 
   return (
     <div>
-      <div className="relative aspect-square md:aspect-[4/5] rounded-2xl overflow-hidden bg-[#ebe6dc] mb-3 group">
+      {/* Main image */}
+      <div
+        className="relative aspect-square md:aspect-[4/5] rounded-2xl overflow-hidden bg-[#ebe6dc] mb-3 select-none"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {current ? (
-          <button
-            type="button"
-            className="absolute inset-0"
-            onClick={() => setStoryOpen(true)}
-            aria-label="فتح الصور"
-          >
-            <Image
-              src={current}
-              alt={name}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 50vw"
-              priority
-            />
-          </button>
+          <Image
+            src={current}
+            alt={name}
+            fill
+            className="object-cover pointer-events-none"
+            sizes="(max-width: 768px) 100vw, 50vw"
+            priority
+            draggable={false}
+          />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-muted">
             لا صورة
           </div>
         )}
 
+        {/* Zoom */}
+        {current && (
+          <button
+            type="button"
+            onClick={() => setLightbox(true)}
+            className="absolute top-3 left-3 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center z-10"
+            aria-label="تكبير"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        )}
+
         {list.length > 1 && (
           <>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                prev();
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center opacity-90 md:opacity-0 md:group-hover:opacity-100 transition z-10"
+              onClick={prev}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/95 shadow-md flex items-center justify-center z-10 active:scale-95 transition"
               aria-label="السابق"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                next();
-              }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center opacity-90 md:opacity-0 md:group-hover:opacity-100 transition z-10"
+              onClick={next}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/95 shadow-md flex items-center justify-center z-10 active:scale-95 transition"
               aria-label="التالي"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
+
             <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5 z-10 pointer-events-none">
               {list.map((_, i) => (
                 <span
                   key={i}
-                  className={`h-1.5 rounded-full transition ${
-                    i === active ? "w-4 bg-white" : "w-1.5 bg-white/50"
+                  className={`h-1.5 rounded-full transition-all ${
+                    i === active ? "w-5 bg-ink" : "w-1.5 bg-ink/35"
                   }`}
                 />
               ))}
@@ -105,72 +124,80 @@ export function ProductGallery({ images, name }: Props) {
         )}
       </div>
 
+      {/* Thumbnails */}
       {list.length > 1 && (
-        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {list.map((url, i) => (
             <button
               key={url + i}
               type="button"
               onClick={() => setActive(i)}
-              className={`relative aspect-square rounded-xl overflow-hidden bg-[#ebe6dc] ring-2 transition ${
-                active === i
-                  ? "ring-ink"
-                  : "ring-transparent opacity-80 hover:opacity-100"
+              className={`relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl overflow-hidden bg-[#ebe6dc] ring-2 transition ${
+                active === i ? "ring-ink" : "ring-transparent opacity-75"
               }`}
             >
-              <Image src={url} alt="" fill className="object-cover" sizes="100px" />
+              <Image src={url} alt="" fill className="object-cover" sizes="80px" />
             </button>
           ))}
         </div>
       )}
 
-      {storyOpen && current && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
-          {list.length > 1 && (
-            <div className="flex gap-1 px-3 pt-3 pb-2">
-              {list.map((_, i) => (
-                <div key={i} className="h-0.5 flex-1 rounded-full bg-white/30 overflow-hidden">
-                  <div
-                    className={`h-full bg-white ${
-                      i < active
-                        ? "w-full"
-                        : i === active
-                          ? "story-progress-active"
-                          : "w-0"
-                    }`}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between px-4 py-2 text-white">
-            <span className="text-sm font-medium truncate">{name}</span>
-            <button type="button" onClick={() => setStoryOpen(false)} aria-label="إغلاق">
-              <X className="w-6 h-6" />
+      {/* Fullscreen lightbox */}
+      {lightbox && current && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 text-white">
+            <span className="text-sm font-medium truncate">
+              {active + 1} / {list.length} — {name}
+            </span>
+            <button type="button" onClick={() => setLightbox(false)} aria-label="إغلاق">
+              <X className="w-7 h-7" />
             </button>
           </div>
-
-          <div className="relative flex-1 flex items-center justify-center">
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 w-1/3 z-10"
-              onClick={prev}
-              aria-label="السابق"
-            />
-            <button
-              type="button"
-              className="absolute inset-y-0 left-0 w-1/3 z-10"
-              onClick={next}
-              aria-label="التالي"
-            />
+          <div
+            className="relative flex-1 flex items-center justify-center"
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+          >
+            {list.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={prev}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/15 text-white flex items-center justify-center z-10"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+                <button
+                  type="button"
+                  onClick={next}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/15 text-white flex items-center justify-center z-10"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+              </>
+            )}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={list[active]}
               alt={name}
-              className="max-h-full max-w-full object-contain"
+              className="max-h-[85vh] max-w-full object-contain"
+              draggable={false}
             />
           </div>
+          {list.length > 1 && (
+            <div className="flex justify-center gap-1.5 pb-6">
+              {list.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setActive(i)}
+                  className={`h-1.5 rounded-full transition-all ${
+                    i === active ? "w-6 bg-white" : "w-1.5 bg-white/40"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
