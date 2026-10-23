@@ -6,7 +6,7 @@ type BrandLogoProps = {
 };
 
 const logoSizeClasses = {
-  sm: "w-28 sm:w-32",
+  sm: "w-24 sm:w-28",
   md: "w-52",
   lg: "w-[min(78vw,520px)]",
 };

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { GalleryCarousel, type GallerySlide } from "./GalleryCarousel";
 
 async function getGallery() {
@@ -23,8 +24,8 @@ export async function Hero() {
   if (slides.length === 0) {
     return (
       <section className="w-full px-4 md:px-8 pt-4">
-        <div className="max-w-page mx-auto rounded-2xl bg-[#ebe6dc] aspect-[16/9] flex items-center justify-center text-muted text-sm">
-          أضف صور المعرض من لوحة التحكم ← معرض الصور
+        <div className="max-w-page mx-auto rounded-2xl bg-[#d0b99b] aspect-[4/5] sm:aspect-[16/10] md:aspect-[21/9] flex items-center justify-center overflow-hidden">
+          <BrandLogo size="lg" />
         </div>
       </section>
     );
