@@ -23,7 +23,6 @@ type Props = {
   colors?: ProductColor[];
   sizes?: string[];
   variants?: ProductVariant[];
-  /** @deprecated computed from variants/stock */
   outOfStock?: boolean;
 };
 
@@ -50,13 +49,14 @@ export function ProductBuyBox({
   const selectedColor = colors[colorIdx];
   const colorName = selectedColor?.name || "";
   const hasMatrix = variants.length > 0;
+  const baseStock = product.stock ?? null;
 
   const stock = useMemo(() => {
     if (hasMatrix) {
-      return variantStock({ stock: product.stock, variants }, size || null, colorName || null);
+      return variantStock({ stock: baseStock, variants }, size || null, colorName || null);
     }
-    return Number(product.stock) || 0;
-  }, [hasMatrix, variants, product.stock, size, colorName]);
+    return Number(baseStock) || 0;
+  }, [hasMatrix, variants, baseStock, size, colorName]);
 
   const unitPrice = useMemo(() => {
     if (hasMatrix) {
@@ -65,7 +65,7 @@ export function ProductBuyBox({
     return product.price;
   }, [hasMatrix, variants, product.price, size, colorName]);
 
-  const outOfStock = stock <= 0;
+  const isOut = stock <= 0;
 
   const sizeAvailable = (s: string) => {
     if (!hasMatrix) return true;
@@ -96,7 +96,7 @@ export function ProductBuyBox({
   );
 
   const onAdd = () => {
-    if (outOfStock) return;
+    if (isOut) return;
     if (sizes.length && !size) return;
     addItem({
       productId: product.id,
@@ -180,7 +180,7 @@ export function ProductBuyBox({
           )}
         </div>
 
-        {outOfStock ? (
+        {isOut ? (
           <p className="text-sale font-medium">نفد من المخزون لهذا الخيار</p>
         ) : (
           <div>
@@ -203,10 +203,10 @@ export function ProductBuyBox({
           <button
             type="button"
             onClick={onAdd}
-            disabled={outOfStock}
+            disabled={isOut}
             className="w-full bg-ink text-page py-3.5 rounded-full text-sm font-semibold tracking-wide hover:opacity-90 transition disabled:opacity-40"
           >
-            {outOfStock ? "غير متوفر" : done ? "تمت الإضافة ✓" : "أضف إلى السلة"}
+            {isOut ? "غير متوفر" : done ? "تمت الإضافة ✓" : "أضف إلى السلة"}
           </button>
           <a
             href={waHref}
@@ -219,7 +219,7 @@ export function ProductBuyBox({
           </a>
         </div>
 
-        {!outOfStock && (
+        {!isOut && (
           <Link
             href="/cart"
             onClick={onAdd}
@@ -253,10 +253,10 @@ export function ProductBuyBox({
           <button
             type="button"
             onClick={onAdd}
-            disabled={outOfStock}
+            disabled={isOut}
             className="shrink-0 bg-[#1a2744] text-white text-xs font-semibold px-4 py-2.5 rounded-full disabled:opacity-40"
           >
-            {outOfStock ? "نفد" : done ? "✓" : "اشترِ الآن"}
+            {isOut ? "نفد" : done ? "✓" : "اشترِ الآن"}
           </button>
         </div>
       </div>
