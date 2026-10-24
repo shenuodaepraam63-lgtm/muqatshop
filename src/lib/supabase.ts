@@ -7,6 +7,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type ProductColor = { name: string; hex: string };
 
+/** One sellable combination: size × color */
+export type ProductVariant = {
+  size?: string | null;
+  color?: string | null;
+  color_hex?: string | null;
+  /** null / undefined → use product.price */
+  price?: number | null;
+  stock: number;
+};
+
+export type ProductType = "mug" | "clothing" | "general";
+
 export type Product = {
   id: string;
   name: string;
@@ -19,12 +31,16 @@ export type Product = {
   brand: string | null;
   material: string | null;
   colors: ProductColor[] | null;
+  sizes?: string[] | null;
+  variants?: ProductVariant[] | null;
+  product_type?: ProductType | string | null;
   features: string | null;
   specs: string | null;
   images: string[] | null;
   main_image_index: number | null;
   stock: number | null;
   weight: string | null;
+  weight_value?: number | null;
   dimensions: string | null;
   origin_country: string | null;
   care_instructions: string | null;
@@ -80,4 +96,40 @@ export function productMainImage(product: {
   if (!imgs || imgs.length === 0) return null;
   const idx = product.main_image_index ?? 0;
   return imgs[Math.min(Math.max(0, idx), imgs.length - 1)] || imgs[0] || null;
+}
+
+export function findVariant(
+  variants: ProductVariant[] | null | undefined,
+  size?: string | null,
+  color?: string | null
+): ProductVariant | undefined {
+  if (!variants?.length) return undefined;
+  return variants.find((v) => {
+    const sizeOk = (v.size || "") === (size || "");
+    const colorOk = (v.color || "") === (color || "");
+    return sizeOk && colorOk;
+  });
+}
+
+export function variantStock(
+  product: Pick<Product, "stock" | "variants">,
+  size?: string | null,
+  color?: string | null
+): number {
+  const v = findVariant(product.variants, size, color);
+  if (v) return Number(v.stock) || 0;
+  if (product.variants && product.variants.length > 0) return 0;
+  return Number(product.stock) || 0;
+}
+
+export function variantPrice(
+  product: Pick<Product, "price" | "variants">,
+  size?: string | null,
+  color?: string | null
+): number {
+  const v = findVariant(product.variants, size, color);
+  if (v && v.price != null && !Number.isNaN(Number(v.price))) {
+    return Number(v.price);
+  }
+  return Number(product.price) || 0;
 }

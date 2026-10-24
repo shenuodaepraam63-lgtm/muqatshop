@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCartStore } from "@/lib/store";
-import type { ProductColor } from "@/lib/supabase";
+import type { ProductColor, ProductVariant } from "@/lib/supabase";
+import { findVariant, variantPrice, variantStock } from "@/lib/supabase";
 import { formatPrice } from "@/lib/utils";
 import { whatsappProductUrl } from "@/lib/whatsapp";
 import { Minus, Plus } from "lucide-react";
@@ -17,9 +18,11 @@ type Props = {
     compareAtPrice?: number | null;
     image: string;
     slug?: string;
+    stock?: number | null;
   };
   colors: ProductColor[];
-  outOfStock?: boolean;
+  sizes: string[];
+  variants: ProductVariant[];
 };
 
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -30,35 +33,77 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-export function ProductBuyBox({ product, colors, outOfStock }: Props) {
+export function ProductBuyBox({ product, colors, sizes, variants }: Props) {
   const addItem = useCartStore((s) => s.addItem);
   const [qty, setQty] = useState(1);
+  const [size, setSize] = useState<string>(sizes[0] || "");
   const [colorIdx, setColorIdx] = useState(0);
   const [done, setDone] = useState(false);
 
   const selectedColor = colors[colorIdx];
+  const colorName = selectedColor?.name || "";
+
+  const hasMatrix = variants.length > 0;
+
+  const stock = useMemo(() => {
+    if (hasMatrix) {
+      return variantStock({ stock: product.stock, variants }, size || null, colorName || null);
+    }
+    return Number(product.stock) || 0;
+  }, [hasMatrix, variants, product.stock, size, colorName]);
+
+  const unitPrice = useMemo(() => {
+    if (hasMatrix) {
+      return variantPrice({ price: product.price, variants }, size || null, colorName || null);
+    }
+    return product.price;
+  }, [hasMatrix, variants, product.price, size, colorName]);
+
+  const outOfStock = stock <= 0;
+
+  const sizeAvailable = (s: string) => {
+    if (!hasMatrix) return true;
+    if (colors.length === 0) {
+      const v = findVariant(variants, s, null);
+      return (v?.stock ?? 0) > 0;
+    }
+    return colors.some((c) => (findVariant(variants, s, c.name)?.stock ?? 0) > 0);
+  };
+
+  const colorAvailable = (cName: string) => {
+    if (!hasMatrix) return true;
+    if (sizes.length === 0) {
+      const v = findVariant(variants, null, cName);
+      return (v?.stock ?? 0) > 0;
+    }
+    return (findVariant(variants, size || null, cName)?.stock ?? 0) > 0;
+  };
+
   const onSale =
-    product.compareAtPrice != null && product.compareAtPrice > product.price;
+    product.compareAtPrice != null && product.compareAtPrice > unitPrice;
 
   const pageUrl =
     typeof window !== "undefined" && product.slug
       ? `${window.location.origin}/products/${product.slug}`
       : undefined;
 
+  const variantLabel = [size, colorName].filter(Boolean).join(" / ");
+
   const waHref = whatsappProductUrl(
-    selectedColor ? `${product.name} (${selectedColor.name})` : product.name,
+    variantLabel ? `${product.name} (${variantLabel})` : product.name,
     pageUrl
   );
 
   const onAdd = () => {
     if (outOfStock) return;
+    if (sizes.length && !size) return;
     addItem({
       productId: product.id,
-      name: selectedColor ? `${product.name} — ${selectedColor.name}` : product.name,
-      price: product.price,
+      name: variantLabel ? `${product.name} — ${variantLabel}` : product.name,
+      price: unitPrice,
       image: product.image,
-      quantity: qty,
-      variant: selectedColor?.name,
+      quantity: Math.min(qty, stock),
+      variant: variantLabel || undefined,
     });
     setDone(true);
     setTimeout(() => setDone(false), 2200);
@@ -67,35 +112,81 @@ export function ProductBuyBox({ product, colors, outOfStock }: Props) {
   return (
     <>
       <div className="space-y-5 pb-24 md:pb-0">
+        {sizes.length > 0 && (
+          <div>
+            <p className="text-sm mb-2.5">المقاس{size ? ` : ${size}` : ""}</p>
+            <div className="flex flex-wrap gap-2">
+              {sizes.map((s) => {
+                const ok = sizeAvailable(s);
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={!ok}
+                    onClick={() => setSize(s)}
+                    className={`min-w-[48px] px-3.5 py-2.5 rounded-full text-sm font-medium border transition ${
+                      size === s
+                        ? "bg-ink text-page border-ink"
+                        : ok
+                          ? "bg-transparent border-[#d4cfc4] text-ink"
+                          : "bg-transparent border-[#e8e2d9] text-muted line-through opacity-50"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {colors.length > 0 && (
           <div>
             <p className="text-sm mb-2.5">
               اللون{selectedColor ? ` : ${selectedColor.name}` : ""}
             </p>
             <div className="flex flex-wrap gap-2">
-              {colors.map((c, i) => (
-                <button
-                  key={c.hex + c.name}
-                  type="button"
-                  onClick={() => setColorIdx(i)}
-                  className={`min-w-[88px] px-5 py-2.5 rounded-full text-sm font-medium border transition ${
-                    colorIdx === i
-                      ? "bg-ink text-page border-ink"
-                      : "bg-transparent border-[#d4cfc4] text-ink"
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
+              {colors.map((c, i) => {
+                const ok = colorAvailable(c.name);
+                return (
+                  <button
+                    key={c.hex + c.name}
+                    type="button"
+                    disabled={!ok}
+                    onClick={() => setColorIdx(i)}
+                    className={`min-w-[88px] px-5 py-2.5 rounded-full text-sm font-medium border transition ${
+                      colorIdx === i
+                        ? "bg-ink text-page border-ink"
+                        : ok
+                          ? "bg-transparent border-[#d4cfc4] text-ink"
+                          : "opacity-40 border-[#e8e2d9] line-through"
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
+        <div className="flex items-baseline gap-2">
+          <span className="text-xl font-bold">{formatPrice(unitPrice)}</span>
+          {onSale && product.compareAtPrice != null && (
+            <span className="text-sm text-muted line-through">
+              {formatPrice(product.compareAtPrice)}
+            </span>
+          )}
+        </div>
+
         {outOfStock ? (
-          <p className="text-sale font-medium">نفد من المخزون</p>
+          <p className="text-sale font-medium">نفد من المخزون لهذا الخيار</p>
         ) : (
           <div>
-            <p className="text-sm mb-2">الكمية</p>
+            <p className="text-sm mb-2">
+              الكمية{" "}
+              <span className="text-muted text-xs">(المتاح: {stock})</span>
+            </p>
             <div className="inline-flex items-center border border-[#e8e2d9] rounded-full overflow-hidden bg-white">
               <button
                 type="button"
@@ -107,7 +198,7 @@ export function ProductBuyBox({ product, colors, outOfStock }: Props) {
               <span className="w-10 text-center text-sm font-semibold">{qty}</span>
               <button
                 type="button"
-                onClick={() => setQty((q) => q + 1)}
+                onClick={() => setQty((q) => Math.min(stock, q + 1))}
                 className="w-11 h-11 flex items-center justify-center"
               >
                 <Plus className="w-4 h-4" />
@@ -156,14 +247,7 @@ export function ProductBuyBox({ product, colors, outOfStock }: Props) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-medium truncate">{product.name}</p>
-            <p className="text-sm font-bold">
-              {formatPrice(product.price)}
-              {onSale && product.compareAtPrice != null && (
-                <span className="text-[10px] text-muted line-through mr-1 font-normal">
-                  {formatPrice(product.compareAtPrice)}
-                </span>
-              )}
-            </p>
+            <p className="text-sm font-bold">{formatPrice(unitPrice)}</p>
           </div>
           <a
             href={waHref}
