@@ -6,7 +6,7 @@ export type Merchant = {
   name: string;
   phone: string | null;
   is_active: boolean;
-  created_at: string;
+  created_at?: string;
 };
 
 export type MerchantSettings = {
@@ -24,7 +24,7 @@ export async function hashPassword(password: string): Promise<string> {
     .join("");
 }
 
-export function saveMerchantSession(m: Merchant) {
+export function saveMerchantSession(m: Pick<Merchant, "id" | "email" | "name" | "phone">) {
   if (typeof window === "undefined") return;
   localStorage.setItem(
     SESSION_KEY,
@@ -66,7 +66,6 @@ export async function getMerchantSettings(): Promise<MerchantSettings> {
   };
 }
 
-/** Move pending profits past hold_until into available balance */
 export async function releaseMaturedProfits(merchantId?: string) {
   let q = supabase
     .from("orders")
@@ -171,7 +170,6 @@ export async function onOrderDelivered(orderId: string) {
   }
 }
 
-/** If order cancelled after hold started, reverse pending/balance */
 export async function onOrderCancelled(orderId: string) {
   const { data: order } = await supabase
     .from("orders")
