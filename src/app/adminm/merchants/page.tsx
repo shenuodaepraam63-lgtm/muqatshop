@@ -9,7 +9,9 @@ type Row = {
   name: string;
   email: string;
   phone: string | null;
+  code: string | null;
   is_active: boolean;
+  commission_percent: number | null;
   created_at: string;
   balance?: number;
   pending?: number;
@@ -20,6 +22,8 @@ type Row = {
 
 export default function AdminmMerchantsPage() {
   const [list, setList] = useState<Row[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [pct, setPct] = useState("");
 
   const load = async () => {
     const { data: merchants } = await supabase
@@ -55,9 +59,22 @@ export default function AdminmMerchantsPage() {
     load();
   };
 
+  const savePct = async (id: string) => {
+    const n = pct.trim() === "" ? null : Math.min(50, Math.max(0, Number(pct)));
+    await supabase
+      .from("merchants")
+      .update({ commission_percent: n })
+      .eq("id", id);
+    setEditing(null);
+    load();
+  };
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">التجار ({list.length})</h1>
+      <p className="text-xs text-muted">
+        نسبة العمولة الخاصة تتجاوز النسبة العامة لطلبات رابط الإحالة فقط. اتركها فارغة لاستخدام الإعداد العام.
+      </p>
       <div className="space-y-3">
         {list.map((m) => (
           <div key={m.id} className="bg-white border rounded-2xl p-4 text-sm">
@@ -66,6 +83,7 @@ export default function AdminmMerchantsPage() {
                 <p className="font-semibold">{m.name}</p>
                 <p className="text-xs text-muted">{m.email}</p>
                 <p className="text-xs text-muted">{m.phone || "—"}</p>
+                <p className="text-xs font-mono mt-1">كود: {m.code || "—"}</p>
               </div>
               <button
                 type="button"
@@ -84,6 +102,42 @@ export default function AdminmMerchantsPage() {
               <div>
                 محفظة: {formatPrice(m.balance || 0)} / معلّق {formatPrice(m.pending || 0)}
               </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-muted">
+                عمولة خاصة:{" "}
+                {m.commission_percent != null ? `${m.commission_percent}%` : "افتراضي عام"}
+              </span>
+              {editing === m.id ? (
+                <>
+                  <input
+                    type="number"
+                    min={0}
+                    max={50}
+                    value={pct}
+                    onChange={(e) => setPct(e.target.value)}
+                    placeholder="%"
+                    className="w-16 border rounded px-1 py-1"
+                  />
+                  <button type="button" onClick={() => savePct(m.id)} className="bg-ink text-white px-2 py-1 rounded">
+                    حفظ
+                  </button>
+                  <button type="button" onClick={() => setEditing(null)} className="text-muted">
+                    إلغاء
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => {
+                    setEditing(m.id);
+                    setPct(m.commission_percent != null ? String(m.commission_percent) : "");
+                  }}
+                >
+                  تعديل النسبة
+                </button>
+              )}
             </div>
           </div>
         ))}

@@ -26,13 +26,10 @@ export function CheckoutForm() {
   const subtotal = useCartStore((s) => s.totalPrice());
   const baseSubtotal = useCartStore((s) => s.totalBase());
 
-  /** تاجر مسجّل يطلب بنفسه (رفع سعر) */
   const [selfMerchantId, setSelfMerchantId] = useState<string | null>(null);
   const [selfMerchantName, setSelfMerchantName] = useState<string | null>(null);
-  /** عميل جاء من رابط إحالة */
   const [refMerchantId, setRefMerchantId] = useState<string | null>(null);
   const [refMerchantName, setRefMerchantName] = useState<string | null>(null);
-  const [commissionPercent, setCommissionPercent] = useState(10);
 
   const [fullName, setFullName] = useState("");
   const [governorate, setGovernorate] = useState("");
@@ -69,8 +66,6 @@ export function CheckoutForm() {
       }
     }
     (async () => {
-      const settings = await getMerchantSettings();
-      setCommissionPercent(settings.commission_percent);
       const { data } = await supabase
         .from("site_settings")
         .select("value")
@@ -96,7 +91,6 @@ export function CheckoutForm() {
   const freeThreshold = shipSettings.free_over;
   const remainingForFree =
     freeThreshold != null ? Math.max(0, freeThreshold - afterDiscount) : null;
-
   const markupProfit = selfMerchantId
     ? Math.max(0, subtotal - baseSubtotal)
     : 0;
@@ -201,7 +195,15 @@ export function CheckoutForm() {
         );
       } else if (refMerchantId) {
         const settings = await getMerchantSettings();
-        const pct = settings.commission_percent;
+        const { data: m } = await supabase
+          .from("merchants")
+          .select("commission_percent")
+          .eq("id", refMerchantId)
+          .maybeSingle();
+        const pct =
+          m?.commission_percent != null
+            ? Number(m.commission_percent)
+            : settings.commission_percent;
         profit = Math.round((net * pct) / 100);
       }
 
@@ -244,7 +246,6 @@ export function CheckoutForm() {
 
       if (couponId) await incrementCouponUse(couponId);
       await decrementStockForItems(orderItems);
-
       if (refMerchantId && !selfMerchantId) clearMerchantRef();
 
       clearCart();
@@ -342,13 +343,7 @@ export function CheckoutForm() {
         <div className="border border-dashed border-[#d4cfc4] rounded-xl p-3 space-y-2">
           <label className="block text-sm font-medium">كود خصم</label>
           <div className="flex gap-2">
-            <input
-              className={field}
-              value={couponCode}
-              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-              placeholder="مثال: SALE10"
-              disabled={!!appliedCode}
-            />
+            <input className={field} value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} placeholder="مثال: SALE10" disabled={!!appliedCode} />
             {appliedCode ? (
               <button type="button" onClick={clearCoupon} className="shrink-0 px-4 rounded-xl border text-sm">إلغاء</button>
             ) : (
@@ -378,9 +373,7 @@ export function CheckoutForm() {
         )}
         <div className="flex justify-between">
           <span className="text-muted">رسوم التوصيل</span>
-          <span>
-            {!governorate ? "—" : shipping === 0 ? "مجاني" : formatPrice(shipping)}
-          </span>
+          <span>{!governorate ? "—" : shipping === 0 ? "مجاني" : formatPrice(shipping)}</span>
         </div>
         <div className="flex justify-between text-base font-bold pt-1">
           <span>الإجمالي</span>

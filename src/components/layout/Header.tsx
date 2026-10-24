@@ -6,6 +6,7 @@ import { Search, ShoppingBag, Heart, Menu, X, User } from "lucide-react";
 import { useCartStore } from "@/lib/store";
 import { useWishlistStore } from "@/lib/wishlist";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { supabase } from "@/lib/supabase";
 import {
   getMerchantSession,
   clearMerchantSession,
@@ -17,9 +18,23 @@ export function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
   const wishCount = useWishlistStore((s) => s.items.length);
   const [merchant, setMerchant] = useState<MerchantSession | null>(null);
+  const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
 
-  const refresh = () => setMerchant(getMerchantSession());
+  const refresh = () => {
+    const s = getMerchantSession();
+    setMerchant(s);
+    if (s) {
+      supabase
+        .from("merchant_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("merchant_id", s.id)
+        .eq("is_read", false)
+        .then(({ count }) => setUnread(count || 0));
+    } else {
+      setUnread(0);
+    }
+  };
 
   useEffect(() => {
     refresh();
@@ -44,7 +59,11 @@ export function Header() {
         { href: "/merchant", label: "لوحتي" },
         { href: "/merchant/orders", label: "طلباتي" },
         { href: "/merchant/wallet", label: "المحفظة" },
-        { href: "/merchant/messages", label: "الرسائل" },
+        {
+          href: "/merchant/messages",
+          label: unread > 0 ? `الرسائل (${unread})` : "الرسائل",
+        },
+        { href: "/merchant/profile", label: "حسابي" },
       ]
     : [{ href: "/merchant/login", label: "دخول تاجر" }];
 
@@ -73,11 +92,7 @@ export function Header() {
           ))}
           <span className="w-px h-4 bg-border" />
           {merchantLinks.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="hover:opacity-70 transition text-[#0f2744]"
-            >
+            <Link key={l.href} href={l.href} className="hover:opacity-70 transition text-[#0f2744]">
               {l.label}
             </Link>
           ))}
@@ -99,11 +114,16 @@ export function Header() {
           {merchant && (
             <Link
               href="/merchant"
-              className="hidden sm:flex items-center gap-1 text-xs font-medium bg-[#0f2744] text-white px-2.5 py-1.5 rounded-full max-w-[120px] truncate"
+              className="hidden sm:flex items-center gap-1 text-xs font-medium bg-[#0f2744] text-white px-2.5 py-1.5 rounded-full max-w-[120px] truncate relative"
               title={merchant.name}
             >
               <User className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">{merchant.name}</span>
+              {unread > 0 && (
+                <span className="absolute -top-1 -left-1 bg-sale text-white text-[9px] min-w-[14px] h-3.5 rounded-full flex items-center justify-center px-0.5">
+                  {unread}
+                </span>
+              )}
             </Link>
           )}
           <Link href="/search" className="p-2 hover:opacity-70 transition" aria-label="بحث">
@@ -132,12 +152,7 @@ export function Header() {
         <div className="md:hidden border-t border-border bg-page px-4 pb-4">
           <nav className="flex flex-col gap-1 pt-2 text-sm font-medium">
             {mainLinks.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                onClick={() => setOpen(false)}
-                className="py-2.5 border-b border-[#f0ebe3]"
-              >
+              <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="py-2.5 border-b border-[#f0ebe3]">
                 {l.label}
               </Link>
             ))}
@@ -145,12 +160,7 @@ export function Header() {
               {merchant ? `حساب التاجر · ${merchant.name}` : "التاجر"}
             </p>
             {merchantLinks.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                onClick={() => setOpen(false)}
-                className="py-2.5 border-b border-[#f0ebe3] text-[#0f2744]"
-              >
+              <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="py-2.5 border-b border-[#f0ebe3] text-[#0f2744]">
                 {l.label}
               </Link>
             ))}
