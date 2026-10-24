@@ -16,7 +16,8 @@ import {
 } from "@/lib/shipping";
 import { validateCoupon, incrementCouponUse } from "@/lib/coupons";
 import { decrementStockForItems } from "@/lib/stock";
-import { getMerchantSession } from "@/lib/merchant";
+import { getMerchantSession, getMerchantSettings } from "@/lib/merchant";
+import { getMerchantRef, clearMerchantRef } from "@/lib/merchant-ref";
 
 export function CheckoutForm() {
   const router = useRouter();
@@ -25,8 +26,13 @@ export function CheckoutForm() {
   const subtotal = useCartStore((s) => s.totalPrice());
   const baseSubtotal = useCartStore((s) => s.totalBase());
 
-  const [merchantId, setMerchantId] = useState<string | null>(null);
-  const [merchantName, setMerchantName] = useState<string | null>(null);
+  /** تاجر مسجّل يطلب بنفسه (رفع سعر) */
+  const [selfMerchantId, setSelfMerchantId] = useState<string | null>(null);
+  const [selfMerchantName, setSelfMerchantName] = useState<string | null>(null);
+  /** عميل جاء من رابط إحالة */
+  const [refMerchantId, setRefMerchantId] = useState<string | null>(null);
+  const [refMerchantName, setRefMerchantName] = useState<string | null>(null);
+  const [commissionPercent, setCommissionPercent] = useState(10);
 
   const [fullName, setFullName] = useState("");
   const [governorate, setGovernorate] = useState("");
@@ -53,10 +59,18 @@ export function CheckoutForm() {
   useEffect(() => {
     const s = getMerchantSession();
     if (s) {
-      setMerchantId(s.id);
-      setMerchantName(s.name);
+      setSelfMerchantId(s.id);
+      setSelfMerchantName(s.name);
+    } else {
+      const ref = getMerchantRef();
+      if (ref) {
+        setRefMerchantId(ref.merchantId);
+        setRefMerchantName(ref.name || null);
+      }
     }
     (async () => {
+      const settings = await getMerchantSettings();
+      setCommissionPercent(settings.commission_percent);
       const { data } = await supabase
         .from("site_settings")
         .select("value")
@@ -82,7 +96,8 @@ export function CheckoutForm() {
   const freeThreshold = shipSettings.free_over;
   const remainingForFree =
     freeThreshold != null ? Math.max(0, freeThreshold - afterDiscount) : null;
-  const merchantProfit = merchantId
+
+  const markupProfit = selfMerchantId
     ? Math.max(0, subtotal - baseSubtotal)
     : 0;
 
@@ -128,7 +143,7 @@ export function CheckoutForm() {
       return;
     }
 
-    if (merchantId) {
+    if (selfMerchantId) {
       for (const i of items) {
         const base = i.basePrice ?? i.price;
         if (i.price < base) {
@@ -144,7 +159,7 @@ export function CheckoutForm() {
       let finalCoupon = appliedCode;
       let couponId = appliedCouponId;
 
-      if (appliedCode && !merchantId) {
+      if (appliedCode && !selfMerchantId) {
         const re = await validateCoupon(appliedCode, subtotal);
         if (!re.ok) {
           setError(re.error);
@@ -159,7 +174,9 @@ export function CheckoutForm() {
       const net = Math.max(0, subtotal - finalDiscount);
       const ship = calcShipping(net, shipSettings);
       const orderTotal = net + ship;
-      const orderNumber = merchantId
+
+      const linkedMerchantId = selfMerchantId || refMerchantId;
+      const orderNumber = linkedMerchantId
         ? `MQ-M-${Date.now().toString(36).toUpperCase()}`
         : `MQ-${Date.now().toString(36).toUpperCase()}`;
 
@@ -173,15 +190,27 @@ export function CheckoutForm() {
         variant: i.variant,
       }));
 
-      const profit = merchantId
-        ? Math.max(
-            0,
-            items.reduce(
-              (s, i) => s + (i.price - (i.basePrice ?? i.price)) * i.quantity,
-              0
-            )
+      let profit = 0;
+      if (selfMerchantId) {
+        profit = Math.max(
+          0,
+          items.reduce(
+            (s, i) => s + (i.price - (i.basePrice ?? i.price)) * i.quantity,
+            0
           )
-        : 0;
+        );
+      } else if (refMerchantId) {
+        const settings = await getMerchantSettings();
+        const pct = settings.commission_percent;
+        profit = Math.round((net * pct) / 100);
+      }
+
+      const noteParts: string[] = [];
+      if (notes.trim()) noteParts.push(notes.trim());
+      if (selfMerchantId && selfMerchantName)
+        noteParts.push(`طلب تاجر: ${selfMerchantName}`);
+      if (!selfMerchantId && refMerchantId)
+        noteParts.push(`إحالة تاجر: ${refMerchantName || refMerchantId.slice(0, 8)}`);
 
       const payload: Record<string, unknown> = {
         order_number: orderNumber,
@@ -193,9 +222,7 @@ export function CheckoutForm() {
         apartment: apartment.trim() || null,
         phone: phone.trim(),
         phone_alt: phoneAlt.trim() || null,
-        notes:
-          notes.trim() ||
-          (merchantId && merchantName ? `طلب تاجر: ${merchantName}` : null),
+        notes: noteParts.length ? noteParts.join(" | ") : null,
         items: orderItems,
         subtotal,
         shipping: ship,
@@ -205,9 +232,9 @@ export function CheckoutForm() {
         status: "new",
       };
 
-      if (merchantId) {
-        payload.merchant_id = merchantId;
-        payload.base_subtotal = baseSubtotal;
+      if (linkedMerchantId) {
+        payload.merchant_id = linkedMerchantId;
+        payload.base_subtotal = selfMerchantId ? baseSubtotal : net;
         payload.merchant_profit = profit;
         payload.profit_released = false;
       }
@@ -217,6 +244,8 @@ export function CheckoutForm() {
 
       if (couponId) await incrementCouponUse(couponId);
       await decrementStockForItems(orderItems);
+
+      if (refMerchantId && !selfMerchantId) clearMerchantRef();
 
       clearCart();
       router.push(`/order-success?n=${encodeURIComponent(orderNumber)}`);
@@ -238,14 +267,20 @@ export function CheckoutForm() {
     <form onSubmit={submit} className="bg-card/60 border border-border rounded-2xl p-5 md:p-6 space-y-4">
       <h2 className="text-lg font-bold text-ink mb-1">بيانات التوصيل</h2>
       <p className="text-xs text-muted mb-4">
-        {merchantId
+        {selfMerchantId
           ? "أدخل بيانات العميل — الطلب يُسجَّل على حسابك كتاجر"
           : "الحقول المعلّمة * مطلوبة"}
       </p>
 
+      {!selfMerchantId && refMerchantId && (
+        <p className="text-xs bg-[#f0ebe3] rounded-lg px-3 py-2 text-muted">
+          طلب عبر رابط تاجر{refMerchantName ? ` (${refMerchantName})` : ""}
+        </p>
+      )}
+
       <div>
         <label className="block text-sm font-medium mb-1.5">
-          {merchantId ? "اسم العميل *" : "اسمك كامل *"}
+          {selfMerchantId ? "اسم العميل *" : "اسمك كامل *"}
         </label>
         <input className={field} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="الاسم بالكامل" required />
       </div>
@@ -303,7 +338,7 @@ export function CheckoutForm() {
         <textarea className={`${field} min-h-[80px] resize-y`} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
 
-      {!merchantId && (
+      {!selfMerchantId && (
         <div className="border border-dashed border-[#d4cfc4] rounded-xl p-3 space-y-2">
           <label className="block text-sm font-medium">كود خصم</label>
           <div className="flex gap-2">
@@ -329,10 +364,10 @@ export function CheckoutForm() {
           <span className="text-muted">المجموع الفرعي</span>
           <span>{formatPrice(subtotal)}</span>
         </div>
-        {merchantId && merchantProfit > 0 && (
+        {selfMerchantId && markupProfit > 0 && (
           <div className="flex justify-between text-green-700">
-            <span>ربحك</span>
-            <span>{formatPrice(merchantProfit)}</span>
+            <span>ربحك (رفع سعر)</span>
+            <span>{formatPrice(markupProfit)}</span>
           </div>
         )}
         {discount > 0 && (
@@ -364,7 +399,7 @@ export function CheckoutForm() {
       {error && <p className="text-sm text-sale bg-sale/10 rounded-lg px-3 py-2">{error}</p>}
 
       <button type="submit" disabled={loading || items.length === 0} className="w-full bg-ink text-page py-3.5 rounded-full text-sm font-semibold hover:opacity-90 transition disabled:opacity-50">
-        {loading ? "جاري إرسال الطلب..." : merchantId ? "إرسال طلب التاجر" : "إرسال الطلب"}
+        {loading ? "جاري إرسال الطلب..." : selfMerchantId ? "إرسال طلب التاجر" : "إرسال الطلب"}
       </button>
     </form>
   );
