@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatPrice } from "@/lib/utils";
-import { onOrderDelivered, onOrderCancelled, releaseMaturedProfits } from "@/lib/merchant";
+import { setMerchantOrderStatus, releaseMaturedProfits } from "@/lib/merchant";
 
 type Row = {
   id: string;
@@ -47,19 +47,14 @@ export default function AdminmOrdersPage() {
   }, []);
 
   const setStatus = async (o: Row, status: string) => {
-    if (status === "delivered" && o.status !== "delivered") {
-      await onOrderDelivered(o.id);
-    } else if (status === "cancelled" && o.status !== "cancelled") {
-      await onOrderCancelled(o.id);
-    } else {
-      await supabase.from("orders").update({ status }).eq("id", o.id);
-    }
+    await setMerchantOrderStatus(o.id, status, o.status);
     load();
   };
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">طلبات التجار</h1>
+      <p className="text-xs text-muted">كل تغيير حالة يرسل رسالة تلقائية للتاجر</p>
       {orders.map((o) => (
         <div key={o.id} className="bg-white border rounded-2xl p-4 text-sm space-y-2">
           <div className="flex flex-wrap justify-between gap-2">

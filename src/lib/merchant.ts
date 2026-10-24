@@ -6,6 +6,7 @@ export type Merchant = {
   name: string;
   phone: string | null;
   is_active: boolean;
+  code?: string | null;
   created_at?: string;
 };
 
@@ -14,7 +15,24 @@ export type MerchantSettings = {
   hold_days: number;
 };
 
+export type MerchantSession = {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  code?: string | null;
+};
+
 const SESSION_KEY = "muqat_merchant_session";
+export const MERCHANT_SESSION_EVENT = "muqat-merchant-session";
+
+const STATUS_AR: Record<string, string> = {
+  new: "قيد المراجعة",
+  confirmed: "تم التأكيد",
+  shipped: "قيد التوصيل",
+  delivered: "تم التسليم",
+  cancelled: "ملغي",
+};
 
 export async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(`muqat_m_v1:${password}`);
@@ -24,20 +42,17 @@ export async function hashPassword(password: string): Promise<string> {
     .join("");
 }
 
-export function saveMerchantSession(m: Pick<Merchant, "id" | "email" | "name" | "phone">) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(
-    SESSION_KEY,
-    JSON.stringify({ id: m.id, email: m.email, name: m.name, phone: m.phone })
-  );
+export function makeMerchantCode(id: string): string {
+  return id.replace(/-/g, "").slice(0, 8).toUpperCase();
 }
 
-export function getMerchantSession(): {
-  id: string;
-  email: string;
-  name: string;
-  phone: string | null;
-} | null {
+export function saveMerchantSession(m: MerchantSession) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(m));
+  window.dispatchEvent(new Event(MERCHANT_SESSION_EVENT));
+}
+
+export function getMerchantSession(): MerchantSession | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(SESSION_KEY);
@@ -51,6 +66,18 @@ export function getMerchantSession(): {
 export function clearMerchantSession() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(SESSION_KEY);
+  window.dispatchEvent(new Event(MERCHANT_SESSION_EVENT));
+}
+
+export async function notifyMerchant(
+  merchantId: string,
+  body: string
+): Promise<void> {
+  if (!merchantId || !body.trim()) return;
+  await supabase.from("merchant_messages").insert({
+    merchant_id: merchantId,
+    body: body.trim(),
+  });
 }
 
 export async function getMerchantSettings(): Promise<MerchantSettings> {
@@ -69,7 +96,7 @@ export async function getMerchantSettings(): Promise<MerchantSettings> {
 export async function releaseMaturedProfits(merchantId?: string) {
   let q = supabase
     .from("orders")
-    .select("id, merchant_id, merchant_profit, hold_until")
+    .select("id, merchant_id, merchant_profit, hold_until, order_number")
     .eq("status", "delivered")
     .eq("profit_released", false)
     .not("merchant_id", "is", null)
@@ -114,6 +141,12 @@ export async function releaseMaturedProfits(merchantId?: string) {
     });
 
     await supabase.from("orders").update({ profit_released: true }).eq("id", o.id);
+
+    await notifyMerchant(
+      o.merchant_id,
+      `تم تحرير عمولة ${profit} ج.م من الطلب ${o.order_number || o.id.slice(0, 8)} إلى رصيدك المتاح.`
+    );
+
     released += 1;
   }
   return released;
@@ -127,7 +160,9 @@ export async function onOrderDelivered(orderId: string) {
     .eq("id", orderId)
     .maybeSingle();
 
-  if (!order?.merchant_id || Number(order.merchant_profit) <= 0) {
+  if (!order) return;
+
+  if (!order.merchant_id || Number(order.merchant_profit) <= 0) {
     await supabase.from("orders").update({ status: "delivered" }).eq("id", orderId);
     return;
   }
@@ -168,6 +203,11 @@ export async function onOrderDelivered(orderId: string) {
       note: `عمولة معلّقة ${settings.hold_days} يوم بعد التسليم`,
     });
   }
+
+  await notifyMerchant(
+    order.merchant_id,
+    `الطلب ${order.order_number}: تم التسليم. ربحك ${profit} ج.م معلّق لمدة ${settings.hold_days} يوم ثم يُضاف للمحفظة إن لم يحدث استرجاع.`
+  );
 }
 
 export async function onOrderCancelled(orderId: string) {
@@ -177,7 +217,9 @@ export async function onOrderCancelled(orderId: string) {
     .eq("id", orderId)
     .maybeSingle();
 
-  if (!order?.merchant_id || Number(order.merchant_profit) <= 0) {
+  if (!order) return;
+
+  if (!order.merchant_id || Number(order.merchant_profit) <= 0) {
     await supabase.from("orders").update({ status: "cancelled" }).eq("id", orderId);
     return;
   }
@@ -221,4 +263,39 @@ export async function onOrderCancelled(orderId: string) {
     .from("orders")
     .update({ status: "cancelled", profit_released: true })
     .eq("id", orderId);
+
+  await notifyMerchant(
+    order.merchant_id,
+    `الطلب ${order.order_number}: تم الإلغاء. تم خصم/إلغاء عمولة ${profit} ج.م إن وُجدت.`
+  );
+}
+
+export async function setMerchantOrderStatus(
+  orderId: string,
+  status: string,
+  prevStatus?: string
+) {
+  if (status === "delivered" && prevStatus !== "delivered") {
+    await onOrderDelivered(orderId);
+    return;
+  }
+  if (status === "cancelled" && prevStatus !== "cancelled") {
+    await onOrderCancelled(orderId);
+    return;
+  }
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("merchant_id, order_number")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  await supabase.from("orders").update({ status }).eq("id", orderId);
+
+  if (order?.merchant_id) {
+    await notifyMerchant(
+      order.merchant_id,
+      `الطلب ${order.order_number}: الحالة الآن «${STATUS_AR[status] || status}».`
+    );
+  }
 }

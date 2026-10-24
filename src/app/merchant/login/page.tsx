@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { hashPassword, saveMerchantSession } from "@/lib/merchant";
+import { hashPassword, saveMerchantSession, makeMerchantCode } from "@/lib/merchant";
 
 export default function MerchantLoginPage() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function MerchantLoginPage() {
     const hash = await hashPassword(password);
     const { data, error: err } = await supabase
       .from("merchants")
-      .select("id, email, name, phone, is_active")
+      .select("id, email, name, phone, is_active, code")
       .eq("email", email.trim().toLowerCase())
       .eq("password_hash", hash)
       .maybeSingle();
@@ -33,7 +33,17 @@ export default function MerchantLoginPage() {
       setError("الحساب موقوف — تواصل مع الإدارة");
       return;
     }
-    saveMerchantSession(data);
+    const code = data.code || makeMerchantCode(data.id);
+    if (!data.code) {
+      await supabase.from("merchants").update({ code }).eq("id", data.id);
+    }
+    saveMerchantSession({
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      phone: data.phone,
+      code,
+    });
     router.replace("/shop");
   };
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { hashPassword, saveMerchantSession } from "@/lib/merchant";
+import { hashPassword, saveMerchantSession, makeMerchantCode } from "@/lib/merchant";
 
 export default function MerchantRegisterPage() {
   const router = useRouter();
@@ -42,13 +42,27 @@ export default function MerchantRegisterPage() {
       return;
     }
 
+    const code = makeMerchantCode(data.id);
+    await supabase.from("merchants").update({ code }).eq("id", data.id);
+
     await supabase.from("merchant_wallets").insert({
       merchant_id: data.id,
       balance: 0,
       pending: 0,
     });
 
-    saveMerchantSession(data);
+    await supabase.from("merchant_messages").insert({
+      merchant_id: data.id,
+      body: `مرحبًا ${data.name}! تم إنشاء حسابك. كود التاجر: ${code}. تصفّح المتجر وارفع السعر في السلة عند الطلب لعملائك.`,
+    });
+
+    saveMerchantSession({
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      phone: data.phone,
+      code,
+    });
     setLoading(false);
     router.replace("/shop");
   };
