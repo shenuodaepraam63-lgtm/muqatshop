@@ -13,6 +13,7 @@ import { ProductBuyBox } from "@/components/product/ProductBuyBox";
 import { ProductAccordion } from "@/components/product/ProductAccordion";
 import { SimilarProducts } from "@/components/product/SimilarProducts";
 import { SaleCountdown } from "@/components/product/SaleCountdown";
+import { SizeGuide } from "@/components/product/SizeGuide";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,20 @@ async function getReturnPolicy(): Promise<string | null> {
   return null;
 }
 
+async function getSizeGuideText(): Promise<string | null> {
+  const { data } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "size_guide")
+    .maybeSingle();
+  if (!data?.value) return null;
+  if (typeof data.value === "string") return data.value.trim() || null;
+  if (typeof data.value === "object" && data.value !== null && "text" in data.value) {
+    return String((data.value as { text?: string }).text || "").trim() || null;
+  }
+  return null;
+}
+
 function showMugTryOn(product: Product): boolean {
   if (product.product_type === "mug") return true;
   const t = `${product.name} ${product.description || ""} ${product.slug}`.toLowerCase();
@@ -91,9 +106,10 @@ export default async function ProductPage({
   const product = await getProduct(slug);
   if (!product) notFound();
 
-  const [similar, returnPolicy] = await Promise.all([
+  const [similar, returnPolicy, sizeGuideText] = await Promise.all([
     getSimilar(product),
     getReturnPolicy(),
+    getSizeGuideText(),
   ]);
 
   const images = product.images?.length ? product.images : [];
@@ -166,8 +182,8 @@ export default async function ProductPage({
             الرئيسية
           </Link>
           <span>/</span>
-          <Link href="/#products" className="hover:text-ink">
-            المنتجات
+          <Link href="/shop" className="hover:text-ink">
+            المتجر
           </Link>
           <span>/</span>
           <span className="text-ink line-clamp-1">{product.name}</span>
@@ -241,6 +257,8 @@ export default async function ProductPage({
               sizes={sizes}
               variants={variants}
             />
+
+            <SizeGuide productType={product.product_type} customText={sizeGuideText} />
 
             {accordionItems.length > 0 && (
               <ProductAccordion items={accordionItems} />
