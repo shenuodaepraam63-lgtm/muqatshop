@@ -1,6 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { supabase, productMainImage, type Product, type ProductColor } from "@/lib/supabase";
+import {
+  supabase,
+  productMainImage,
+  type Product,
+  type ProductColor,
+  type ProductVariant,
+} from "@/lib/supabase";
 import { formatPrice } from "@/lib/utils";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductBuyBox } from "@/components/product/ProductBuyBox";
@@ -70,7 +76,8 @@ async function getReturnPolicy(): Promise<string | null> {
   return null;
 }
 
-function looksLikeMug(product: Product): boolean {
+function showMugTryOn(product: Product): boolean {
+  if (product.product_type === "mug") return true;
   const t = `${product.name} ${product.description || ""} ${product.slug}`.toLowerCase();
   return /مج|كوب|كباية|mug|cup|كبايه/.test(t);
 }
@@ -92,6 +99,8 @@ export default async function ProductPage({
   const images = product.images?.length ? product.images : [];
   const main = productMainImage(product) || "";
   const colors = (product.colors || []) as ProductColor[];
+  const sizes = (product.sizes || []) as string[];
+  const variants = (product.variants || []) as ProductVariant[];
   const features = product.features
     ? product.features.split("\n").map((s) => s.trim()).filter(Boolean)
     : [];
@@ -107,8 +116,7 @@ export default async function ProductPage({
     Number(product.compare_at_price) > Number(product.price) &&
     (saleEndsAt == null || saleActive);
 
-  const outOfStock = (product.stock ?? 0) <= 0;
-  const showTryMug = looksLikeMug(product);
+  const tryMug = showMugTryOn(product);
 
   const accordionItems: { title: string; content: React.ReactNode }[] = [];
 
@@ -134,6 +142,8 @@ export default async function ProductPage({
   const extra: string[] = [];
   if (product.material?.trim()) extra.push(`الخامة: ${product.material.trim()}`);
   if (product.weight?.trim()) extra.push(`الوزن: ${product.weight.trim()}`);
+  else if (product.weight_value != null)
+    extra.push(`الوزن: ${product.weight_value} جرام`);
   if (product.dimensions?.trim()) extra.push(`الأبعاد: ${product.dimensions.trim()}`);
   if (product.origin_country?.trim())
     extra.push(`بلد المنشأ: ${product.origin_country.trim()}`);
@@ -205,7 +215,7 @@ export default async function ProductPage({
               </p>
             )}
 
-            {showTryMug && (
+            {tryMug && (
               <Link
                 href={`/try-mug?product=${encodeURIComponent(product.slug)}&name=${encodeURIComponent(product.name)}`}
                 className="mb-5 flex items-center justify-center gap-2 w-full border-2 border-ink text-ink py-3 rounded-full text-sm font-semibold hover:bg-ink hover:text-page transition"
@@ -225,9 +235,11 @@ export default async function ProductPage({
                     : null,
                 image: main,
                 slug: product.slug,
+                stock: product.stock,
               }}
               colors={colors}
-              outOfStock={outOfStock}
+              sizes={sizes}
+              variants={variants}
             />
 
             {accordionItems.length > 0 && (
