@@ -14,6 +14,7 @@ import { ProductAccordion } from "@/components/product/ProductAccordion";
 import { SimilarProducts } from "@/components/product/SimilarProducts";
 import { SaleCountdown } from "@/components/product/SaleCountdown";
 import { SizeGuide } from "@/components/product/SizeGuide";
+import { ProductReviews } from "@/components/product/ProductReviews";
 
 export const dynamic = "force-dynamic";
 
@@ -264,6 +265,10 @@ export default async function ProductPage({
               <ProductAccordion items={accordionItems} />
             )}
           </div>
+        </div>
+
+        <div className="max-w-2xl">
+          <ProductReviews productId={product.id} />
         </div>
       </div>
 
