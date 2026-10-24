@@ -7,12 +7,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type ProductColor = { name: string; hex: string };
 
-/** One sellable combination: size × color */
 export type ProductVariant = {
   size?: string | null;
   color?: string | null;
   color_hex?: string | null;
-  /** null / undefined → use product.price */
   price?: number | null;
   stock: number;
 };

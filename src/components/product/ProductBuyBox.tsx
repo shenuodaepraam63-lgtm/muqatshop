@@ -20,9 +20,11 @@ type Props = {
     slug?: string;
     stock?: number | null;
   };
-  colors: ProductColor[];
-  sizes: string[];
-  variants: ProductVariant[];
+  colors?: ProductColor[];
+  sizes?: string[];
+  variants?: ProductVariant[];
+  /** @deprecated computed from variants/stock */
+  outOfStock?: boolean;
 };
 
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -33,7 +35,12 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-export function ProductBuyBox({ product, colors, sizes, variants }: Props) {
+export function ProductBuyBox({
+  product,
+  colors = [],
+  sizes = [],
+  variants = [],
+}: Props) {
   const addItem = useCartStore((s) => s.addItem);
   const [qty, setQty] = useState(1);
   const [size, setSize] = useState<string>(sizes[0] || "");
@@ -42,7 +49,6 @@ export function ProductBuyBox({ product, colors, sizes, variants }: Props) {
 
   const selectedColor = colors[colorIdx];
   const colorName = selectedColor?.name || "";
-
   const hasMatrix = variants.length > 0;
 
   const stock = useMemo(() => {
@@ -64,8 +70,7 @@ export function ProductBuyBox({ product, colors, sizes, variants }: Props) {
   const sizeAvailable = (s: string) => {
     if (!hasMatrix) return true;
     if (colors.length === 0) {
-      const v = findVariant(variants, s, null);
-      return (v?.stock ?? 0) > 0;
+      return (findVariant(variants, s, null)?.stock ?? 0) > 0;
     }
     return colors.some((c) => (findVariant(variants, s, c.name)?.stock ?? 0) > 0);
   };
@@ -73,14 +78,10 @@ export function ProductBuyBox({ product, colors, sizes, variants }: Props) {
   const colorAvailable = (cName: string) => {
     if (!hasMatrix) return true;
     if (sizes.length === 0) {
-      const v = findVariant(variants, null, cName);
-      return (v?.stock ?? 0) > 0;
+      return (findVariant(variants, null, cName)?.stock ?? 0) > 0;
     }
     return (findVariant(variants, size || null, cName)?.stock ?? 0) > 0;
   };
-
-  const onSale =
-    product.compareAtPrice != null && product.compareAtPrice > unitPrice;
 
   const pageUrl =
     typeof window !== "undefined" && product.slug
@@ -102,7 +103,7 @@ export function ProductBuyBox({ product, colors, sizes, variants }: Props) {
       name: variantLabel ? `${product.name} — ${variantLabel}` : product.name,
       price: unitPrice,
       image: product.image,
-      quantity: Math.min(qty, stock),
+      quantity: Math.min(qty, Math.max(1, stock)),
       variant: variantLabel || undefined,
     });
     setDone(true);
@@ -172,7 +173,7 @@ export function ProductBuyBox({ product, colors, sizes, variants }: Props) {
 
         <div className="flex items-baseline gap-2">
           <span className="text-xl font-bold">{formatPrice(unitPrice)}</span>
-          {onSale && product.compareAtPrice != null && (
+          {product.compareAtPrice != null && product.compareAtPrice > unitPrice && (
             <span className="text-sm text-muted line-through">
               {formatPrice(product.compareAtPrice)}
             </span>
@@ -184,23 +185,14 @@ export function ProductBuyBox({ product, colors, sizes, variants }: Props) {
         ) : (
           <div>
             <p className="text-sm mb-2">
-              الكمية{" "}
-              <span className="text-muted text-xs">(المتاح: {stock})</span>
+              الكمية <span className="text-muted text-xs">(المتاح: {stock})</span>
             </p>
             <div className="inline-flex items-center border border-[#e8e2d9] rounded-full overflow-hidden bg-white">
-              <button
-                type="button"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-                className="w-11 h-11 flex items-center justify-center"
-              >
+              <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-11 h-11 flex items-center justify-center">
                 <Minus className="w-4 h-4" />
               </button>
               <span className="w-10 text-center text-sm font-semibold">{qty}</span>
-              <button
-                type="button"
-                onClick={() => setQty((q) => Math.min(stock, q + 1))}
-                className="w-11 h-11 flex items-center justify-center"
-              >
+              <button type="button" onClick={() => setQty((q) => Math.min(stock, q + 1))} className="w-11 h-11 flex items-center justify-center">
                 <Plus className="w-4 h-4" />
               </button>
             </div>
@@ -241,9 +233,9 @@ export function ProductBuyBox({ product, colors, sizes, variants }: Props) {
       <div className="md:hidden fixed bottom-16 inset-x-0 z-40 px-3 pb-2 pointer-events-none">
         <div className="pointer-events-auto bg-white border border-[#e8e2d9] shadow-lg rounded-2xl p-2.5 flex items-center gap-2">
           <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-[#ebe6dc] shrink-0">
-            {product.image && (
+            {product.image ? (
               <Image src={product.image} alt="" fill className="object-cover" sizes="44px" />
-            )}
+            ) : null}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-medium truncate">{product.name}</p>
