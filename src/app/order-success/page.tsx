@@ -16,16 +16,26 @@ function SuccessContent() {
       <h1 className="text-2xl font-bold mb-2">تم استلام طلبك</h1>
       <p className="text-muted mb-2">هنكلمك قريبًا لتأكيد التوصيل</p>
       {n && (
-        <p className="text-sm font-medium mb-8">
+        <p className="text-sm font-medium mb-6">
           رقم الطلب: <span className="font-mono">{n}</span>
         </p>
       )}
-      <Link
-        href="/"
-        className="inline-block bg-ink text-page px-8 py-3 rounded-full text-sm font-semibold"
-      >
-        العودة للمتجر
-      </Link>
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        {n && (
+          <Link
+            href={`/track?n=${encodeURIComponent(n)}`}
+            className="inline-block border border-ink text-ink px-8 py-3 rounded-full text-sm font-semibold"
+          >
+            تتبع الطلب
+          </Link>
+        )}
+        <Link
+          href="/shop"
+          className="inline-block bg-ink text-page px-8 py-3 rounded-full text-sm font-semibold"
+        >
+          متابعة التسوق
+        </Link>
+      </div>
     </div>
   );
 }

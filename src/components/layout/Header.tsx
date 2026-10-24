@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Search, ShoppingBag } from "lucide-react";
+import { Search, ShoppingBag, Heart } from "lucide-react";
 import { useCartStore } from "@/lib/store";
+import { useWishlistStore } from "@/lib/wishlist";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 
 export function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
+  const wishCount = useWishlistStore((s) => s.items.length);
 
   return (
     <header className="sticky top-0 z-40 bg-page/95 backdrop-blur-sm shadow-header">
@@ -16,23 +18,24 @@ export function Header() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-          <Link href="/shop" className="hover:opacity-70 transition">
-            المتجر
-          </Link>
-          <Link href="/categories/mugs" className="hover:opacity-70 transition">
-            مجات
-          </Link>
-          <Link href="/categories/clothing" className="hover:opacity-70 transition">
-            ملابس
-          </Link>
-          <Link href="/search" className="hover:opacity-70 transition">
-            بحث
-          </Link>
+          <Link href="/shop" className="hover:opacity-70 transition">المتجر</Link>
+          <Link href="/categories/mugs" className="hover:opacity-70 transition">مجات</Link>
+          <Link href="/categories/clothing" className="hover:opacity-70 transition">ملابس</Link>
+          <Link href="/track" className="hover:opacity-70 transition">تتبع طلب</Link>
+          <Link href="/search" className="hover:opacity-70 transition">بحث</Link>
         </nav>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link href="/search" className="p-2 hover:opacity-70 transition" aria-label="بحث">
             <Search className="w-6 h-6" strokeWidth={1.5} />
+          </Link>
+          <Link href="/wishlist" className="relative p-2 hover:opacity-70 transition" aria-label="الأمنيات">
+            <Heart className="w-6 h-6" strokeWidth={1.5} />
+            {wishCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-sale text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center">
+                {wishCount}
+              </span>
+            )}
           </Link>
           <Link href="/cart" className="relative p-2 hover:opacity-70 transition" aria-label="السلة">
             <ShoppingBag className="w-6 h-6" strokeWidth={1.5} />

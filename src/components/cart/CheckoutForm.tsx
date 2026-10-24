@@ -15,6 +15,7 @@ import {
   type ShippingSettings,
 } from "@/lib/shipping";
 import { validateCoupon, incrementCouponUse } from "@/lib/coupons";
+import { decrementStockForItems } from "@/lib/stock";
 
 export function CheckoutForm() {
   const router = useRouter();
@@ -133,6 +134,15 @@ export function CheckoutForm() {
       const orderTotal = Math.max(0, subtotal - finalDiscount + ship);
       const orderNumber = `MQ-${Date.now().toString(36).toUpperCase()}`;
 
+      const orderItems = items.map((i) => ({
+        productId: i.productId,
+        name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+        image: i.image,
+        variant: i.variant,
+      }));
+
       const payload = {
         order_number: orderNumber,
         customer_name: fullName.trim(),
@@ -144,14 +154,7 @@ export function CheckoutForm() {
         phone: phone.trim(),
         phone_alt: phoneAlt.trim() || null,
         notes: notes.trim() || null,
-        items: items.map((i) => ({
-          productId: i.productId,
-          name: i.name,
-          price: i.price,
-          quantity: i.quantity,
-          image: i.image,
-          variant: i.variant,
-        })),
+        items: orderItems,
         subtotal,
         shipping: ship,
         discount: finalDiscount,
@@ -164,6 +167,7 @@ export function CheckoutForm() {
       if (insertError) throw insertError;
 
       if (couponId) await incrementCouponUse(couponId);
+      await decrementStockForItems(orderItems);
 
       clearCart();
       router.push(`/order-success?n=${encodeURIComponent(orderNumber)}`);
@@ -255,13 +259,9 @@ export function CheckoutForm() {
             disabled={!!appliedCode}
           />
           {appliedCode ? (
-            <button type="button" onClick={clearCoupon} className="shrink-0 px-4 rounded-xl border text-sm">
-              إلغاء
-            </button>
+            <button type="button" onClick={clearCoupon} className="shrink-0 px-4 rounded-xl border text-sm">إلغاء</button>
           ) : (
-            <button type="button" onClick={applyCoupon} className="shrink-0 px-4 rounded-xl bg-ink text-white text-sm">
-              تطبيق
-            </button>
+            <button type="button" onClick={applyCoupon} className="shrink-0 px-4 rounded-xl bg-ink text-white text-sm">تطبيق</button>
           )}
         </div>
         {couponMsg && <p className="text-xs text-muted">{couponMsg}</p>}
@@ -280,32 +280,17 @@ export function CheckoutForm() {
         )}
         <div className="flex justify-between">
           <span className="text-muted">رسوم التوصيل</span>
-          <span>
-            {!governorate
-              ? "—"
-              : shipping === 0
-                ? "مجاني"
-                : formatPrice(shipping)}
-          </span>
+          <span>{!governorate ? "—" : shipping === 0 ? "مجاني" : formatPrice(shipping)}</span>
         </div>
         <div className="flex justify-between text-base font-bold pt-1">
           <span>الإجمالي</span>
           <span>{formatPrice(total)}</span>
         </div>
-        <p className="text-xs text-muted">
-          التوصيل {formatPrice(shipSettings.fee)}
-          {shipSettings.free_over != null &&
-            ` · مجاني فوق ${formatPrice(shipSettings.free_over)}`}
-        </p>
       </div>
 
       {error && <p className="text-sm text-sale bg-sale/10 rounded-lg px-3 py-2">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={loading || items.length === 0}
-        className="w-full bg-ink text-page py-3.5 rounded-full text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
-      >
+      <button type="submit" disabled={loading || items.length === 0} className="w-full bg-ink text-page py-3.5 rounded-full text-sm font-semibold hover:opacity-90 transition disabled:opacity-50">
         {loading ? "جاري إرسال الطلب..." : "إرسال الطلب"}
       </button>
     </form>

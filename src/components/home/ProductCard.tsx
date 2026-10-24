@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useState } from "react";
 import { formatPrice, isSaleActive, salePercent } from "@/lib/utils";
 import { useCartStore } from "@/lib/store";
+import { useWishlistStore } from "@/lib/wishlist";
+import { Heart } from "lucide-react";
 
 type ProductCardProps = {
   id: string;
@@ -15,6 +17,7 @@ type ProductCardProps = {
   saleEndsAt?: string | null;
   image: string;
   category?: string | null;
+  stock?: number | null;
 };
 
 export function ProductCard({
@@ -26,12 +29,16 @@ export function ProductCard({
   saleEndsAt,
   image,
   category,
+  stock,
 }: ProductCardProps) {
   const addItem = useCartStore((s) => s.addItem);
+  const toggleWish = useWishlistStore((s) => s.toggle);
+  const wished = useWishlistStore((s) => s.has(id));
   const [added, setAdded] = useState(false);
   const onSale = isSaleActive(price, compareAtPrice, saleEndsAt);
   const percent =
     onSale && compareAtPrice ? salePercent(price, compareAtPrice) : 0;
+  const lowStock = stock != null && stock > 0 && stock <= 3;
 
   const onAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -44,6 +51,12 @@ export function ProductCard({
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
+  };
+
+  const onWish = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleWish({ productId: id, name, slug, price, image: image || "" });
   };
 
   return (
@@ -72,7 +85,23 @@ export function ProductCard({
           </span>
         )}
 
-        {/* إضافة للسلة عند المرور / اللمس */}
+        {lowStock && (
+          <span className="absolute top-3 left-3 z-10 bg-ink/80 text-white text-[10px] font-bold px-2 py-1 rounded-full">
+            متبقي {stock}
+          </span>
+        )}
+
+        <button
+          type="button"
+          onClick={onWish}
+          className="absolute bottom-3 left-3 z-10 w-9 h-9 rounded-full bg-white/90 shadow flex items-center justify-center"
+          aria-label="أمنية"
+        >
+          <Heart
+            className={`w-4 h-4 ${wished ? "fill-sale text-sale" : "text-ink"}`}
+          />
+        </button>
+
         <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-active:translate-y-0 group-active:opacity-100 transition duration-200 bg-gradient-to-t from-black/50 to-transparent">
           <button
             type="button"
