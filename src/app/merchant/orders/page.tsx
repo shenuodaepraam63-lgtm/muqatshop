@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getMerchantSession, releaseMaturedProfits } from "@/lib/merchant";
 import { formatPrice } from "@/lib/utils";
@@ -55,7 +56,11 @@ export default function MerchantOrdersPage() {
           o.hold_until &&
           new Date(o.hold_until) > new Date();
         return (
-          <div key={o.id} className="bg-white border rounded-2xl p-4 text-sm">
+          <Link
+            key={o.id}
+            href={`/merchant/orders/${o.id}`}
+            className="block bg-white border rounded-2xl p-4 text-sm hover:border-ink/30 transition"
+          >
             <div className="flex justify-between gap-2">
               <span className="font-mono font-semibold">{o.order_number}</span>
               <span className="text-xs bg-[#f0ebe3] px-2 py-0.5 rounded-full">
@@ -65,17 +70,19 @@ export default function MerchantOrdersPage() {
             <p className="text-muted mt-1">{o.customer_name}</p>
             <div className="flex justify-between mt-2">
               <span>الإجمالي {formatPrice(Number(o.total))}</span>
-              <span className="text-green-700">ربحك {formatPrice(Number(o.merchant_profit) || 0)}</span>
+              <span className="text-green-700">
+                ربحك {formatPrice(Number(o.merchant_profit) || 0)}
+              </span>
             </div>
             {waiting && (
               <p className="text-xs text-amber-700 mt-2">
-                انتظر حتى {new Date(o.hold_until!).toLocaleDateString("ar-EG")} لتحرير العمولة
+                انتظر حتى {new Date(o.hold_until!).toLocaleDateString("ar-EG")}
               </p>
             )}
             {o.profit_released && o.status === "delivered" && (
-              <p className="text-xs text-green-700 mt-2">تم تحرير العمولة للمحفظة</p>
+              <p className="text-xs text-green-700 mt-2">تم تحرير العمولة</p>
             )}
-          </div>
+          </Link>
         );
       })}
     </div>

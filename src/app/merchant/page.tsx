@@ -31,7 +31,17 @@ export default function MerchantHome() {
     (async () => {
       await releaseMaturedProfits(s.id);
       const settings = await getMerchantSettings();
-      setCommission(settings.commission_percent);
+      const { data: me } = await supabase
+        .from("merchants")
+        .select("commission_percent")
+        .eq("id", s.id)
+        .maybeSingle();
+      const pct =
+        me?.commission_percent != null
+          ? Number(me.commission_percent)
+          : settings.commission_percent;
+      setCommission(pct);
+
       const [{ data: w }, { data: ords }, { count }] = await Promise.all([
         supabase.from("merchant_wallets").select("balance, pending").eq("merchant_id", s.id).maybeSingle(),
         supabase.from("orders").select("id, status").eq("merchant_id", s.id),
@@ -69,6 +79,10 @@ export default function MerchantHome() {
   };
 
   const share = code ? merchantShareUrl(code, "/shop") : "";
+  const waText = encodeURIComponent(
+    `تصفّح منتجاتنا من هنا 👇\n${share}`
+  );
+  const waHref = `https://wa.me/?text=${waText}`;
 
   return (
     <div className="space-y-6">
@@ -85,18 +99,28 @@ export default function MerchantHome() {
           </button>
         </div>
         <div>
-          <p className="text-xs text-muted mb-1">رابط المشاركة (عمولة {commission}% للعميل)</p>
+          <p className="text-xs text-muted mb-1">رابط المشاركة (عمولة {commission}%)</p>
           <p className="text-xs break-all bg-[#f8f5f0] rounded-lg px-2 py-2 font-mono">{share}</p>
-          <button
-            type="button"
-            onClick={() => copy(share, "share")}
-            className="mt-2 text-sm border border-ink px-4 py-2 rounded-full"
-          >
-            {shareCopied ? "تم نسخ الرابط" : "نسخ رابط المتجر"}
-          </button>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => copy(share, "share")}
+              className="text-sm border border-ink px-4 py-2 rounded-full"
+            >
+              {shareCopied ? "تم نسخ الرابط" : "نسخ الرابط"}
+            </button>
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm bg-[#25D366] text-white px-4 py-2 rounded-full"
+            >
+              مشاركة واتساب
+            </a>
+          </div>
         </div>
         <p className="text-xs text-muted leading-relaxed">
-          ابعت الرابط لعملائك. لو طلبوا بأنفسهم تاخد نسبة العمولة. أو ادخل المتجر بنفسك وارفع السعر في السلة.
+          ابعت الرابط لعملائك لعمولة النسبة، أو اطلب بنفسك من المتجر مع رفع السعر.
         </p>
       </div>
 
@@ -106,7 +130,7 @@ export default function MerchantHome() {
           <p className="text-xl font-bold">{formatPrice(balance)}</p>
         </div>
         <div className="bg-white rounded-2xl border p-4">
-          <p className="text-xs text-muted">معلّق (انتظار)</p>
+          <p className="text-xs text-muted">معلّق</p>
           <p className="text-xl font-bold">{formatPrice(pending)}</p>
         </div>
         <div className="bg-white rounded-2xl border p-4">
@@ -130,12 +154,14 @@ export default function MerchantHome() {
         </Link>
       )}
 
-      <Link
-        href="/shop"
-        className="block text-center bg-ink text-white py-3.5 rounded-full text-sm font-semibold"
-      >
-        تسوق واطلب لعميل (رفع سعر)
-      </Link>
+      <div className="grid grid-cols-2 gap-2">
+        <Link href="/shop" className="text-center bg-ink text-white py-3 rounded-full text-sm font-semibold">
+          تسوق واطلب
+        </Link>
+        <Link href="/merchant/profile" className="text-center border border-ink py-3 rounded-full text-sm font-semibold">
+          حسابي
+        </Link>
+      </div>
     </div>
   );
 }

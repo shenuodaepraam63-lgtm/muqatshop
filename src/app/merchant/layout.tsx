@@ -28,7 +28,9 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted text-sm">جاري التحميل...</div>
+      <div className="min-h-[40vh] flex items-center justify-center text-muted text-sm">
+        جاري التحميل...
+      </div>
     );
   }
 
@@ -36,17 +38,17 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
 
   const nav = [
     { href: "/merchant", label: "الرئيسية" },
-    { href: "/merchant/new-order", label: "طلب جديد" },
     { href: "/merchant/orders", label: "طلباتي" },
     { href: "/merchant/wallet", label: "المحفظة" },
     { href: "/merchant/messages", label: "الرسائل" },
+    { href: "/merchant/profile", label: "حسابي" },
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8f5f0]">
-      <header className="bg-white border-b border-[#e8e2d9] sticky top-0 z-30">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="font-bold text-sm">تاجر · {name}</span>
+    <div className="min-h-[50vh]">
+      <div className="bg-[#0f2744]/5 border-b border-[#e8e2d9]">
+        <div className="max-w-3xl mx-auto px-4 py-2 flex items-center justify-between text-sm">
+          <span className="font-medium">تاجر · {name}</span>
           <button
             type="button"
             className="text-xs text-sale"
@@ -59,19 +61,25 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
           </button>
         </div>
         <nav className="max-w-3xl mx-auto px-2 flex gap-1 overflow-x-auto pb-2">
-          {nav.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className={`shrink-0 text-xs px-3 py-1.5 rounded-full ${
-                pathname === n.href ? "bg-ink text-white" : "bg-[#f0ebe3] text-ink"
-              }`}
-            >
-              {n.label}
-            </Link>
-          ))}
+          {nav.map((n) => {
+            const active =
+              n.href === "/merchant"
+                ? pathname === "/merchant"
+                : pathname === n.href || pathname.startsWith(n.href + "/");
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={`shrink-0 text-xs px-3 py-1.5 rounded-full ${
+                  active ? "bg-ink text-white" : "bg-[#f0ebe3] text-ink"
+                }`}
+              >
+                {n.label}
+              </Link>
+            );
+          })}
         </nav>
-      </header>
+      </div>
       <main className="max-w-3xl mx-auto px-4 py-6">{children}</main>
     </div>
   );
