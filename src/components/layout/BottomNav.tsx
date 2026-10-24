@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "الرئيسية", icon: Home },
-  { href: "/#products", label: "المنتجات", icon: LayoutGrid },
+  { href: "/shop", label: "المتجر", icon: LayoutGrid },
   { href: "/search", label: "بحث", icon: Search },
   { href: "/cart", label: "السلة", icon: ShoppingBag },
 ];
@@ -24,9 +24,7 @@ export function BottomNav() {
           const active =
             href === "/"
               ? pathname === "/"
-              : href.startsWith("/#")
-                ? pathname === "/"
-                : pathname === href || pathname.startsWith(href);
+              : pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
               key={href}

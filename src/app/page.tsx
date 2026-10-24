@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Hero } from "@/components/home/Hero";
 import { ProductCard } from "@/components/home/ProductCard";
 import { supabase, productMainImage, type Product } from "@/lib/supabase";
@@ -23,16 +24,50 @@ async function getProducts(): Promise<Product[]> {
   }
 }
 
+async function getCategories() {
+  const { data } = await supabase
+    .from("categories")
+    .select("id, name, slug")
+    .order("sort_order");
+  return data || [];
+}
+
 export default async function HomePage() {
-  const products = await getProducts();
+  const [products, categories] = await Promise.all([getProducts(), getCategories()]);
 
   return (
     <div>
       <Hero />
 
+      {categories.length > 0 && (
+        <section className="max-w-page mx-auto px-4 md:px-8 mt-10">
+          <h2 className="text-xl md:text-2xl font-bold mb-4">تسوق حسب القسم</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            {categories.map((c) => (
+              <Link
+                key={c.id}
+                href={`/categories/${c.slug}`}
+                className="rounded-2xl bg-[#f5f1e8] border border-[#e8e2d9] px-4 py-6 text-center hover:shadow-md transition"
+              >
+                <span className="font-semibold text-ink">{c.name}</span>
+              </Link>
+            ))}
+            <Link
+              href="/shop"
+              className="rounded-2xl bg-ink text-page px-4 py-6 text-center hover:opacity-90 transition"
+            >
+              <span className="font-semibold">كل المتجر</span>
+            </Link>
+          </div>
+        </section>
+      )}
+
       <section id="products" className="max-w-page mx-auto px-4 md:px-8 mt-10 md:mt-14 mb-16 scroll-mt-24">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl md:text-2xl font-bold">المنتجات</h2>
+          <h2 className="text-xl md:text-2xl font-bold">أحدث المنتجات</h2>
+          <Link href="/shop" className="text-sm text-muted underline">
+            عرض الكل
+          </Link>
         </div>
 
         {products.length === 0 ? (

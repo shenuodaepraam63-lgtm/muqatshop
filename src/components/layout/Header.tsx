@@ -15,9 +15,15 @@ export function Header() {
           <BrandLogo size="sm" />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
-          <Link href="/#products" className="hover:opacity-70 transition">
-            المنتجات
+        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+          <Link href="/shop" className="hover:opacity-70 transition">
+            المتجر
+          </Link>
+          <Link href="/categories/mugs" className="hover:opacity-70 transition">
+            مجات
+          </Link>
+          <Link href="/categories/clothing" className="hover:opacity-70 transition">
+            ملابس
           </Link>
           <Link href="/search" className="hover:opacity-70 transition">
             بحث
