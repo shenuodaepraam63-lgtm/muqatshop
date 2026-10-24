@@ -16,6 +16,7 @@ import {
   Tags,
   Megaphone,
   Images,
+  TicketPercent,
 } from "lucide-react";
 
 const ADMIN_EMAIL = "muqatshop@gmail.com";
@@ -111,7 +112,7 @@ export default function AdminLayout({
   const sidebar = (
     <>
       <div className="p-5 border-b border-[#e8e2d9]">
-        <Link href="/admin" className="inline-flex" onClick={() => setMenuOpen(false)} aria-label="Muqatshop — لوحة الإدارة">
+        <Link href="/admin" className="inline-flex" onClick={() => setMenuOpen(false)} aria-label="Muqatshop">
           <BrandLogo size="sm" />
         </Link>
         <p className="text-xs text-muted mt-1 truncate">{userEmail}</p>
@@ -119,11 +120,12 @@ export default function AdminLayout({
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navLink("/admin", "لوحة التحكم", <LayoutDashboard className="w-4 h-4" />, pathname === "/admin")}
         {navLink("/admin/orders", "الطلبات", <ShoppingBag className="w-4 h-4" />, pathname?.startsWith("/admin/orders"))}
+        {navLink("/admin/coupons", "كوبونات", <TicketPercent className="w-4 h-4" />, pathname?.includes("/coupons"))}
         {navLink("/admin/gallery", "معرض الصور", <Images className="w-4 h-4" />, pathname?.includes("/gallery"))}
         {navLink("/admin/products/new", "إضافة منتج", <Plus className="w-4 h-4" />, pathname === "/admin/products/new")}
         {navLink("/admin", "المنتجات", <Package className="w-4 h-4" />, pathname === "/admin")}
         {navLink("/admin/categories", "التصنيفات", <Tags className="w-4 h-4" />, pathname?.includes("/categories"))}
-        {navLink("/admin/announcement", "الشريط الإعلاني", <Megaphone className="w-4 h-4" />, pathname?.includes("/announcement"))}
+        {navLink("/admin/announcement", "إعدادات المتجر", <Megaphone className="w-4 h-4" />, pathname?.includes("/announcement"))}
       </nav>
       <div className="p-3 border-t border-[#e8e2d9]">
         <button onClick={handleLogout} className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition">
@@ -143,7 +145,7 @@ export default function AdminLayout({
         <button type="button" onClick={() => setMenuOpen(true)} className="p-2 -mr-2 rounded-lg hover:bg-[#f8f5f0]" aria-label="فتح القائمة">
           <Menu className="w-6 h-6 text-ink" />
         </button>
-        <Link href="/admin" aria-label="Muqatshop — لوحة الإدارة" className="inline-flex"><BrandLogo size="sm" /></Link>
+        <Link href="/admin" className="inline-flex"><BrandLogo size="sm" /></Link>
         <div className="w-10" />
       </div>
       {menuOpen && <div className="fixed inset-0 bg-black/40 z-50 md:hidden" onClick={() => setMenuOpen(false)} />}
