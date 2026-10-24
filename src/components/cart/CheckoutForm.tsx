@@ -16,12 +16,17 @@ import {
 } from "@/lib/shipping";
 import { validateCoupon, incrementCouponUse } from "@/lib/coupons";
 import { decrementStockForItems } from "@/lib/stock";
+import { getMerchantSession } from "@/lib/merchant";
 
 export function CheckoutForm() {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
   const clearCart = useCartStore((s) => s.clearCart);
   const subtotal = useCartStore((s) => s.totalPrice());
+  const baseSubtotal = useCartStore((s) => s.totalBase());
+
+  const [merchantId, setMerchantId] = useState<string | null>(null);
+  const [merchantName, setMerchantName] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [governorate, setGovernorate] = useState("");
@@ -46,6 +51,11 @@ export function CheckoutForm() {
   const [couponMsg, setCouponMsg] = useState("");
 
   useEffect(() => {
+    const s = getMerchantSession();
+    if (s) {
+      setMerchantId(s.id);
+      setMerchantName(s.name);
+    }
     (async () => {
       const { data } = await supabase
         .from("site_settings")
@@ -72,6 +82,9 @@ export function CheckoutForm() {
   const freeThreshold = shipSettings.free_over;
   const remainingForFree =
     freeThreshold != null ? Math.max(0, freeThreshold - afterDiscount) : null;
+  const merchantProfit = merchantId
+    ? Math.max(0, subtotal - baseSubtotal)
+    : 0;
 
   const onGovChange = (v: string) => {
     setGovernorate(v);
@@ -115,6 +128,17 @@ export function CheckoutForm() {
       return;
     }
 
+    // تحقق أسعار التاجر
+    if (merchantId) {
+      for (const i of items) {
+        const base = i.basePrice ?? i.price;
+        if (i.price < base) {
+          setError(`سعر «${i.name}» أقل من سعر المتجر`);
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     try {
       let finalDiscount = discount;
@@ -136,18 +160,31 @@ export function CheckoutForm() {
       const net = Math.max(0, subtotal - finalDiscount);
       const ship = calcShipping(net, shipSettings);
       const orderTotal = net + ship;
-      const orderNumber = `MQ-${Date.now().toString(36).toUpperCase()}`;
+      const orderNumber = merchantId
+        ? `MQ-M-${Date.now().toString(36).toUpperCase()}`
+        : `MQ-${Date.now().toString(36).toUpperCase()}`;
 
       const orderItems = items.map((i) => ({
         productId: i.productId,
         name: i.name,
         price: i.price,
+        basePrice: i.basePrice ?? i.price,
         quantity: i.quantity,
         image: i.image,
         variant: i.variant,
       }));
 
-      const payload = {
+      const profit = merchantId
+        ? Math.max(
+            0,
+            items.reduce(
+              (s, i) => s + (i.price - (i.basePrice ?? i.price)) * i.quantity,
+              0
+            )
+          )
+        : 0;
+
+      const payload: Record<string, unknown> = {
         order_number: orderNumber,
         customer_name: fullName.trim(),
         governorate,
@@ -157,7 +194,9 @@ export function CheckoutForm() {
         apartment: apartment.trim() || null,
         phone: phone.trim(),
         phone_alt: phoneAlt.trim() || null,
-        notes: notes.trim() || null,
+        notes:
+          notes.trim() ||
+          (merchantId && merchantName ? `طلب تاجر: ${merchantName}` : null),
         items: orderItems,
         subtotal,
         shipping: ship,
@@ -166,6 +205,13 @@ export function CheckoutForm() {
         total: orderTotal,
         status: "new",
       };
+
+      if (merchantId) {
+        payload.merchant_id = merchantId;
+        payload.base_subtotal = baseSubtotal;
+        payload.merchant_profit = profit;
+        payload.profit_released = false;
+      }
 
       const { error: insertError } = await supabase.from("orders").insert(payload);
       if (insertError) throw insertError;
@@ -192,10 +238,16 @@ export function CheckoutForm() {
   return (
     <form onSubmit={submit} className="bg-card/60 border border-border rounded-2xl p-5 md:p-6 space-y-4">
       <h2 className="text-lg font-bold text-ink mb-1">بيانات التوصيل</h2>
-      <p className="text-xs text-muted mb-4">الحقول المعلّمة * مطلوبة</p>
+      <p className="text-xs text-muted mb-4">
+        {merchantId
+          ? "أدخل بيانات العميل — الطلب يُسجَّل على حسابك كتاجر"
+          : "الحقول المعلّمة * مطلوبة"}
+      </p>
 
       <div>
-        <label className="block text-sm font-medium mb-1.5">اسمك كامل *</label>
+        <label className="block text-sm font-medium mb-1.5">
+          {merchantId ? "اسم العميل *" : "اسمك كامل *"}
+        </label>
         <input className={field} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="الاسم بالكامل" required />
       </div>
 
@@ -252,30 +304,38 @@ export function CheckoutForm() {
         <textarea className={`${field} min-h-[80px] resize-y`} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
 
-      <div className="border border-dashed border-[#d4cfc4] rounded-xl p-3 space-y-2">
-        <label className="block text-sm font-medium">كود خصم</label>
-        <div className="flex gap-2">
-          <input
-            className={field}
-            value={couponCode}
-            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-            placeholder="مثال: SALE10"
-            disabled={!!appliedCode}
-          />
-          {appliedCode ? (
-            <button type="button" onClick={clearCoupon} className="shrink-0 px-4 rounded-xl border text-sm">إلغاء</button>
-          ) : (
-            <button type="button" onClick={applyCoupon} className="shrink-0 px-4 rounded-xl bg-ink text-white text-sm">تطبيق</button>
-          )}
+      {!merchantId && (
+        <div className="border border-dashed border-[#d4cfc4] rounded-xl p-3 space-y-2">
+          <label className="block text-sm font-medium">كود خصم</label>
+          <div className="flex gap-2">
+            <input
+              className={field}
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+              placeholder="مثال: SALE10"
+              disabled={!!appliedCode}
+            />
+            {appliedCode ? (
+              <button type="button" onClick={clearCoupon} className="shrink-0 px-4 rounded-xl border text-sm">إلغاء</button>
+            ) : (
+              <button type="button" onClick={applyCoupon} className="shrink-0 px-4 rounded-xl bg-ink text-white text-sm">تطبيق</button>
+            )}
+          </div>
+          {couponMsg && <p className="text-xs text-muted">{couponMsg}</p>}
         </div>
-        {couponMsg && <p className="text-xs text-muted">{couponMsg}</p>}
-      </div>
+      )}
 
       <div className="border-t border-border pt-4 space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-muted">المجموع الفرعي</span>
           <span>{formatPrice(subtotal)}</span>
         </div>
+        {merchantId && merchantProfit > 0 && (
+          <div className="flex justify-between text-green-700">
+            <span>ربحك</span>
+            <span>{formatPrice(merchantProfit)}</span>
+          </div>
+        )}
         {discount > 0 && (
           <div className="flex justify-between text-green-700">
             <span>خصم {appliedCode && `(${appliedCode})`}</span>
@@ -285,11 +345,7 @@ export function CheckoutForm() {
         <div className="flex justify-between">
           <span className="text-muted">رسوم التوصيل</span>
           <span>
-            {!governorate
-              ? "—"
-              : shipping === 0
-                ? "مجاني"
-                : formatPrice(shipping)}
+            {!governorate ? "—" : shipping === 0 ? "مجاني" : formatPrice(shipping)}
           </span>
         </div>
         <div className="flex justify-between text-base font-bold pt-1">
@@ -309,7 +365,7 @@ export function CheckoutForm() {
       {error && <p className="text-sm text-sale bg-sale/10 rounded-lg px-3 py-2">{error}</p>}
 
       <button type="submit" disabled={loading || items.length === 0} className="w-full bg-ink text-page py-3.5 rounded-full text-sm font-semibold hover:opacity-90 transition disabled:opacity-50">
-        {loading ? "جاري إرسال الطلب..." : "إرسال الطلب"}
+        {loading ? "جاري إرسال الطلب..." : merchantId ? "إرسال طلب التاجر" : "إرسال الطلب"}
       </button>
     </form>
   );

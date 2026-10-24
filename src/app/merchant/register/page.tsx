@@ -50,27 +50,26 @@ export default function MerchantRegisterPage() {
 
     saveMerchantSession(data);
     setLoading(false);
-    router.replace("/merchant");
+    router.replace("/shop");
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f5f0] flex items-center justify-center px-4">
+    <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
       <form onSubmit={submit} className="bg-white border border-[#e8e2d9] rounded-2xl p-6 w-full max-w-md space-y-4">
-        <h1 className="text-xl font-bold">تسجيل تاجر جديد</h1>
-        <p className="text-sm text-muted">مفتوح للجميع — اطلب لعملائك بهامش ربحك</p>
+        <h1 className="text-xl font-bold">تسجيل تاجر</h1>
+        <p className="text-sm text-muted">
+          نفس المتجر بالكامل — بعد التسجيل تتصفح وتطلب عادي، والطلب يتسجل كتاجر مع ربحك
+        </p>
         <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم" className="w-full border rounded-xl px-4 py-3 text-sm" />
         <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="البريد" className="w-full border rounded-xl px-4 py-3 text-sm" />
         <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="موبايل" className="w-full border rounded-xl px-4 py-3 text-sm" />
         <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="كلمة المرور" className="w-full border rounded-xl px-4 py-3 text-sm" />
         {error && <p className="text-sm text-sale">{error}</p>}
         <button type="submit" disabled={loading} className="w-full bg-ink text-white py-3 rounded-full text-sm font-semibold disabled:opacity-50">
-          {loading ? "..." : "إنشاء الحساب"}
+          {loading ? "..." : "إنشاء ودخول المتجر"}
         </button>
         <p className="text-sm text-center text-muted">
-          عندك حساب؟{" "}
-          <Link href="/merchant/login" className="underline">
-            دخول
-          </Link>
+          عندك حساب؟ <Link href="/merchant/login" className="underline">دخول</Link>
         </p>
       </form>
     </div>

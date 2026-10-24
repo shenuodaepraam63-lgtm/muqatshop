@@ -66,20 +66,14 @@ export function ProductBuyBox({
   }, [hasMatrix, variants, product.price, size, colorName]);
 
   const isOut = stock <= 0;
-
   const sizeAvailable = (s: string) => {
     if (!hasMatrix) return true;
-    if (colors.length === 0) {
-      return (findVariant(variants, s, null)?.stock ?? 0) > 0;
-    }
+    if (colors.length === 0) return (findVariant(variants, s, null)?.stock ?? 0) > 0;
     return colors.some((c) => (findVariant(variants, s, c.name)?.stock ?? 0) > 0);
   };
-
   const colorAvailable = (cName: string) => {
     if (!hasMatrix) return true;
-    if (sizes.length === 0) {
-      return (findVariant(variants, null, cName)?.stock ?? 0) > 0;
-    }
+    if (sizes.length === 0) return (findVariant(variants, null, cName)?.stock ?? 0) > 0;
     return (findVariant(variants, size || null, cName)?.stock ?? 0) > 0;
   };
 
@@ -87,9 +81,7 @@ export function ProductBuyBox({
     typeof window !== "undefined" && product.slug
       ? `${window.location.origin}/products/${product.slug}`
       : undefined;
-
   const variantLabel = [size, colorName].filter(Boolean).join(" / ");
-
   const waHref = whatsappProductUrl(
     variantLabel ? `${product.name} (${variantLabel})` : product.name,
     pageUrl
@@ -102,6 +94,7 @@ export function ProductBuyBox({
       productId: product.id,
       name: variantLabel ? `${product.name} — ${variantLabel}` : product.name,
       price: unitPrice,
+      basePrice: unitPrice,
       image: product.image,
       quantity: Math.min(qty, Math.max(1, stock)),
       variant: variantLabel || undefined,
@@ -120,142 +113,76 @@ export function ProductBuyBox({
               {sizes.map((s) => {
                 const ok = sizeAvailable(s);
                 return (
-                  <button
-                    key={s}
-                    type="button"
-                    disabled={!ok}
-                    onClick={() => setSize(s)}
+                  <button key={s} type="button" disabled={!ok} onClick={() => setSize(s)}
                     className={`min-w-[48px] px-3.5 py-2.5 rounded-full text-sm font-medium border transition ${
-                      size === s
-                        ? "bg-ink text-page border-ink"
-                        : ok
-                          ? "bg-transparent border-[#d4cfc4] text-ink"
-                          : "bg-transparent border-[#e8e2d9] text-muted line-through opacity-50"
-                    }`}
-                  >
-                    {s}
-                  </button>
+                      size === s ? "bg-ink text-page border-ink" : ok ? "bg-transparent border-[#d4cfc4] text-ink" : "bg-transparent border-[#e8e2d9] text-muted line-through opacity-50"
+                    }`}>{s}</button>
                 );
               })}
             </div>
           </div>
         )}
-
         {colors.length > 0 && (
           <div>
-            <p className="text-sm mb-2.5">
-              اللون{selectedColor ? ` : ${selectedColor.name}` : ""}
-            </p>
+            <p className="text-sm mb-2.5">اللون{selectedColor ? ` : ${selectedColor.name}` : ""}</p>
             <div className="flex flex-wrap gap-2">
               {colors.map((c, i) => {
                 const ok = colorAvailable(c.name);
                 return (
-                  <button
-                    key={c.hex + c.name}
-                    type="button"
-                    disabled={!ok}
-                    onClick={() => setColorIdx(i)}
+                  <button key={c.hex + c.name} type="button" disabled={!ok} onClick={() => setColorIdx(i)}
                     className={`min-w-[88px] px-5 py-2.5 rounded-full text-sm font-medium border transition ${
-                      colorIdx === i
-                        ? "bg-ink text-page border-ink"
-                        : ok
-                          ? "bg-transparent border-[#d4cfc4] text-ink"
-                          : "opacity-40 border-[#e8e2d9] line-through"
-                    }`}
-                  >
-                    {c.name}
-                  </button>
+                      colorIdx === i ? "bg-ink text-page border-ink" : ok ? "bg-transparent border-[#d4cfc4] text-ink" : "opacity-40 border-[#e8e2d9] line-through"
+                    }`}>{c.name}</button>
                 );
               })}
             </div>
           </div>
         )}
-
         <div className="flex items-baseline gap-2">
           <span className="text-xl font-bold">{formatPrice(unitPrice)}</span>
           {product.compareAtPrice != null && product.compareAtPrice > unitPrice && (
-            <span className="text-sm text-muted line-through">
-              {formatPrice(product.compareAtPrice)}
-            </span>
+            <span className="text-sm text-muted line-through">{formatPrice(product.compareAtPrice)}</span>
           )}
         </div>
-
         {isOut ? (
           <p className="text-sale font-medium">نفد من المخزون لهذا الخيار</p>
         ) : (
           <div>
-            <p className="text-sm mb-2">
-              الكمية <span className="text-muted text-xs">(المتاح: {stock})</span>
-            </p>
+            <p className="text-sm mb-2">الكمية <span className="text-muted text-xs">(المتاح: {stock})</span></p>
             <div className="inline-flex items-center border border-[#e8e2d9] rounded-full overflow-hidden bg-white">
-              <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-11 h-11 flex items-center justify-center">
-                <Minus className="w-4 h-4" />
-              </button>
+              <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-11 h-11 flex items-center justify-center"><Minus className="w-4 h-4" /></button>
               <span className="w-10 text-center text-sm font-semibold">{qty}</span>
-              <button type="button" onClick={() => setQty((q) => Math.min(stock, q + 1))} className="w-11 h-11 flex items-center justify-center">
-                <Plus className="w-4 h-4" />
-              </button>
+              <button type="button" onClick={() => setQty((q) => Math.min(stock, q + 1))} className="w-11 h-11 flex items-center justify-center"><Plus className="w-4 h-4" /></button>
             </div>
           </div>
         )}
-
         <div className="hidden md:grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={onAdd}
-            disabled={isOut}
-            className="w-full bg-ink text-page py-3.5 rounded-full text-sm font-semibold tracking-wide hover:opacity-90 transition disabled:opacity-40"
-          >
+          <button type="button" onClick={onAdd} disabled={isOut} className="w-full bg-ink text-page py-3.5 rounded-full text-sm font-semibold tracking-wide hover:opacity-90 transition disabled:opacity-40">
             {isOut ? "غير متوفر" : done ? "تمت الإضافة ✓" : "أضف إلى السلة"}
           </button>
-          <a
-            href={waHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white py-3.5 rounded-full text-sm font-semibold hover:opacity-90 transition"
-          >
-            <WhatsAppIcon className="w-5 h-5" />
-            واتساب
+          <a href={waHref} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white py-3.5 rounded-full text-sm font-semibold hover:opacity-90 transition">
+            <WhatsAppIcon className="w-5 h-5" /> واتساب
           </a>
         </div>
-
         {!isOut && (
-          <Link
-            href="/cart"
-            onClick={onAdd}
-            className="hidden md:flex w-full items-center justify-center bg-[#1a2744] text-white py-3.5 rounded-full text-sm font-semibold hover:opacity-90 transition"
-          >
+          <Link href="/cart" onClick={onAdd} className="hidden md:flex w-full items-center justify-center bg-[#1a2744] text-white py-3.5 rounded-full text-sm font-semibold hover:opacity-90 transition">
             اشترِ الآن
           </Link>
         )}
       </div>
-
       <div className="md:hidden fixed bottom-16 inset-x-0 z-40 px-3 pb-2 pointer-events-none">
         <div className="pointer-events-auto bg-white border border-[#e8e2d9] shadow-lg rounded-2xl p-2.5 flex items-center gap-2">
           <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-[#ebe6dc] shrink-0">
-            {product.image ? (
-              <Image src={product.image} alt="" fill className="object-cover" sizes="44px" />
-            ) : null}
+            {product.image ? <Image src={product.image} alt="" fill className="object-cover" sizes="44px" /> : null}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-medium truncate">{product.name}</p>
             <p className="text-sm font-bold">{formatPrice(unitPrice)}</p>
           </div>
-          <a
-            href={waHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 w-11 h-11 rounded-full bg-[#25D366] text-white flex items-center justify-center"
-            aria-label="واتساب"
-          >
+          <a href={waHref} target="_blank" rel="noopener noreferrer" className="shrink-0 w-11 h-11 rounded-full bg-[#25D366] text-white flex items-center justify-center" aria-label="واتساب">
             <WhatsAppIcon className="w-5 h-5" />
           </a>
-          <button
-            type="button"
-            onClick={onAdd}
-            disabled={isOut}
-            className="shrink-0 bg-[#1a2744] text-white text-xs font-semibold px-4 py-2.5 rounded-full disabled:opacity-40"
-          >
+          <button type="button" onClick={onAdd} disabled={isOut} className="shrink-0 bg-[#1a2744] text-white text-xs font-semibold px-4 py-2.5 rounded-full disabled:opacity-40">
             {isOut ? "نفد" : done ? "✓" : "اشترِ الآن"}
           </button>
         </div>

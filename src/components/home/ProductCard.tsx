@@ -47,6 +47,7 @@ export function ProductCard({
       productId: id,
       name,
       price,
+      basePrice: price,
       image: image || "",
     });
     setAdded(true);
@@ -78,30 +79,24 @@ export function ProductCard({
             صورة قادمة
           </div>
         )}
-
         {onSale && percent > 0 && (
           <span className="absolute top-3 right-3 z-10 bg-sale text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow">
             خصم {percent}%
           </span>
         )}
-
         {lowStock && (
           <span className="absolute top-3 left-3 z-10 bg-ink/80 text-white text-[10px] font-bold px-2 py-1 rounded-full">
             متبقي {stock}
           </span>
         )}
-
         <button
           type="button"
           onClick={onWish}
           className="absolute bottom-3 left-3 z-10 w-9 h-9 rounded-full bg-white/90 shadow flex items-center justify-center"
           aria-label="أمنية"
         >
-          <Heart
-            className={`w-4 h-4 ${wished ? "fill-sale text-sale" : "text-ink"}`}
-          />
+          <Heart className={`w-4 h-4 ${wished ? "fill-sale text-sale" : "text-ink"}`} />
         </button>
-
         <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-active:translate-y-0 group-active:opacity-100 transition duration-200 bg-gradient-to-t from-black/50 to-transparent">
           <button
             type="button"
@@ -114,9 +109,7 @@ export function ProductCard({
       </div>
       <div className="px-3 pt-3 pb-4">
         {category && (
-          <p className="text-[10px] tracking-widest uppercase text-muted mb-1">
-            {category}
-          </p>
+          <p className="text-[10px] tracking-widest uppercase text-muted mb-1">{category}</p>
         )}
         <h3 className="text-sm font-semibold text-ink line-clamp-2 mb-1.5 leading-snug group-hover:opacity-80 transition">
           {name}
