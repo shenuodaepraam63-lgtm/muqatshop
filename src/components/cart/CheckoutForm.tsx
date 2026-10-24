@@ -37,7 +37,7 @@ export function CheckoutForm() {
 
   const [shipSettings, setShipSettings] = useState<ShippingSettings>({
     fee: DEFAULT_SHIPPING_FEE,
-    free_over: null,
+    free_over: 1000,
   });
   const [couponCode, setCouponCode] = useState("");
   const [discount, setDiscount] = useState(0);
@@ -56,7 +56,7 @@ export function CheckoutForm() {
         const v = data.value as { fee?: number; free_over?: number | null };
         setShipSettings({
           fee: typeof v.fee === "number" ? v.fee : DEFAULT_SHIPPING_FEE,
-          free_over: typeof v.free_over === "number" ? v.free_over : null,
+          free_over: typeof v.free_over === "number" ? v.free_over : 1000,
         });
       }
     })();
@@ -66,9 +66,12 @@ export function CheckoutForm() {
     () => (governorate ? EGYPT_GOVERNORATES[governorate] || [] : []),
     [governorate]
   );
-
-  const shipping = governorate ? calcShipping(subtotal, shipSettings) : 0;
-  const total = Math.max(0, subtotal - discount + shipping);
+  const afterDiscount = Math.max(0, subtotal - discount);
+  const shipping = governorate ? calcShipping(afterDiscount, shipSettings) : 0;
+  const total = afterDiscount + shipping;
+  const freeThreshold = shipSettings.free_over;
+  const remainingForFree =
+    freeThreshold != null ? Math.max(0, freeThreshold - afterDiscount) : null;
 
   const onGovChange = (v: string) => {
     setGovernorate(v);
@@ -130,8 +133,9 @@ export function CheckoutForm() {
         finalCoupon = re.coupon.code;
       }
 
-      const ship = calcShipping(subtotal, shipSettings);
-      const orderTotal = Math.max(0, subtotal - finalDiscount + ship);
+      const net = Math.max(0, subtotal - finalDiscount);
+      const ship = calcShipping(net, shipSettings);
+      const orderTotal = net + ship;
       const orderNumber = `MQ-${Date.now().toString(36).toUpperCase()}`;
 
       const orderItems = items.map((i) => ({
@@ -280,12 +284,26 @@ export function CheckoutForm() {
         )}
         <div className="flex justify-between">
           <span className="text-muted">رسوم التوصيل</span>
-          <span>{!governorate ? "—" : shipping === 0 ? "مجاني" : formatPrice(shipping)}</span>
+          <span>
+            {!governorate
+              ? "—"
+              : shipping === 0
+                ? "مجاني"
+                : formatPrice(shipping)}
+          </span>
         </div>
         <div className="flex justify-between text-base font-bold pt-1">
           <span>الإجمالي</span>
           <span>{formatPrice(total)}</span>
         </div>
+        {freeThreshold != null && (
+          <p className="text-xs text-muted leading-relaxed">
+            {remainingForFree != null && remainingForFree > 0
+              ? `أضف ${formatPrice(remainingForFree)} للحصول على توصيل مجاني (فوق ${formatPrice(freeThreshold)})`
+              : `✓ توصيل مجاني للطلبات فوق ${formatPrice(freeThreshold)}`}
+            {` · غير ذلك ${formatPrice(shipSettings.fee)}`}
+          </p>
+        )}
       </div>
 
       {error && <p className="text-sm text-sale bg-sale/10 rounded-lg px-3 py-2">{error}</p>}

@@ -10,29 +10,37 @@ export function Footer() {
             <Link href="/" aria-label="Muqatshop — الصفحة الرئيسية" className="inline-flex mb-4">
               <BrandLogo size="md" />
             </Link>
+            <p className="text-sm text-muted leading-relaxed">
+              تصميمك، قصتك — توصيل لكل محافظات مصر
+            </p>
           </div>
 
           <div>
             <h4 className="font-semibold mb-4">روابط سريعة</h4>
             <ul className="space-y-2 text-sm text-muted">
               <li>
-                <Link href="/collections" className="hover:text-ink transition">
+                <Link href="/shop" className="hover:text-ink transition">
                   جميع المنتجات
                 </Link>
               </li>
               <li>
-                <Link href="/collections/bags" className="hover:text-ink transition">
-                  مقاطف
+                <Link href="/categories/mugs" className="hover:text-ink transition">
+                  مجات
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="hover:text-ink transition">
-                  عن المتجر
+                <Link href="/categories/clothing" className="hover:text-ink transition">
+                  ملابس
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-ink transition">
-                  تواصل معنا
+                <Link href="/track" className="hover:text-ink transition">
+                  تتبع طلب
+                </Link>
+              </li>
+              <li>
+                <Link href="/merchant/register" className="hover:text-ink transition">
+                  سجّل كتاجر
                 </Link>
               </li>
             </ul>
@@ -42,8 +50,14 @@ export function Footer() {
             <h4 className="font-semibold mb-4">خدمة العملاء</h4>
             <ul className="space-y-2 text-sm text-muted">
               <li>شحن لكل محافظات مصر</li>
+              <li>توصيل مجاني للطلبات فوق 1000 ج.م</li>
               <li>الدفع عند الاستلام متاح</li>
               <li>تواصل عبر واتساب</li>
+              <li>
+                <Link href="/merchant/login" className="hover:text-ink transition">
+                  دخول التاجر
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
