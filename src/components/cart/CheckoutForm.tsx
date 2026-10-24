@@ -128,12 +128,11 @@ export function CheckoutForm() {
       return;
     }
 
-    // تحقق أسعار التاجر
     if (merchantId) {
       for (const i of items) {
         const base = i.basePrice ?? i.price;
         if (i.price < base) {
-          setError(`سعر «${i.name}» أقل من سعر المتجر`);
+          setError("ممنوع السعر أقل برجاء وضع سعر مناسب");
           return;
         }
       }
@@ -145,7 +144,7 @@ export function CheckoutForm() {
       let finalCoupon = appliedCode;
       let couponId = appliedCouponId;
 
-      if (appliedCode) {
+      if (appliedCode && !merchantId) {
         const re = await validateCoupon(appliedCode, subtotal);
         if (!re.ok) {
           setError(re.error);

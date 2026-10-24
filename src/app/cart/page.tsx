@@ -17,10 +17,50 @@ export default function CartPage() {
   const totalPrice = useCartStore((s) => s.totalPrice());
   const totalBase = useCartStore((s) => s.totalBase());
   const [isMerchant, setIsMerchant] = useState(false);
+  /** draft prices while typing */
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setIsMerchant(!!getMerchantSession());
   }, []);
+
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    items.forEach((i) => {
+      next[i.id] = String(i.price);
+    });
+    setDrafts(next);
+  }, [items]);
+
+  const applyPrice = (id: string, base: number, raw: string) => {
+    const n = Number(raw);
+    if (raw.trim() === "" || Number.isNaN(n)) {
+      setErrors((e) => ({
+        ...e,
+        [id]: "برجاء وضع سعر مناسب",
+      }));
+      return;
+    }
+    if (n < base) {
+      setErrors((e) => ({
+        ...e,
+        [id]: "ممنوع السعر أقل برجاء وضع سعر مناسب",
+      }));
+      // أعد العرض لآخر سعر صالح
+      setDrafts((d) => ({
+        ...d,
+        [id]: String(items.find((x) => x.id === id)?.price ?? base),
+      }));
+      return;
+    }
+    setErrors((e) => {
+      const copy = { ...e };
+      delete copy[id];
+      return copy;
+    });
+    updatePrice(id, n);
+  };
 
   if (items.length === 0) {
     return (
@@ -44,7 +84,7 @@ export default function CartPage() {
       <h1 className="text-2xl font-bold mb-2">سلة التسوق وإتمام الطلب</h1>
       {isMerchant && (
         <p className="text-sm text-muted mb-6">
-          أنت في <strong>وضع التاجر</strong> — ارفع سعر البيع (مش أقل من سعر المتجر) والفرق يروح لمحفظتك بعد التسليم.
+          وضع التاجر: امسح السعر واكتب سعرك — ممنوع أقل من سعر المتجر.
         </p>
       )}
 
@@ -82,13 +122,41 @@ export default function CartPage() {
                           type="number"
                           min={base}
                           step="1"
-                          value={item.price}
-                          onChange={(e) =>
-                            updatePrice(item.id, Number(e.target.value))
+                          value={drafts[item.id] ?? String(item.price)}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setDrafts((d) => ({ ...d, [item.id]: v }));
+                            const n = Number(v);
+                            if (v.trim() !== "" && !Number.isNaN(n) && n < base) {
+                              setErrors((err) => ({
+                                ...err,
+                                [item.id]: "ممنوع السعر أقل برجاء وضع سعر مناسب",
+                              }));
+                            } else {
+                              setErrors((err) => {
+                                const c = { ...err };
+                                delete c[item.id];
+                                return c;
+                              });
+                            }
+                          }}
+                          onBlur={() =>
+                            applyPrice(
+                              item.id,
+                              base,
+                              drafts[item.id] ?? String(item.price)
+                            )
                           }
-                          className="w-full max-w-[140px] border border-border rounded-lg px-2 py-1.5 text-sm font-semibold"
+                          className={`w-full max-w-[160px] border rounded-lg px-2 py-1.5 text-sm font-semibold ${
+                            errors[item.id]
+                              ? "border-sale ring-1 ring-sale/30"
+                              : "border-border"
+                          }`}
                         />
-                        {item.price > base && (
+                        {errors[item.id] && (
+                          <p className="text-xs text-sale font-medium">{errors[item.id]}</p>
+                        )}
+                        {!errors[item.id] && item.price > base && (
                           <p className="text-xs text-green-700">
                             ربحك: {formatPrice((item.price - base) * item.quantity)}
                           </p>

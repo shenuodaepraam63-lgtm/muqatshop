@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Changa } from "next/font/google";
 import "./globals.css";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
-import { MerchantStrip } from "@/components/layout/MerchantStrip";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -37,7 +36,6 @@ export default function RootLayout({
     <html lang="ar" dir="rtl">
       <body className={`${changa.variable} font-sans antialiased`}>
         <AnnouncementBar />
-        <MerchantStrip />
         <Header />
         <main className="min-h-[70vh] pb-20 md:pb-0">{children}</main>
         <Footer />
