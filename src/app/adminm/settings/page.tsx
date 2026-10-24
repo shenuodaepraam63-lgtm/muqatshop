@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 export default function AdminmSettingsPage() {
   const [minW, setMinW] = useState("200");
   const [holdDays, setHoldDays] = useState("2");
+  const [commission, setCommission] = useState("10");
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
@@ -16,9 +17,14 @@ export default function AdminmSettingsPage() {
       .maybeSingle()
       .then(({ data }) => {
         if (data?.value && typeof data.value === "object") {
-          const v = data.value as { min_withdrawal?: number; hold_days?: number };
+          const v = data.value as {
+            min_withdrawal?: number;
+            hold_days?: number;
+            commission_percent?: number;
+          };
           if (v.min_withdrawal != null) setMinW(String(v.min_withdrawal));
           if (v.hold_days != null) setHoldDays(String(v.hold_days));
+          if (v.commission_percent != null) setCommission(String(v.commission_percent));
         }
       });
   }, []);
@@ -29,6 +35,7 @@ export default function AdminmSettingsPage() {
       value: {
         min_withdrawal: Number(minW) || 200,
         hold_days: Number(holdDays) || 2,
+        commission_percent: Math.min(50, Math.max(0, Number(commission) || 0)),
       },
       updated_at: new Date().toISOString(),
     });
@@ -41,23 +48,18 @@ export default function AdminmSettingsPage() {
       <div className="bg-white border rounded-2xl p-4 space-y-3">
         <div>
           <label className="text-sm block mb-1">الحد الأدنى للسحب (ج.م)</label>
-          <input
-            type="number"
-            min={0}
-            value={minW}
-            onChange={(e) => setMinW(e.target.value)}
-            className="w-full border rounded-xl px-3 py-2.5 text-sm"
-          />
+          <input type="number" min={0} value={minW} onChange={(e) => setMinW(e.target.value)} className="w-full border rounded-xl px-3 py-2.5 text-sm" />
         </div>
         <div>
           <label className="text-sm block mb-1">أيام الانتظار بعد التسليم</label>
-          <input
-            type="number"
-            min={0}
-            value={holdDays}
-            onChange={(e) => setHoldDays(e.target.value)}
-            className="w-full border rounded-xl px-3 py-2.5 text-sm"
-          />
+          <input type="number" min={0} value={holdDays} onChange={(e) => setHoldDays(e.target.value)} className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+        </div>
+        <div>
+          <label className="text-sm block mb-1">نسبة عمولة رابط الإحالة %</label>
+          <input type="number" min={0} max={50} value={commission} onChange={(e) => setCommission(e.target.value)} className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+          <p className="text-xs text-muted mt-1">
+            لما العميل يطلب من رابط التاجر (?m=كود) بدون ما التاجر يرفع السعر — تُحسب هذه النسبة من مجموع المنتجات
+          </p>
         </div>
         <button type="button" onClick={save} className="bg-ink text-white text-sm font-semibold px-5 py-2.5 rounded-full">
           حفظ

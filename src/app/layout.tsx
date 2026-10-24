@@ -5,6 +5,7 @@ import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { MerchantRefCaptureGate } from "@/components/layout/MerchantRefCaptureGate";
 
 const changa = Changa({
   subsets: ["arabic", "latin"],
@@ -35,6 +36,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body className={`${changa.variable} font-sans antialiased`}>
+        <MerchantRefCaptureGate />
         <AnnouncementBar />
         <Header />
         <main className="min-h-[70vh] pb-20 md:pb-0">{children}</main>

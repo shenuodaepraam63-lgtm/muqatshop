@@ -7,7 +7,9 @@ import {
   getMerchantSession,
   releaseMaturedProfits,
   makeMerchantCode,
+  getMerchantSettings,
 } from "@/lib/merchant";
+import { merchantShareUrl } from "@/lib/merchant-ref";
 import { formatPrice } from "@/lib/utils";
 
 export default function MerchantHome() {
@@ -19,6 +21,8 @@ export default function MerchantHome() {
   const [code, setCode] = useState("");
   const [unread, setUnread] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [commission, setCommission] = useState(10);
 
   useEffect(() => {
     const s = getMerchantSession();
@@ -26,6 +30,8 @@ export default function MerchantHome() {
     setCode(s.code || makeMerchantCode(s.id));
     (async () => {
       await releaseMaturedProfits(s.id);
+      const settings = await getMerchantSettings();
+      setCommission(settings.commission_percent);
       const [{ data: w }, { data: ords }, { count }] = await Promise.all([
         supabase.from("merchant_wallets").select("balance, pending").eq("merchant_id", s.id).maybeSingle(),
         supabase.from("orders").select("id, status").eq("merchant_id", s.id),
@@ -47,28 +53,51 @@ export default function MerchantHome() {
     })();
   }, []);
 
-  const copy = async () => {
+  const copy = async (text: string, kind: "code" | "share") => {
     try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      await navigator.clipboard.writeText(text);
+      if (kind === "code") {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } else {
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 1500);
+      }
     } catch {
       /* */
     }
   };
 
+  const share = code ? merchantShareUrl(code, "/shop") : "";
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold">لوحتي</h1>
 
-      <div className="bg-white border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-muted">كود التاجر</p>
-          <p className="font-mono text-lg font-bold tracking-wider">{code}</p>
+      <div className="bg-white border rounded-2xl p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-muted">كود التاجر</p>
+            <p className="font-mono text-lg font-bold tracking-wider">{code}</p>
+          </div>
+          <button type="button" onClick={() => copy(code, "code")} className="text-sm bg-ink text-white px-4 py-2 rounded-full">
+            {copied ? "تم النسخ" : "نسخ الكود"}
+          </button>
         </div>
-        <button type="button" onClick={copy} className="text-sm bg-ink text-white px-4 py-2 rounded-full">
-          {copied ? "تم النسخ" : "نسخ الكود"}
-        </button>
+        <div>
+          <p className="text-xs text-muted mb-1">رابط المشاركة (عمولة {commission}% للعميل)</p>
+          <p className="text-xs break-all bg-[#f8f5f0] rounded-lg px-2 py-2 font-mono">{share}</p>
+          <button
+            type="button"
+            onClick={() => copy(share, "share")}
+            className="mt-2 text-sm border border-ink px-4 py-2 rounded-full"
+          >
+            {shareCopied ? "تم نسخ الرابط" : "نسخ رابط المتجر"}
+          </button>
+        </div>
+        <p className="text-xs text-muted leading-relaxed">
+          ابعت الرابط لعملائك. لو طلبوا بأنفسهم تاخد نسبة العمولة. أو ادخل المتجر بنفسك وارفع السعر في السلة.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -105,13 +134,8 @@ export default function MerchantHome() {
         href="/shop"
         className="block text-center bg-ink text-white py-3.5 rounded-full text-sm font-semibold"
       >
-        تسوق من المتجر واطلب لعميل
+        تسوق واطلب لعميل (رفع سعر)
       </Link>
-
-      <p className="text-xs text-muted leading-relaxed">
-        ادخل المتجر → أضف للسلة → ارفع سعر البيع → أدخل بيانات العميل. بعد التسليم تُحتسب العمولة
-        معلّقة ثم تُحرَّر بعد يومين.
-      </p>
     </div>
   );
 }

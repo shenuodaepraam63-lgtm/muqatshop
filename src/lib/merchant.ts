@@ -13,6 +13,8 @@ export type Merchant = {
 export type MerchantSettings = {
   min_withdrawal: number;
   hold_days: number;
+  /** نسبة عمولة من طلبات العملاء عبر رابط التاجر */
+  commission_percent: number;
 };
 
 export type MerchantSession = {
@@ -86,10 +88,16 @@ export async function getMerchantSettings(): Promise<MerchantSettings> {
     .select("value")
     .eq("key", "merchant_settings")
     .maybeSingle();
-  const v = (data?.value || {}) as { min_withdrawal?: number; hold_days?: number };
+  const v = (data?.value || {}) as {
+    min_withdrawal?: number;
+    hold_days?: number;
+    commission_percent?: number;
+  };
   return {
     min_withdrawal: typeof v.min_withdrawal === "number" ? v.min_withdrawal : 200,
     hold_days: typeof v.hold_days === "number" ? v.hold_days : 2,
+    commission_percent:
+      typeof v.commission_percent === "number" ? v.commission_percent : 10,
   };
 }
 
