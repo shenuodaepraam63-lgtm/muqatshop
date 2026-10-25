@@ -45,7 +45,6 @@ function WelcomeInner() {
     router.replace("/");
   };
 
-  /** تسجيل بحساب Supabase Auth — البريد يرسل رابط تأكيد */
   const register = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -82,7 +81,6 @@ function WelcomeInner() {
       return;
     }
 
-    // إن كان التأكيد معطلًا في المشروع قد تُنشأ جلسة فورًا
     if (data.session) {
       const synced = await syncCustomerFromAuthUser({ name: name.trim() });
       setLoading(false);
@@ -134,7 +132,6 @@ function WelcomeInner() {
     router.replace(next.startsWith("/") ? next : "/");
   };
 
-  /** نسيت كلمة المرور — رابط Reset من Supabase */
   const startForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -142,6 +139,7 @@ function WelcomeInner() {
     setLoading(true);
     const em = email.trim().toLowerCase();
 
+    // يوجّه مباشرة لصفحة تعيين كلمة المرور (تدعم code و hash)
     const { error: err } = await supabase.auth.resetPasswordForEmail(em, {
       redirectTo: authRedirectTo("/auth/reset-password"),
     });
@@ -152,7 +150,7 @@ function WelcomeInner() {
       return;
     }
     setInfo(
-      "إن وُجد حساب بهذا البريد، ستصلك رسالة فيها رابط لإعادة تعيين كلمة المرور. صلاحية الرابط محدودة."
+      "إن وُجد حساب بهذا البريد، ستصلك رسالة فيها رابط. بعد الضغط عليه ستفتح صفحة تعيين كلمة مرور جديدة."
     );
   };
 
@@ -316,16 +314,13 @@ function WelcomeInner() {
                   >
                     {loading ? "..." : "إنشاء حساب وإرسال رابط التأكيد"}
                   </button>
-                  <p className="text-[11px] text-muted text-center">
-                    ستصلك رسالة فيها <strong>رابط</strong> للتأكيد — اضغطه من هاتفك أو الكمبيوتر.
-                  </p>
                 </form>
               )}
 
               {custMode === "forgot" && (
                 <form onSubmit={startForgot} className="space-y-3">
                   <p className="text-sm text-muted text-center">
-                    نرسل إلى بريدك <strong>رابطًا</strong> لإعادة تعيين كلمة المرور.
+                    نرسل رابطًا يفتح صفحة <strong>تعيين كلمة مرور جديدة</strong>.
                   </p>
                   <input
                     type="email"
@@ -365,9 +360,6 @@ function WelcomeInner() {
               >
                 دخول تاجر
               </a>
-              <p className="text-xs text-muted text-center">
-                العميل يقدّم طلب تاجر من صفحة <strong>حسابي</strong> بعد تسجيل الدخول.
-              </p>
             </>
           )}
         </div>

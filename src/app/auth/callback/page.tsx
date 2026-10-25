@@ -14,7 +14,7 @@ function CallbackInner() {
   const router = useRouter();
   const sp = useSearchParams();
   const next = sp.get("next") || "/";
-  const roleParam = sp.get("role"); // merchant | customer
+  const roleParam = sp.get("role");
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [message, setMessage] = useState("جاري تأكيد الرابط...");
 
@@ -27,49 +27,60 @@ function CallbackInner() {
         const url = new URL(href);
         const code = url.searchParams.get("code");
         const token_hash = url.searchParams.get("token_hash");
-        const type = url.searchParams.get("type");
+        const typeQ = url.searchParams.get("type") || sp.get("type") || "";
+
+        const hash = url.hash?.replace(/^#/, "") || "";
+        const hashParams = new URLSearchParams(hash);
+        const hashType = hashParams.get("type") || "";
 
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
-        } else if (token_hash && type) {
+        } else if (token_hash && (typeQ || hashType)) {
+          const t = (typeQ || hashType) as
+            | "signup"
+            | "invite"
+            | "magiclink"
+            | "recovery"
+            | "email";
           const { error } = await supabase.auth.verifyOtp({
             token_hash,
-            type: type as "signup" | "invite" | "magiclink" | "recovery" | "email",
+            type: t,
+          });
+          if (error) throw error;
+        } else if (hashParams.get("access_token") && hashParams.get("refresh_token")) {
+          const { error } = await supabase.auth.setSession({
+            access_token: hashParams.get("access_token")!,
+            refresh_token: hashParams.get("refresh_token")!,
           });
           if (error) throw error;
         } else {
-          const hash = url.hash?.replace(/^#/, "") || "";
-          const params = new URLSearchParams(hash);
-          const access_token = params.get("access_token");
-          const refresh_token = params.get("refresh_token");
-          if (access_token && refresh_token) {
-            const { error } = await supabase.auth.setSession({
-              access_token,
-              refresh_token,
-            });
-            if (error) throw error;
-          } else {
-            const {
-              data: { session },
-            } = await supabase.auth.getSession();
-            if (!session) {
-              throw new Error("رابط غير صالح أو منتهي الصلاحية");
-            }
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (!session) {
+            throw new Error("رابط غير صالح أو منتهي الصلاحية");
           }
         }
 
         if (cancelled) return;
 
-        const hashType = new URLSearchParams(
-          (typeof window !== "undefined" ? window.location.hash : "").replace(/^#/, "")
-        ).get("type");
+        // استعادة كلمة المرور → صفحة تعيين كلمة جديدة دائمًا
         const isRecovery =
-          type === "recovery" || hashType === "recovery" || sp.get("type") === "recovery";
+          typeQ === "recovery" ||
+          hashType === "recovery" ||
+          sp.get("type") === "recovery";
 
         if (isRecovery) {
           setStatus("ok");
-          setMessage("تم التحقق — سيتم فتح صفحة كلمة المرور الجديدة");
+          setMessage("تم التحقق — جاري فتح صفحة كلمة المرور الجديدة");
+          router.replace("/auth/reset-password");
+          return;
+        }
+
+        // أحيانًا Supabase لا يمرّر type=recovery في الـ query بعد code exchange
+        // إن وُجدت معلمة next تشير لصفحة الباسورد
+        if (next.includes("reset-password")) {
           router.replace("/auth/reset-password");
           return;
         }
@@ -90,7 +101,7 @@ function CallbackInner() {
           setMessage("تم تأكيد بريد التاجر بنجاح");
           setTimeout(() => {
             router.replace(next.startsWith("/") ? next : "/merchant");
-          }, 800);
+          }, 600);
           return;
         }
 
@@ -101,7 +112,7 @@ function CallbackInner() {
         setMessage("تم تأكيد حسابك بنجاح");
         setTimeout(() => {
           router.replace(next.startsWith("/") ? next : "/");
-        }, 800);
+        }, 600);
       } catch (e: unknown) {
         if (cancelled) return;
         setStatus("error");
@@ -121,11 +132,11 @@ function CallbackInner() {
         <p className={`text-sm ${status === "error" ? "text-sale" : "text-ink"}`}>{message}</p>
         {status === "error" && (
           <div className="space-y-2 pt-2">
-            <Link href="/welcome?tab=merchant" className="block text-sm font-semibold underline">
-              دخول تاجر
-            </Link>
-            <Link href="/merchant/register" className="block text-xs text-muted">
-              تسجيل تاجر من جديد
+            <Link
+              href="/welcome?tab=customer&mode=forgot"
+              className="block text-sm font-semibold underline"
+            >
+              طلب رابط استعادة جديد
             </Link>
             <Link href="/welcome?tab=customer" className="block text-xs text-muted">
               دخول عميل
@@ -139,7 +150,11 @@ function CallbackInner() {
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-sm text-muted">...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-sm text-muted">...</div>
+      }
+    >
       <CallbackInner />
     </Suspense>
   );
