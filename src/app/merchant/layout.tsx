@@ -38,6 +38,7 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
 
   const nav = [
     { href: "/merchant", label: "الرئيسية" },
+    { href: "/merchant/catalog", label: "الكتالوج" },
     { href: "/merchant/orders", label: "طلباتي" },
     { href: "/merchant/wallet", label: "المحفظة" },
     { href: "/merchant/messages", label: "الرسائل" },
