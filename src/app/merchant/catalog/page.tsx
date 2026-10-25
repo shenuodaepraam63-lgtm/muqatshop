@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { supabase, productMainImage, type Product } from "@/lib/supabase";
 import {
   getMerchantSession,
@@ -9,7 +10,21 @@ import {
 } from "@/lib/merchant";
 import { merchantShareUrl } from "@/lib/merchant-ref";
 import { formatPrice } from "@/lib/utils";
-import { Copy, Link2, Image as ImageIcon, FileText, Search, Loader2, Check } from "lucide-react";
+import {
+  loadFavorites,
+  toggleFavorite,
+} from "@/lib/marketer-local";
+import {
+  Copy,
+  Link2,
+  Image as ImageIcon,
+  FileText,
+  Search,
+  Loader2,
+  Check,
+  Heart,
+  PlusCircle,
+} from "lucide-react";
 
 type MP = {
   product_id: string;
@@ -26,6 +41,7 @@ export default function MerchantCatalogPage() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [favs, setFavs] = useState<string[]>([]);
   const [toast, setToast] = useState("");
 
   const showToast = (t: string) => {
@@ -38,6 +54,7 @@ export default function MerchantCatalogPage() {
     if (!s) return;
     setMerchantId(s.id);
     setCode(s.code || makeMerchantCode(s.id));
+    setFavs(loadFavorites());
     (async () => {
       setLoading(true);
       const [{ data: prods }, { data: rows }] = await Promise.all([
@@ -79,6 +96,12 @@ export default function MerchantCatalogPage() {
         (p.brand || "").toLowerCase().includes(t)
     );
   }, [products, q]);
+
+  const onToggleFav = (id: string) => {
+    const next = toggleFavorite(id);
+    setFavs(next);
+    showToast(next.includes(id) ? "أُضيف للمفضلة" : "أُزيل من المفضلة");
+  };
 
   const savePrice = async (product: Product) => {
     if (!merchantId) return;
@@ -126,11 +149,19 @@ export default function MerchantCatalogPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold">كتالوج المنتجات</h1>
-        <p className="text-sm text-muted mt-1">
-          حدّد سعر بيعك، انسخ الرابط والصور والوصف — زي تاجر
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-bold">كتالوج المنتجات</h1>
+          <p className="text-sm text-muted mt-1">
+            حدّد سعر بيعك، أضف للمفضلة، انسخ الرابط والصور
+          </p>
+        </div>
+        <Link
+          href="/merchant/favorites"
+          className="text-xs text-[#0042EB] hover:underline flex items-center gap-1"
+        >
+          <Heart className="w-3.5 h-3.5" /> المفضلة ({favs.length})
+        </Link>
       </div>
 
       {toast && (
@@ -166,6 +197,7 @@ export default function MerchantCatalogPage() {
               !Number.isNaN(sellNum) && sellNum >= base ? sellNum - base : null;
             const img = productMainImage(p) || "";
             const desc = (p.description || "").trim();
+            const liked = favs.includes(p.id);
 
             return (
               <article
@@ -179,9 +211,29 @@ export default function MerchantCatalogPage() {
                     ) : null}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h2 className="font-semibold text-sm sm:text-base line-clamp-2">{p.name}</h2>
+                    <div className="flex items-start justify-between gap-2">
+                      <h2 className="font-semibold text-sm sm:text-base line-clamp-2">
+                        {p.name}
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => onToggleFav(p.id)}
+                        className={`shrink-0 w-9 h-9 rounded-full border flex items-center justify-center ${
+                          liked
+                            ? "border-sale bg-sale/10 text-sale"
+                            : "border-[#eae6df] text-muted hover:text-sale"
+                        }`}
+                        aria-label={liked ? "إزالة من المفضلة" : "إضافة للمفضلة"}
+                      >
+                        <Heart
+                          className="w-4 h-4"
+                          fill={liked ? "currentColor" : "none"}
+                        />
+                      </button>
+                    </div>
                     <p className="text-xs text-muted mt-1">
-                      تكلفة المنصة: <span className="font-medium text-ink">{formatPrice(base)}</span>
+                      تكلفة المنصة:{" "}
+                      <span className="font-medium text-ink">{formatPrice(base)}</span>
                     </p>
                     {profit != null && profit > 0 && (
                       <p className="text-xs text-green-700 mt-0.5">
@@ -193,7 +245,9 @@ export default function MerchantCatalogPage() {
 
                 <div className="flex flex-wrap items-end gap-2">
                   <div className="flex-1 min-w-[120px]">
-                    <label className="block text-[11px] text-muted mb-1">سعر بيعك (ج.م)</label>
+                    <label className="block text-[11px] text-muted mb-1">
+                      سعر بيعك (ج.م)
+                    </label>
                     <input
                       type="number"
                       min={base}
@@ -214,6 +268,12 @@ export default function MerchantCatalogPage() {
                   >
                     {savingId === p.id ? "..." : "حفظ السعر"}
                   </button>
+                  <Link
+                    href={`/merchant/new-order?product=${p.id}`}
+                    className="inline-flex items-center gap-1 text-sm border border-ink px-3 py-2 rounded-xl"
+                  >
+                    <PlusCircle className="w-4 h-4" /> أوردر
+                  </Link>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
