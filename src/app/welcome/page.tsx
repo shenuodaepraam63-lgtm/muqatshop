@@ -29,7 +29,6 @@ function WelcomeInner() {
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
-  const [debugCode, setDebugCode] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,25 +51,19 @@ function WelcomeInner() {
   };
 
   const sendOtpMail = async (em: string, code: string, nm: string) => {
-    try {
-      const r = await fetch("/api/otp/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: em, code, name: nm }),
-      });
-      const j = await r.json();
-      if (j.debugCode) setDebugCode(j.debugCode);
-      return j;
-    } catch {
-      return { ok: false };
-    }
+    const r = await fetch("/api/otp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: em, code, name: nm }),
+    });
+    const j = await r.json();
+    return j as { ok: boolean; error?: string; sent?: boolean };
   };
 
   const register = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setInfo("");
-    setDebugCode("");
     if (password.length < 6) {
       setError("كلمة المرور 6 أحرف على الأقل");
       return;
@@ -116,7 +109,13 @@ function WelcomeInner() {
     }
 
     const code = await createAndStoreOtp(em, "register");
-    await sendOtpMail(em, code, name.trim());
+    const mail = await sendOtpMail(em, code, name.trim());
+    if (!mail.ok) {
+      setLoading(false);
+      setError(mail.error || "تعذر إرسال رمز التحقق إلى بريدك");
+      return;
+    }
+
     setPendingEmail(em);
     setCustMode("otp");
     setInfo("أرسلنا رمز تحقق إلى بريدك. أدخله لإتمام التسجيل.");
@@ -135,10 +134,7 @@ function WelcomeInner() {
       return;
     }
 
-    await supabase
-      .from("customers")
-      .update({ email_verified: true })
-      .eq("email", em);
+    await supabase.from("customers").update({ email_verified: true }).eq("email", em);
 
     const { data: cust } = await supabase
       .from("customers")
@@ -176,19 +172,25 @@ function WelcomeInner() {
       .eq("password_hash", hash)
       .maybeSingle();
 
-    setLoading(false);
     if (err || !data) {
+      setLoading(false);
       setError("بيانات الدخول غير صحيحة");
       return;
     }
     if (!data.is_active) {
+      setLoading(false);
       setError("الحساب موقوف");
       return;
     }
     if (!data.email_verified) {
-      setPendingEmail(em);
       const code = await createAndStoreOtp(em, "register");
-      await sendOtpMail(em, code, data.name);
+      const mail = await sendOtpMail(em, code, data.name);
+      setLoading(false);
+      if (!mail.ok) {
+        setError(mail.error || "تعذر إرسال رمز التحقق");
+        return;
+      }
+      setPendingEmail(em);
       setCustMode("otp");
       setInfo("حسابك غير مفعّل — أدخل رمز التحقق المرسل لبريدك");
       return;
@@ -201,6 +203,7 @@ function WelcomeInner() {
       phone: data.phone,
     });
     setSiteRole("customer");
+    setLoading(false);
     router.replace(next.startsWith("/") ? next : "/");
   };
 
@@ -214,7 +217,6 @@ function WelcomeInner() {
       </div>
 
       <div className="w-full max-w-md bg-white border border-[#e8e2d9] rounded-3xl shadow-sm overflow-hidden">
-        {/* Tabs */}
         <div className="grid grid-cols-3 border-b border-[#e8e2d9]">
           {(
             [
@@ -232,9 +234,7 @@ function WelcomeInner() {
                 setInfo("");
               }}
               className={`py-3.5 text-sm font-semibold transition ${
-                tab === t.id
-                  ? "bg-ink text-white"
-                  : "bg-[#faf8f5] text-muted hover:text-ink"
+                tab === t.id ? "bg-ink text-white" : "bg-[#faf8f5] text-muted hover:text-ink"
               }`}
             >
               {t.label}
@@ -249,18 +249,10 @@ function WelcomeInner() {
               <p className="text-sm text-muted text-center leading-relaxed">
                 تشوف المنتجات والأسعار عادي. للشراء أو السلة هتحتاج تسجّل كعميل.
               </p>
-              <button
-                type="button"
-                onClick={goGuest}
-                className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold"
-              >
+              <button type="button" onClick={goGuest} className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold">
                 دخول كزائر
               </button>
-              <button
-                type="button"
-                onClick={() => setTab("customer")}
-                className="w-full text-sm text-muted underline"
-              >
+              <button type="button" onClick={() => setTab("customer")} className="w-full text-sm text-muted underline">
                 لدي حساب عميل
               </button>
             </>
@@ -269,27 +261,15 @@ function WelcomeInner() {
           {tab === "customer" && (
             <>
               <h1 className="text-lg font-bold text-center">
-                {custMode === "otp"
-                  ? "تأكيد البريد"
-                  : custMode === "register"
-                    ? "إنشاء حساب عميل"
-                    : "دخول عميل"}
+                {custMode === "otp" ? "تأكيد البريد" : custMode === "register" ? "إنشاء حساب عميل" : "دخول عميل"}
               </h1>
 
               {custMode !== "otp" && (
                 <div className="flex rounded-full bg-[#f0ebe3] p-1 text-sm">
-                  <button
-                    type="button"
-                    className={`flex-1 py-2 rounded-full ${custMode === "login" ? "bg-white font-semibold shadow-sm" : ""}`}
-                    onClick={() => setCustMode("login")}
-                  >
+                  <button type="button" className={`flex-1 py-2 rounded-full ${custMode === "login" ? "bg-white font-semibold shadow-sm" : ""}`} onClick={() => setCustMode("login")}>
                     دخول
                   </button>
-                  <button
-                    type="button"
-                    className={`flex-1 py-2 rounded-full ${custMode === "register" ? "bg-white font-semibold shadow-sm" : ""}`}
-                    onClick={() => setCustMode("register")}
-                  >
+                  <button type="button" className={`flex-1 py-2 rounded-full ${custMode === "register" ? "bg-white font-semibold shadow-sm" : ""}`} onClick={() => setCustMode("register")}>
                     حساب جديد
                   </button>
                 </div>
@@ -325,11 +305,6 @@ function WelcomeInner() {
                   <p className="text-sm text-muted text-center">
                     أدخل الرمز المرسل إلى <strong dir="ltr">{pendingEmail}</strong>
                   </p>
-                  {debugCode && (
-                    <p className="text-xs text-center bg-amber-50 border border-amber-200 rounded-lg py-2">
-                      وضع اختبار — الرمز: <strong className="font-mono tracking-widest">{debugCode}</strong>
-                    </p>
-                  )}
                   <input
                     inputMode="numeric"
                     maxLength={6}
@@ -349,10 +324,12 @@ function WelcomeInner() {
                     type="button"
                     className="w-full text-xs text-muted"
                     onClick={async () => {
+                      setError("");
                       const em = pendingEmail || email;
                       const code = await createAndStoreOtp(em, "register");
-                      await sendOtpMail(em, code, name || "عميل");
-                      setInfo("تم إرسال رمز جديد");
+                      const mail = await sendOtpMail(em, code, name || "عميل");
+                      if (!mail.ok) setError(mail.error || "فشل إعادة الإرسال");
+                      else setInfo("تم إرسال رمز جديد إلى بريدك");
                     }}
                   >
                     إعادة إرسال الرمز
@@ -365,42 +342,24 @@ function WelcomeInner() {
           {tab === "merchant" && (
             <>
               <h1 className="text-lg font-bold text-center">حساب تاجر</h1>
-              <p className="text-sm text-muted text-center">
-                نفس المتجر مع صلاحيات رفع السعر والمحفظة
-              </p>
-              <a
-                href="/merchant/login"
-                className="block w-full text-center bg-ink text-white py-3.5 rounded-full text-sm font-semibold"
-              >
+              <p className="text-sm text-muted text-center">نفس المتجر مع صلاحيات رفع السعر والمحفظة</p>
+              <a href="/merchant/login" className="block w-full text-center bg-ink text-white py-3.5 rounded-full text-sm font-semibold">
                 دخول تاجر
               </a>
-              <a
-                href="/merchant/register"
-                className="block w-full text-center border border-ink py-3.5 rounded-full text-sm font-semibold"
-              >
-                تسجيل تاجر جديد
-              </a>
+              <p className="text-xs text-muted text-center leading-relaxed">
+                لو عندك حساب عميل، قدّم طلب تاجر من <strong>حسابي</strong> بعد تسجيل الدخول — الموافقة من الإدارة.
+              </p>
             </>
           )}
         </div>
       </div>
-
-      <p className="text-xs text-muted mt-6 text-center max-w-sm">
-        باختيارك المتابعة، توافق على استخدام المنصة وفق سياسة المتجر.
-      </p>
     </div>
   );
 }
 
 export default function WelcomePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center text-muted text-sm">
-          ...
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted text-sm">...</div>}>
       <WelcomeInner />
     </Suspense>
   );
