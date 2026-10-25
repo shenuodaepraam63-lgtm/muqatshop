@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useCartStore } from "@/lib/store";
+import { productMainImage, type Product } from "@/lib/supabase";
+import { ensureCanPurchase, redirectToCustomerAuth } from "@/lib/purchase-guard";
 
 type Props = {
-  product: {
-    id: string;
-    name: string;
-    price: number;
-    image: string;
-  };
+  product: Pick<
+    Product,
+    "id" | "name" | "slug" | "price" | "images" | "main_image_index"
+  >;
   disabled?: boolean;
 };
 
@@ -18,25 +18,31 @@ export function AddToCartButton({ product, disabled }: Props) {
   const [done, setDone] = useState(false);
 
   const onClick = () => {
-    if (disabled) return;
+    if (!ensureCanPurchase()) {
+      redirectToCustomerAuth(
+        `/products/${encodeURIComponent(product.slug)}`
+      );
+      return;
+    }
     addItem({
       productId: product.id,
       name: product.name,
-      price: product.price,
-      image: product.image,
+      price: Number(product.price),
+      basePrice: Number(product.price),
+      image: productMainImage(product) || "",
     });
     setDone(true);
-    setTimeout(() => setDone(false), 2000);
+    setTimeout(() => setDone(false), 1500);
   };
 
   return (
     <button
       type="button"
-      onClick={onClick}
       disabled={disabled}
-      className="w-full sm:w-auto min-w-[200px] bg-ink text-page px-8 py-3.5 rounded-btn text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+      onClick={onClick}
+      className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold disabled:opacity-50"
     >
-      {disabled ? "غير متوفر" : done ? "تمت الإضافة ✓" : "أضف إلى السلة"}
+      {done ? "تمت الإضافة ✓" : "أضف إلى السلة"}
     </button>
   );
 }

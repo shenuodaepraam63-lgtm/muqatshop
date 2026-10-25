@@ -7,6 +7,7 @@ import { formatPrice, isSaleActive, salePercent } from "@/lib/utils";
 import { useCartStore } from "@/lib/store";
 import { useWishlistStore } from "@/lib/wishlist";
 import { Heart } from "lucide-react";
+import { ensureCanPurchase, redirectToCustomerAuth } from "@/lib/purchase-guard";
 
 type ProductCardProps = {
   id: string;
@@ -43,6 +44,10 @@ export function ProductCard({
   const onAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!ensureCanPurchase()) {
+      redirectToCustomerAuth(`/products/${encodeURIComponent(slug)}`);
+      return;
+    }
     addItem({
       productId: id,
       name,
@@ -57,6 +62,10 @@ export function ProductCard({
   const onWish = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!ensureCanPurchase()) {
+      redirectToCustomerAuth(`/products/${encodeURIComponent(slug)}`);
+      return;
+    }
     toggleWish({ productId: id, name, slug, price, image: image || "" });
   };
 

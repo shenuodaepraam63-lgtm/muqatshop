@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
 import { Changa } from "next/font/google";
 import "./globals.css";
-import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import { BottomNav } from "@/components/layout/BottomNav";
 import { MerchantRefCaptureGate } from "@/components/layout/MerchantRefCaptureGate";
 import { RoleGate } from "@/components/auth/RoleGate";
+import { SiteChrome } from "@/components/layout/SiteChrome";
 
 const changa = Changa({
   subsets: ["arabic", "latin"],
@@ -39,11 +36,7 @@ export default function RootLayout({
       <body className={`${changa.variable} font-sans antialiased`}>
         <MerchantRefCaptureGate />
         <RoleGate>
-          <AnnouncementBar />
-          <Header />
-          <main className="min-h-[70vh] pb-20 md:pb-0">{children}</main>
-          <Footer />
-          <BottomNav />
+          <SiteChrome>{children}</SiteChrome>
         </RoleGate>
       </body>
     </html>
