@@ -168,14 +168,35 @@ export default async function ProductPage({
     accordionItems.push({ title: "تفاصيل إضافية", content: extra.join("\n") });
   }
 
-  const customSections = (product.detail_sections || []).filter(
-    (s) => s?.title?.trim() && s?.content?.trim()
-  );
+  const customSections = product.detail_sections || [];
   for (const s of customSections) {
-    accordionItems.push({
-      title: s.title.trim(),
-      content: s.content.trim(),
-    });
+    const title = (s.title || "").trim();
+    if (!title) continue;
+    const rows = (s.rows || []).filter((r) => (r.label || "").trim() || (r.value || "").trim());
+    const isSpecs = s.kind === "specs" || rows.length > 0;
+    if (isSpecs && rows.length) {
+      accordionItems.push({
+        title,
+        content: (
+          <dl className="space-y-2">
+            {rows.map((r, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[minmax(0,40%)_1fr] gap-2 text-sm border-b border-[#f0ebe3] pb-2 last:border-0"
+              >
+                <dt className="font-medium text-ink">{r.label}</dt>
+                <dd className="text-muted">{r.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ),
+      });
+    } else if ((s.content || "").trim()) {
+      accordionItems.push({
+        title,
+        content: (s.content || "").trim(),
+      });
+    }
   }
 
   if (returnPolicy) {
