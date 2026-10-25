@@ -60,6 +60,8 @@ export default function AccountPage() {
   const [deleteStep, setDeleteStep] = useState<"idle" | "code">("idle");
   const [deleteOtp, setDeleteOtp] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
+  const [deleteMsg, setDeleteMsg] = useState("");
 
   const centers = useMemo(() => {
     if (country !== "مصر" || !governorate) return [];
@@ -143,117 +145,92 @@ export default function AccountPage() {
     router.replace("/welcome");
   };
 
-  /**
-   * يطلب رمزًا رقميًا من Supabase Auth (قالب Reauthentication / OTP)
-   * عبر reauthenticate، مع احتياطي signInWithOtp
-   */
   const requestDeleteCode = async () => {
-    setErr("");
-    setMsg("");
+    setDeleteErr("");
+    setDeleteMsg("");
     if (!confirm("سيتم إرسال رمز تحقق رقمي من Supabase إلى بريدك لتأكيد حذف الحساب. متابعة؟"))
       return;
 
     setDeleteLoading(true);
+    const em = email.trim().toLowerCase();
 
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
-    // إن لم تكن جلسة Auth: نطلب OTP بالبريد مباشرة (بدون إنشاء مستخدم جديد)
     if (!session) {
       const { error: otpErr } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
+        email: em,
         options: { shouldCreateUser: false },
       });
       setDeleteLoading(false);
       if (otpErr) {
-        setErr(
-          otpErr.message.includes("Signups not allowed") ||
-            otpErr.message.toLowerCase().includes("user not found")
-            ? "لازم تسجّل دخول بحساب مؤكد من الرابط أولًا، ثم تحذف الحساب"
-            : otpErr.message
+        setDeleteErr(
+          "لازم تسجّل دخول بحساب مؤكد (من رابط البريد) أولًا، ثم تحذف الحساب.\n" +
+            otpErr.message
         );
         return;
       }
       setDeleteStep("code");
       setDeleteOtp("");
-      setMsg("أرسلنا رمزًا رقميًا إلى بريدك عبر Supabase. أدخله لتأكيد الحذف.");
+      setDeleteMsg("تم إرسال الرمز الرقمي إلى بريدك عبر Supabase.");
       return;
     }
 
-    // مع جلسة: إعادة مصادقة — يستخدم قالب Reauthentication و{{ .Token }}
     const { error: reErr } = await supabase.auth.reauthenticate();
     if (reErr) {
-      // احتياطي: OTP بالبريد
       const { error: otpErr } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
+        email: em,
         options: { shouldCreateUser: false },
       });
       setDeleteLoading(false);
       if (otpErr) {
-        setErr(reErr.message || otpErr.message);
+        setDeleteErr(reErr.message || otpErr.message);
         return;
       }
       setDeleteStep("code");
       setDeleteOtp("");
-      setMsg("أرسلنا رمزًا رقميًا إلى بريدك عبر Supabase. أدخله لتأكيد الحذف.");
+      setDeleteMsg("تم إرسال الرمز الرقمي إلى بريدك عبر Supabase.");
       return;
     }
 
     setDeleteLoading(false);
     setDeleteStep("code");
     setDeleteOtp("");
-    setMsg("أرسلنا رمز التحقق الرقمي إلى بريدك (من Supabase). أدخله لتأكيد الحذف النهائي.");
+    setDeleteMsg("تم إرسال الرمز الرقمي إلى بريدك عبر Supabase.");
   };
 
   const confirmDelete = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErr("");
+    setDeleteErr("");
     setDeleteLoading(true);
 
     const em = email.trim().toLowerCase();
     const token = deleteOtp.trim();
 
-    // التحقق من الرمز الرقمي عبر Supabase
-    let verified = false;
-    const attempts: Array<{ type: "email" | "signup" | "recovery" | "invite" }> = [
-      { type: "email" },
-    ];
+    const { error: vErr } = await supabase.auth.verifyOtp({
+      email: em,
+      token,
+      type: "email",
+    });
 
-    for (const a of attempts) {
-      const { error: vErr } = await supabase.auth.verifyOtp({
-        email: em,
-        token,
-        type: a.type,
-      });
-      if (!vErr) {
-        verified = true;
-        break;
-      }
-    }
-
-    if (!verified) {
-      // بعض الإصدارات تستخدم type مرتبط بإعادة المصادقة كـ email فقط؛
-      // إن فشل: رسالة واضحة
+    if (vErr) {
       setDeleteLoading(false);
-      setErr("رمز التحقق غير صحيح أو منتهي — اطلب رمزًا جديدًا");
+      setDeleteErr("رمز التحقق غير صحيح أو منتهي — اطلب رمزًا جديدًا");
       return;
     }
 
-    // حذف بيانات الملف المرتبط بالمتجر
     await supabase.from("merchant_applications").delete().eq("customer_id", customerId);
     await supabase.from("customer_otps").delete().eq("email", em);
 
     const { error: delErr } = await supabase.from("customers").delete().eq("id", customerId);
     if (delErr) {
-      // تعطيل بدل الحذف إن فشل
       await supabase
         .from("customers")
         .update({ is_active: false, email_verified: false })
         .eq("id", customerId);
     }
 
-    // إنهاء جلسة Auth (حذف مستخدم Auth نفسه يحتاج Service Role من السيرفر)
     await supabase.auth.signOut();
     clearCustomerSession();
     clearSiteRole();
@@ -305,7 +282,7 @@ export default function AccountPage() {
   const field = "w-full border border-border rounded-xl px-4 py-2.5 text-sm bg-white";
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-lg mx-auto px-4 py-8 space-y-6 pb-24">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">حسابي</h1>
         <Link href="/shop" className="text-sm text-muted">
@@ -388,8 +365,8 @@ export default function AccountPage() {
         <label className="block text-sm font-medium">الشقة / المبنى</label>
         <input className={field} value={apartment} onChange={(e) => setApartment(e.target.value)} />
 
-        {err && deleteStep === "idle" && <p className="text-sm text-sale">{err}</p>}
-        {msg && deleteStep === "idle" && <p className="text-sm text-green-700">{msg}</p>}
+        {err && <p className="text-sm text-sale">{err}</p>}
+        {msg && <p className="text-sm text-green-700">{msg}</p>}
 
         <button
           type="submit"
@@ -433,43 +410,50 @@ export default function AccountPage() {
         )}
       </div>
 
-      <div className="bg-white border border-border rounded-2xl p-5 space-y-3">
-        <h2 className="font-semibold text-sale">حذف الحساب</h2>
+      {/* —— حذف الحساب: واضح في صفحة حسابي —— */}
+      <div
+        id="delete-account"
+        className="bg-red-50 border-2 border-sale rounded-2xl p-5 space-y-3"
+      >
+        <h2 className="font-bold text-sale text-base">حذف الحساب</h2>
         <p className="text-xs text-muted leading-relaxed">
-          الحذف نهائي. يتم إرسال <strong>رمز رقمي</strong> من <strong>Supabase</strong> إلى بريدك
-          (قالب إعادة المصادقة / OTP). بعد إدخال الرمز الصحيح يُحذف ملفك وتُنهى الجلسة.
+          هذا الزر في صفحة <strong>حسابي</strong>. بعد الضغط يوصلك رمز رقمي من Supabase على الإيميل،
+          وبعد كتابة الرمز يُحذف الحساب نهائيًا.
         </p>
+
         {deleteStep === "idle" && (
           <button
             type="button"
             disabled={deleteLoading}
             onClick={requestDeleteCode}
-            className="w-full border border-sale text-sale py-3 rounded-full text-sm font-medium disabled:opacity-50"
+            className="w-full bg-sale text-white py-3.5 rounded-full text-sm font-bold disabled:opacity-50 shadow-sm"
           >
-            {deleteLoading ? "جاري إرسال الرمز..." : "طلب رمز حذف الحساب"}
+            {deleteLoading ? "جاري إرسال الرمز..." : "حذف الحساب نهائيًا"}
           </button>
         )}
+
         {deleteStep === "code" && (
           <form onSubmit={confirmDelete} className="space-y-3">
-            {msg && <p className="text-sm text-green-700">{msg}</p>}
-            {err && <p className="text-sm text-sale">{err}</p>}
+            {deleteMsg && <p className="text-sm text-green-700">{deleteMsg}</p>}
+            {deleteErr && <p className="text-sm text-sale whitespace-pre-line">{deleteErr}</p>}
+            <label className="block text-sm font-medium">الرمز الرقمي من الإيميل</label>
             <input
               inputMode="numeric"
               maxLength={8}
               required
               value={deleteOtp}
               onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, ""))}
-              placeholder="الرمز الرقمي من الإيميل"
-              className={`${field} text-center tracking-widest font-mono text-lg`}
+              placeholder="000000"
+              className={`${field} text-center tracking-[0.35em] font-mono text-xl`}
               dir="ltr"
               autoComplete="one-time-code"
             />
             <button
               type="submit"
               disabled={deleteLoading || deleteOtp.length < 6}
-              className="w-full bg-sale text-white py-3 rounded-full text-sm font-semibold disabled:opacity-50"
+              className="w-full bg-sale text-white py-3.5 rounded-full text-sm font-bold disabled:opacity-50"
             >
-              {deleteLoading ? "..." : "تأكيد الحذف النهائي"}
+              {deleteLoading ? "..." : "تأكيد الحذف بالرمز"}
             </button>
             <button
               type="button"
@@ -477,8 +461,8 @@ export default function AccountPage() {
               onClick={() => {
                 setDeleteStep("idle");
                 setDeleteOtp("");
-                setErr("");
-                setMsg("");
+                setDeleteErr("");
+                setDeleteMsg("");
               }}
             >
               إلغاء
@@ -492,6 +476,10 @@ export default function AccountPage() {
               إعادة إرسال الرمز
             </button>
           </form>
+        )}
+
+        {deleteStep === "idle" && deleteErr && (
+          <p className="text-sm text-sale whitespace-pre-line">{deleteErr}</p>
         )}
       </div>
 
