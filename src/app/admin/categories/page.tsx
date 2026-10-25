@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase, type Category, type CategoryGroup } from "@/lib/supabase";
-import { Plus, Trash2, Loader2, Pencil, Check, X, ChevronLeft } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Check, X, ChevronLeft, GitBranch } from "lucide-react";
 
 function slugify(text: string) {
   return text
@@ -11,6 +11,58 @@ function slugify(text: string) {
     .replace(/[^\u0600-\u06FFa-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
+}
+
+/** كل التصنيفات في المجموعة كخيارات شجرية (أي عمق) */
+function buildParentOptions(
+  categories: Category[],
+  groupId: string,
+  excludeIds: Set<string> = new Set()
+): { id: string; label: string }[] {
+  const inGroup = categories.filter((c) => c.group_id === groupId);
+  const byParent = new Map<string | null, Category[]>();
+  for (const c of inGroup) {
+    const key = c.parent_id || null;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(c);
+  }
+  for (const list of byParent.values()) {
+    list.sort(
+      (a, b) =>
+        (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name, "ar")
+    );
+  }
+  const out: { id: string; label: string }[] = [];
+  const walk = (parentId: string | null, depth: number) => {
+    for (const c of byParent.get(parentId) || []) {
+      if (!excludeIds.has(c.id)) {
+        const prefix = depth === 0 ? "" : "— ".repeat(depth);
+        out.push({ id: c.id, label: `${prefix}${c.name}` });
+      }
+      walk(c.id, depth + 1);
+    }
+  };
+  walk(null, 0);
+  return out;
+}
+
+/** يمنع اختيار فرع تحت نفسه أو تحت أحد أحفاده */
+function collectSelfAndDescendants(
+  id: string,
+  categories: Category[]
+): Set<string> {
+  const set = new Set<string>([id]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const c of categories) {
+      if (c.parent_id && set.has(c.parent_id) && !set.has(c.id)) {
+        set.add(c.id);
+        changed = true;
+      }
+    }
+  }
+  return set;
 }
 
 export default function CategoriesAdminPage() {
@@ -51,8 +103,9 @@ export default function CategoriesAdminPage() {
     load();
   }, []);
 
-  const parentsInGroup = categories.filter(
-    (c) => c.group_id === cGroupId && !c.parent_id
+  const parentOptions = useMemo(
+    () => (cGroupId ? buildParentOptions(categories, cGroupId) : []),
+    [categories, cGroupId]
   );
 
   const addGroup = async (e: React.FormEvent) => {
@@ -83,10 +136,16 @@ export default function CategoriesAdminPage() {
     setSaving(true);
     setError("");
     const parent = cParentId || null;
+    if (parent) {
+      const parentCat = categories.find((x) => x.id === parent);
+      if (parentCat && parentCat.group_id !== cGroupId) {
+        setError("الأب لازم يكون في نفس المجموعة");
+        setSaving(false);
+        return;
+      }
+    }
     const siblings = categories.filter(
-      (x) =>
-        x.group_id === cGroupId &&
-        (x.parent_id || null) === parent
+      (x) => x.group_id === cGroupId && (x.parent_id || null) === parent
     );
     const { error: err } = await supabase.from("categories").insert({
       name: cName.trim(),
@@ -97,19 +156,31 @@ export default function CategoriesAdminPage() {
     });
     if (err) {
       if (err.message.includes("parent_id")) {
-        setError(
-          "عمود parent_id غير موجود في قاعدة البيانات. شغّل SQL الموجود في README_NESTED_CATEGORIES.md"
-        );
+        setError("عمود parent_id غير موجود. تأكد من تشغيل الـ migration.");
       } else {
         setError(err.message.includes("unique") ? "رابط التصنيف مستخدم" : err.message);
       }
     } else {
       setCName("");
       setCSlug("");
-      setCParentId("");
+      // نسيّب cParentId عشان تقدر تضيف فروع متتالية تحت نفس الأب
       await load();
     }
     setSaving(false);
+  };
+
+  const startAddChild = (parent: Category) => {
+    setCGroupId(parent.group_id || "");
+    setCParentId(parent.id);
+    setCName("");
+    setCSlug("");
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    // focus بعد ما الـ form يتحدّث
+    setTimeout(() => {
+      const el = document.getElementById("cat-name-input");
+      el?.focus();
+    }, 100);
   };
 
   const saveGroupEdit = async (id: string) => {
@@ -126,6 +197,13 @@ export default function CategoriesAdminPage() {
     if (parent === id) {
       setError("لا يمكن أن يكون التصنيف أباً لنفسه");
       return;
+    }
+    if (parent) {
+      const banned = collectSelfAndDescendants(id, categories);
+      if (banned.has(parent)) {
+        setError("لا يمكن وضع التصنيف تحت أحد فروعه");
+        return;
+      }
     }
     const { error: err } = await supabase
       .from("categories")
@@ -152,7 +230,7 @@ export default function CategoriesAdminPage() {
     if (children.length) {
       if (
         !confirm(
-          `هذا التصنيف فيه ${children.length} فرع. الحذف هيمسح الروابط الأبوية للفروع (مش هيمسح الفروع نفسها). متابعة؟`
+          `هذا التصنيف فيه ${children.length} فرع. الحذف هيفصل الفروع (تصير جذور) ومش هيتمسحوا. متابعة؟`
         )
       )
         return;
@@ -167,22 +245,30 @@ export default function CategoriesAdminPage() {
       .filter((x) => x.parent_id === c.id)
       .sort(
         (a, b) =>
-          (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
-          a.name.localeCompare(b.name, "ar")
+          (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name, "ar")
       );
+
+    const editParentOpts =
+      editCat === c.id
+        ? buildParentOptions(
+            categories,
+            editCGroup,
+            collectSelfAndDescendants(c.id, categories)
+          )
+        : [];
 
     return (
       <div key={c.id}>
         <li
           className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-[#faf8f5]"
-          style={{ paddingInlineStart: `${8 + depth * 16}px` }}
+          style={{ paddingInlineStart: `${8 + depth * 18}px` }}
         >
           {editCat === c.id ? (
             <>
               <input
                 value={editCName}
                 onChange={(e) => setEditCName(e.target.value)}
-                className="flex-1 border rounded-lg px-2 py-1 text-sm"
+                className="flex-1 border rounded-lg px-2 py-1 text-sm min-w-[100px]"
               />
               <select
                 value={editCGroup}
@@ -201,21 +287,14 @@ export default function CategoriesAdminPage() {
               <select
                 value={editCParent}
                 onChange={(e) => setEditCParent(e.target.value)}
-                className="border rounded-lg text-sm px-2 py-1 max-w-[140px]"
+                className="border rounded-lg text-sm px-2 py-1 max-w-[180px]"
               >
                 <option value="">بدون أب (جذر)</option>
-                {categories
-                  .filter(
-                    (x) =>
-                      x.group_id === editCGroup &&
-                      x.id !== c.id &&
-                      !x.parent_id
-                  )
-                  .map((x) => (
-                    <option key={x.id} value={x.id}>
-                      تحت: {x.name}
-                    </option>
-                  ))}
+                {editParentOpts.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    تحت: {x.label}
+                  </option>
+                ))}
               </select>
               <button
                 type="button"
@@ -234,12 +313,26 @@ export default function CategoriesAdminPage() {
                 <ChevronLeft className="w-3.5 h-3.5 text-muted shrink-0 rotate-180" />
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{c.name}</p>
+                <p className="text-sm font-medium truncate">
+                  {c.name}
+                  {depth > 0 && (
+                    <span className="text-[10px] text-muted font-normal mr-1">
+                      (مستوى {depth + 1})
+                    </span>
+                  )}
+                </p>
                 <p className="text-[11px] text-muted" dir="ltr">
                   /categories/{c.slug}
-                  {c.parent_id ? " · فرع" : ""}
                 </p>
               </div>
+              <button
+                type="button"
+                title="أضف فرع تحت هذا"
+                onClick={() => startAddChild(c)}
+                className="p-1.5 text-muted hover:text-ink"
+              >
+                <GitBranch className="w-3.5 h-3.5" />
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -272,7 +365,8 @@ export default function CategoriesAdminPage() {
       <div>
         <h1 className="text-2xl font-bold text-ink">المجموعات والتصنيفات</h1>
         <p className="text-sm text-muted mt-1">
-          مجموعة → تصنيف → فروع فرعية (مثال: ملابس → ملابس منزلية → بيجامات)
+          شجرة بلا حد: مجموعة → تصنيف → فرع → فرع للفرع… (مثال: ملابس → منزلية → بيجامات →
+          شتوي)
         </p>
       </div>
 
@@ -376,7 +470,7 @@ export default function CategoriesAdminPage() {
       </section>
 
       <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
-        <h2 className="font-semibold">2) التصنيفات والفروع</h2>
+        <h2 className="font-semibold">2) التصنيفات والفروع (أي عمق)</h2>
         <form onSubmit={addCategory} className="flex flex-wrap gap-3 items-end">
           <div className="min-w-[140px]">
             <label className="block text-xs text-muted mb-1">المجموعة</label>
@@ -397,17 +491,17 @@ export default function CategoriesAdminPage() {
               ))}
             </select>
           </div>
-          <div className="min-w-[140px]">
-            <label className="block text-xs text-muted mb-1">تحت تصنيف (اختياري)</label>
+          <div className="min-w-[180px] flex-1">
+            <label className="block text-xs text-muted mb-1">تحت أي تصنيف؟ (اختياري)</label>
             <select
               value={cParentId}
               onChange={(e) => setCParentId(e.target.value)}
               className="w-full border rounded-xl px-3 py-2 text-sm bg-white"
             >
               <option value="">— جذر (مباشر تحت المجموعة)</option>
-              {parentsInGroup.map((p) => (
+              {parentOptions.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {p.label}
                 </option>
               ))}
             </select>
@@ -415,13 +509,14 @@ export default function CategoriesAdminPage() {
           <div className="flex-1 min-w-[140px]">
             <label className="block text-xs text-muted mb-1">اسم التصنيف / الفرع</label>
             <input
+              id="cat-name-input"
               value={cName}
               onChange={(e) => {
                 setCName(e.target.value);
                 setCSlug(slugify(e.target.value));
               }}
               className="w-full border rounded-xl px-3 py-2 text-sm"
-              placeholder="مثال: ملابس منزلية أو بيجامات"
+              placeholder="مثال: بيجامات شتوي"
               required
             />
           </div>
@@ -442,6 +537,20 @@ export default function CategoriesAdminPage() {
             <Plus className="w-4 h-4" /> إضافة
           </button>
         </form>
+        {cParentId && (
+          <p className="text-xs text-muted">
+            هيضاف كفرع تحت:{" "}
+            <strong>{categories.find((x) => x.id === cParentId)?.name || "…"}</strong>
+            {" "}
+            <button
+              type="button"
+              className="underline text-ink"
+              onClick={() => setCParentId("")}
+            >
+              إلغاء الأب
+            </button>
+          </p>
+        )}
 
         <div className="space-y-6">
           {groups.map((g) => {
