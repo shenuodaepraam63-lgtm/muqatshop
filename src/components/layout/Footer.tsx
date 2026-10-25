@@ -40,7 +40,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/merchant/register" className="hover:text-ink transition">
-                  سجّل كتاجر
+                  سجّل كمسوق
                 </Link>
               </li>
             </ul>
@@ -55,7 +55,7 @@ export function Footer() {
               <li>تواصل عبر واتساب</li>
               <li>
                 <Link href="/merchant/login" className="hover:text-ink transition">
-                  دخول التاجر
+                  دخول المسوق
                 </Link>
               </li>
             </ul>
