@@ -6,8 +6,7 @@ import { Heart, Loader2 } from "lucide-react";
 import { supabase, productMainImage, type Product } from "@/lib/supabase";
 import { getMerchantSession } from "@/lib/merchant";
 import { formatPrice } from "@/lib/utils";
-
-const KEY = "muqat_marketer_favorites";
+import { loadFavorites, saveFavorites } from "@/lib/marketer-local";
 
 export default function MarketerFavoritesPage() {
   const [ids, setIds] = useState<string[]>([]);
@@ -16,33 +15,28 @@ export default function MarketerFavoritesPage() {
 
   useEffect(() => {
     if (!getMerchantSession()) return;
-    try {
-      const raw = localStorage.getItem(KEY);
-      const list: string[] = raw ? JSON.parse(raw) : [];
-      setIds(list);
-      if (!list.length) {
-        setLoading(false);
-        return;
-      }
-      supabase
-        .from("products")
-        .select("*")
-        .in("id", list)
-        .eq("is_active", true)
-        .then(({ data }) => {
-          setProducts((data as Product[]) || []);
-          setLoading(false);
-        });
-    } catch {
+    const list = loadFavorites();
+    setIds(list);
+    if (!list.length) {
       setLoading(false);
+      return;
     }
+    supabase
+      .from("products")
+      .select("*")
+      .in("id", list)
+      .eq("is_active", true)
+      .then(({ data }) => {
+        setProducts((data as Product[]) || []);
+        setLoading(false);
+      });
   }, []);
 
   const remove = (id: string) => {
     const next = ids.filter((x) => x !== id);
     setIds(next);
     setProducts((p) => p.filter((x) => x.id !== id));
-    localStorage.setItem(KEY, JSON.stringify(next));
+    saveFavorites(next);
   };
 
   return (
@@ -50,7 +44,7 @@ export default function MarketerFavoritesPage() {
       <div>
         <h1 className="text-xl font-bold">المفضلة</h1>
         <p className="text-sm text-muted mt-1">
-          منتجات حفظتها للرجوع السريع عند تسجيل الأوردرات
+          أضف منتجات من الكتالوج بزر القلب للرجوع السريع
         </p>
       </div>
 
@@ -66,7 +60,7 @@ export default function MarketerFavoritesPage() {
             href="/merchant/catalog"
             className="inline-block text-sm text-[#0042EB] hover:underline"
           >
-            تصفح الكتالوج
+            تصفح الكتالوج وأضف للمفضلة
           </Link>
         </div>
       ) : (
@@ -92,7 +86,7 @@ export default function MarketerFavoritesPage() {
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
                   <Link
-                    href="/merchant/new-order"
+                    href={`/merchant/new-order?product=${p.id}`}
                     className="text-xs bg-ink text-white px-3 py-1.5 rounded-full text-center"
                   >
                     أوردر

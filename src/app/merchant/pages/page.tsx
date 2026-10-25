@@ -3,54 +3,50 @@
 import { useEffect, useState } from "react";
 import { FileStack, Plus, Trash2 } from "lucide-react";
 import { getMerchantSession } from "@/lib/merchant";
-
-type MPage = { id: string; name: string; note: string; created_at: string };
-
-const KEY = "muqat_marketer_pages";
+import {
+  loadMarketerPages,
+  saveMarketerPages,
+  type MarketerPage,
+} from "@/lib/marketer-local";
 
 export default function MarketerPagesPage() {
-  const [pages, setPages] = useState<MPage[]>([]);
+  const [pages, setPages] = useState<MarketerPage[]>([]);
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
 
   useEffect(() => {
     if (!getMerchantSession()) return;
-    try {
-      const raw = localStorage.getItem(KEY);
-      setPages(raw ? JSON.parse(raw) : []);
-    } catch {
-      setPages([]);
-    }
+    setPages(loadMarketerPages());
   }, []);
 
-  const save = (list: MPage[]) => {
+  const persist = (list: MarketerPage[]) => {
     setPages(list);
-    localStorage.setItem(KEY, JSON.stringify(list));
+    saveMarketerPages(list);
   };
 
   const add = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    const item: MPage = {
+    const item: MarketerPage = {
       id: crypto.randomUUID(),
       name: name.trim(),
       note: note.trim(),
       created_at: new Date().toISOString(),
     };
-    save([item, ...pages]);
+    persist([item, ...pages]);
     setName("");
     setNote("");
   };
 
-  const remove = (id: string) => save(pages.filter((p) => p.id !== id));
+  const remove = (id: string) => persist(pages.filter((p) => p.id !== id));
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold">صفحاتي</h1>
         <p className="text-sm text-muted mt-1">
-          تصنيف تنظيمي داخلي لتتبع مبيعات وأداء كل صفحة تسويقية (فيسبوك،
-          إنستجرام، واتساب...)
+          تصنيف تنظيمي داخلي — عند تسجيل الأوردر تقدر تربط الطلب بصفحة معينة
+          لمتابعة أداء كل قناة
         </p>
       </div>
 
@@ -86,6 +82,9 @@ export default function MarketerPagesPage() {
         <div className="bg-white border border-[#eae6df] rounded-2xl p-10 text-center space-y-2">
           <FileStack className="w-10 h-10 text-muted mx-auto" strokeWidth={1.25} />
           <p className="text-sm text-muted">لم تضف صفحات بعد</p>
+          <p className="text-xs text-muted">
+            بعد الإضافة هتظهر في قائمة «إضافة أوردر»
+          </p>
         </div>
       ) : (
         <ul className="space-y-2">
