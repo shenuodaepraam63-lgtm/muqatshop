@@ -1,4 +1,4 @@
-/** بيانات محلية لحساب المسوق (صفحات + مفضلة) */
+/** بيانات محلية لحساب المسوق (صفحات + مفضلة + أسعار البيع) */
 
 export type MarketerPage = {
   id: string;
@@ -9,6 +9,7 @@ export type MarketerPage = {
 
 const PAGES_KEY = "muqat_marketer_pages";
 const FAV_KEY = "muqat_marketer_favorites";
+const PRICES_KEY = "muqat_marketer_prices";
 
 export function loadMarketerPages(): MarketerPage[] {
   if (typeof window === "undefined") return [];
@@ -51,4 +52,27 @@ export function toggleFavorite(productId: string): string[] {
 
 export function isFavorite(productId: string): boolean {
   return loadFavorites().includes(productId);
+}
+
+/** أسعار البيع: productId → number */
+export function loadLocalPrices(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(PRICES_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function getLocalPrice(productId: string): number | null {
+  const n = loadLocalPrices()[productId];
+  return typeof n === "number" && !Number.isNaN(n) ? n : null;
+}
+
+export function setLocalPrice(productId: string, price: number) {
+  if (typeof window === "undefined") return;
+  const all = loadLocalPrices();
+  all[productId] = price;
+  localStorage.setItem(PRICES_KEY, JSON.stringify(all));
 }

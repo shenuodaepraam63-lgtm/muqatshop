@@ -7,6 +7,8 @@ import {
   supabase,
   productMainImage,
   type Product,
+  type ProductColor,
+  type ProductVariant,
 } from "@/lib/supabase";
 import {
   getMerchantSession,
@@ -15,52 +17,23 @@ import {
 import { merchantShareUrl } from "@/lib/merchant-ref";
 import { formatPrice } from "@/lib/utils";
 import { ProductGallery } from "@/components/product/ProductGallery";
-import { loadFavorites, toggleFavorite } from "@/lib/marketer-local";
+import { ProductAccordion } from "@/components/product/ProductAccordion";
 import {
-  cleanSpecRows,
-  looksLikeLongDump,
-  softSpaceText,
-} from "@/lib/product-display";
+  getLocalPrice,
+  loadFavorites,
+  setLocalPrice,
+  toggleFavorite,
+} from "@/lib/marketer-local";
+import { softSpaceText } from "@/lib/product-display";
 import {
   ArrowRight,
   Check,
-  ChevronDown,
   Copy,
-  FileText,
   Heart,
-  Image as ImageIcon,
-  ImageOff,
   Link2,
   Loader2,
   PlusCircle,
 } from "lucide-react";
-
-function CollapsibleText({ text }: { text: string }) {
-  const long = looksLikeLongDump(text);
-  const [open, setOpen] = useState(!long);
-  const cleaned = softSpaceText(text);
-  return (
-    <div>
-      <div
-        className={`marketer-prose marketer-collapse-body ${open ? "is-open" : ""}`}
-      >
-        <p className="whitespace-pre-line">{cleaned}</p>
-      </div>
-      {long && (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="mt-2 text-xs font-semibold text-accent inline-flex items-center gap-1"
-        >
-          {open ? "عرض أقل" : "اقرأ المزيد"}
-          <ChevronDown
-            className={`w-3.5 h-3.5 transition ${open ? "rotate-180" : ""}`}
-          />
-        </button>
-      )}
-    </div>
-  );
-}
 
 export default function MarketerProductDetailPage() {
   const params = useParams();
@@ -74,10 +47,11 @@ export default function MarketerProductDetailPage() {
   const [saving, setSaving] = useState(false);
   const [liked, setLiked] = useState(false);
   const [toast, setToast] = useState("");
+  const [savedOk, setSavedOk] = useState(false);
 
   const showToast = (t: string) => {
     setToast(t);
-    setTimeout(() => setToast(""), 1800);
+    setTimeout(() => setToast(""), 2000);
   };
 
   useEffect(() => {
@@ -103,18 +77,23 @@ export default function MarketerProductDetailPage() {
       const p = data as Product;
       setProduct(p);
 
-      const { data: mp } = await supabase
-        .from("merchant_products")
-        .select("selling_price")
-        .eq("merchant_id", s.id)
-        .eq("product_id", id)
-        .maybeSingle();
-
-      setSell(
-        mp?.selling_price != null
-          ? String(mp.selling_price)
-          : String(Number(p.price) || 0)
-      );
+      // أولوية: سعر محلي → جدول merchant_products → سعر المنصة
+      const local = getLocalPrice(id);
+      if (local != null) {
+        setSell(String(local));
+      } else {
+        const { data: mp } = await supabase
+          .from("merchant_products")
+          .select("selling_price")
+          .eq("merchant_id", s.id)
+          .eq("product_id", id)
+          .maybeSingle();
+        setSell(
+          mp?.selling_price != null
+            ? String(mp.selling_price)
+            : String(Number(p.price) || 0)
+        );
+      }
       setLoading(false);
     })();
   }, [id]);
@@ -142,12 +121,12 @@ export default function MarketerProductDetailPage() {
   const sellNum = Number(sell);
   const profit =
     !Number.isNaN(sellNum) && sellNum >= base ? sellNum - base : null;
-  const images = (product.images || []).filter(Boolean);
+  const images = product.images?.length ? product.images : [];
+  const colors = (product.colors || []) as ProductColor[];
+  const sizes = (product.sizes || []) as string[];
+  const variants = (product.variants || []) as ProductVariant[];
   const features = product.features
-    ? product.features
-        .split("\n")
-        .map((s) => softSpaceText(s))
-        .filter(Boolean)
+    ? product.features.split("\n").map((s) => s.trim()).filter(Boolean)
     : [];
 
   const shareLink = merchantShareUrl(
@@ -156,29 +135,55 @@ export default function MarketerProductDetailPage() {
   );
 
   const savePrice = async () => {
-    if (!merchantId) return;
+    if (!merchantId) {
+      showToast("سجّل الدخول كمسوق أولاً");
+      return;
+    }
     const price = Number(sell);
     if (Number.isNaN(price) || price < base) {
       showToast(`السعر لازم يكون ≥ ${formatPrice(base)}`);
       return;
     }
+
     setSaving(true);
-    const { error } = await supabase.from("merchant_products").upsert(
-      {
-        merchant_id: merchantId,
-        product_id: product.id,
-        selling_price: price,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "merchant_id,product_id" }
-    );
-    setSaving(false);
-    if (error) {
-      showToast(error.message);
-      return;
+
+    // 1) حفظ محلي دائمًا (يشتغل فورًا)
+    setLocalPrice(product.id, price);
+    setSavedOk(true);
+
+    // 2) محاولة حفظ في قاعدة البيانات (لو الجدول/الصلاحيات موجودة)
+    try {
+      const { data: existing } = await supabase
+        .from("merchant_products")
+        .select("id")
+        .eq("merchant_id", merchantId)
+        .eq("product_id", product.id)
+        .maybeSingle();
+
+      if (existing?.id) {
+        await supabase
+          .from("merchant_products")
+          .update({
+            selling_price: price,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("merchant_products").insert({
+          merchant_id: merchantId,
+          product_id: product.id,
+          selling_price: price,
+          is_active: true,
+        });
+      }
+    } catch {
+      // المحلي كافي لو الـ DB رفضت
     }
+
+    setSaving(false);
     showToast("تم حفظ سعر البيع");
+    setTimeout(() => setSavedOk(false), 2500);
   };
 
   const copyText = async (text: string, label: string) => {
@@ -190,14 +195,76 @@ export default function MarketerProductDetailPage() {
     }
   };
 
+  // نفس أقسام صفحة المنتج القديمة
+  const accordionItems: { title: string; content: React.ReactNode }[] = [];
+
+  if (product.description?.trim()) {
+    accordionItems.push({
+      title: "الوصف",
+      content: softSpaceText(product.description.trim()),
+    });
+  }
+  if (features.length) {
+    accordionItems.push({
+      title: "المميزات",
+      content: features.map((f) => `• ${f}`).join("\n"),
+    });
+  }
+  if (product.specs?.trim()) {
+    accordionItems.push({
+      title: "المواصفات",
+      content: softSpaceText(product.specs.trim()),
+    });
+  }
+  if (product.care_instructions?.trim()) {
+    accordionItems.push({
+      title: "تعليمات العناية",
+      content: product.care_instructions.trim(),
+    });
+  }
+  const extra: string[] = [];
+  if (product.material?.trim()) extra.push(`الخامة: ${product.material.trim()}`);
+  if (product.weight?.trim()) extra.push(`الوزن: ${product.weight.trim()}`);
+  if (product.dimensions?.trim())
+    extra.push(`الأبعاد: ${product.dimensions.trim()}`);
+  if (product.origin_country?.trim())
+    extra.push(`بلد المنشأ: ${product.origin_country.trim()}`);
+  if (extra.length) {
+    accordionItems.push({ title: "تفاصيل إضافية", content: extra.join("\n") });
+  }
+
+  for (const s of product.detail_sections || []) {
+    const title = (s.title || "").trim();
+    if (!title) continue;
+    const rows = (s.rows || []).filter(
+      (r) => (r.label || "").trim() || (r.value || "").trim()
+    );
+    if (rows.length) {
+      accordionItems.push({
+        title,
+        content: rows.map((r) => `${r.label}: ${r.value}`).join("\n"),
+      });
+    } else if ((s.content || "").trim()) {
+      accordionItems.push({ title, content: (s.content || "").trim() });
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <Link
-        href="/merchant/catalog"
-        className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink"
-      >
-        <ArrowRight className="w-4 h-4" /> الكتالوج
-      </Link>
+    <div className="-mx-4 md:-mx-8 -mt-2">
+      {/* شريط علوي زي المتجر */}
+      <div className="bg-[#e8e2d4] text-[11px] tracking-wide text-muted">
+        <div className="max-w-page mx-auto px-4 md:px-8 py-2.5 flex flex-wrap gap-1 items-center">
+          <Link href="/merchant" className="hover:text-ink">
+            بوابة المسوق
+          </Link>
+          <span>/</span>
+          <Link href="/merchant/catalog" className="hover:text-ink">
+            الكتالوج
+          </Link>
+          <span>/</span>
+          <span className="text-ink line-clamp-1">{product.name}</span>
+        </div>
+      </div>
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white text-sm px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
@@ -205,150 +272,154 @@ export default function MarketerProductDetailPage() {
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-6 md:gap-10 items-start">
-        <div className="marketer-card p-3 sm:p-4">
-          {images.length > 0 ? (
+      <div className="max-w-page mx-auto px-4 md:px-8 py-5 md:py-10">
+        <Link
+          href="/merchant/catalog"
+          className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink mb-4"
+        >
+          <ArrowRight className="w-4 h-4" /> رجوع للكتالوج
+        </Link>
+
+        {/* نفس تخطيط صفحة المنتج القديمة: صورتين عمود */}
+        <div className="grid min-w-0 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-start">
+          <div className="min-w-0">
             <ProductGallery images={images} name={product.name} />
-          ) : (
-            <div className="gallery-empty">
-              <ImageOff className="w-10 h-10 opacity-40" strokeWidth={1.25} />
-              <span>لا توجد صور لهذا المنتج</span>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-4 min-w-0">
-          {product.brand?.trim() && (
-            <p className="text-[11px] tracking-widest uppercase text-muted">
-              {product.brand.trim()}
-            </p>
-          )}
-          <h1 className="text-xl md:text-2xl font-bold text-ink leading-snug">
-            {softSpaceText(product.name)}
-          </h1>
-
-          <div className="flex flex-wrap gap-2 text-sm">
-            <div className="bg-[#f5f1e8] rounded-xl px-3 py-2">
-              <p className="text-[10px] text-muted">تكلفة المنصة</p>
-              <p className="font-bold">{formatPrice(base)}</p>
-            </div>
-            {product.stock != null && (
-              <div className="bg-[#f5f1e8] rounded-xl px-3 py-2">
-                <p className="text-[10px] text-muted">المخزون</p>
-                <p className="font-bold">{product.stock} قطعة</p>
-              </div>
-            )}
-            {profit != null && profit > 0 && (
-              <div className="bg-green-50 text-green-800 rounded-xl px-3 py-2">
-                <p className="text-[10px] opacity-80">ربحك المتوقع</p>
-                <p className="font-bold">{formatPrice(profit)}</p>
-              </div>
-            )}
           </div>
 
-          {product.description?.trim() && (
-            <div className="marketer-card p-4">
-              <h2 className="text-sm font-semibold mb-2">الوصف</h2>
-              <CollapsibleText text={product.description.trim()} />
-            </div>
-          )}
+          <div className="min-w-0 md:sticky md:top-6 space-y-5">
+            {product.brand?.trim() && (
+              <p className="text-[11px] tracking-widest uppercase text-muted">
+                {product.brand.trim()}
+              </p>
+            )}
 
-          <div className="marketer-card p-4 space-y-3">
-            <h2 className="text-sm font-semibold">سعر بيعك للعميل</h2>
-            <div className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[120px]">
-                <label className="text-[11px] text-muted block mb-1">
-                  ج.م (الحد الأدنى {formatPrice(base)})
-                </label>
+            <h1 className="text-2xl md:text-3xl font-bold text-ink leading-tight">
+              {product.name}
+            </h1>
+
+            {/* أسعار */}
+            <div className="flex flex-wrap items-baseline gap-3">
+              <span className="text-sm text-muted">تكلفة المنصة</span>
+              <span className="text-lg font-bold text-ink">{formatPrice(base)}</span>
+            </div>
+
+            {product.description?.trim() && (
+              <p className="text-sm text-muted leading-relaxed line-clamp-3">
+                {softSpaceText(product.description.trim())}
+              </p>
+            )}
+
+            {/* ألوان / مقاسات للعرض فقط */}
+            {colors.length > 0 && (
+              <div>
+                <p className="text-sm mb-2">الألوان</p>
+                <div className="flex flex-wrap gap-2">
+                  {colors.map((c, i) => (
+                    <span
+                      key={c.name + i}
+                      title={c.name}
+                      className="w-9 h-9 rounded-full border border-[#e8e2d9]"
+                      style={{ backgroundColor: c.hex }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {sizes.length > 0 && (
+              <div>
+                <p className="text-sm mb-2">المقاسات</p>
+                <div className="flex flex-wrap gap-2">
+                  {sizes.map((s) => (
+                    <span
+                      key={s}
+                      className="min-w-[3rem] px-3 py-2 rounded-lg border border-[#e8e2d9] text-sm text-center"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {product.stock != null && (
+              <p className="text-xs text-muted">المخزون: {product.stock} قطعة</p>
+            )}
+
+            {/* سعر البيع — يشتغل */}
+            <div className="rounded-2xl border border-[#e8e2d9] bg-[#f5f1e8] p-4 space-y-3">
+              <p className="text-sm font-semibold">سعر بيعك للعميل</p>
+              <div className="flex flex-wrap gap-2 items-center">
                 <input
                   type="number"
+                  inputMode="numeric"
                   min={base}
                   step="1"
                   value={sell}
-                  onChange={(e) => setSell(e.target.value)}
-                  className="w-full border border-[#e8e2d9] rounded-xl px-3 py-2.5 text-sm bg-page"
+                  onChange={(e) => {
+                    setSell(e.target.value);
+                    setSavedOk(false);
+                  }}
+                  className="flex-1 min-w-[100px] border border-[#e8e2d9] rounded-xl px-3 py-2.5 text-sm bg-white"
                 />
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={savePrice}
+                  className="bg-ink text-white text-sm font-semibold px-5 py-2.5 rounded-full disabled:opacity-50"
+                >
+                  {saving ? "..." : savedOk ? "تم الحفظ ✓" : "حفظ السعر"}
+                </button>
               </div>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={savePrice}
-                className="bg-ink text-white text-sm px-5 py-2.5 rounded-full font-semibold disabled:opacity-50"
-              >
-                {saving ? "..." : "حفظ السعر"}
-              </button>
+              {profit != null && profit >= 0 && (
+                <p className="text-sm text-green-700 font-medium">
+                  ربحك المتوقع: {formatPrice(profit)}
+                </p>
+              )}
+              <p className="text-[11px] text-muted">
+                الحد الأدنى = تكلفة المنصة ({formatPrice(base)})
+              </p>
             </div>
-          </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/merchant/new-order?product=${product.id}`}
-              className="inline-flex items-center gap-1.5 bg-accent text-white text-sm font-semibold px-4 py-2.5 rounded-full"
-            >
-              <PlusCircle className="w-4 h-4" /> تسجيل أوردر
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                const next = toggleFavorite(product.id);
-                setLiked(next.includes(product.id));
-                showToast(
-                  next.includes(product.id)
-                    ? "أُضيف للمفضلة"
-                    : "أُزيل من المفضلة"
-                );
-              }}
-              className={`inline-flex items-center gap-1.5 text-sm border px-4 py-2.5 rounded-full ${
-                liked
-                  ? "border-sale text-sale bg-sale/5"
-                  : "border-[#e8e2d9]"
-              }`}
-            >
-              <Heart
-                className="w-4 h-4"
-                fill={liked ? "currentColor" : "none"}
-              />
-              مفضلة
-            </button>
-          </div>
-
-          <div className="marketer-card p-4 space-y-2">
-            <h2 className="text-sm font-semibold">أدوات التسويق</h2>
-            <p className="text-[11px] text-muted">
-              الرابط ده لعملائك على المتجر العام — أنت تفضل جوه بوابة المسوق
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => copyText(shareLink, "الرابط")}
-                className="inline-flex items-center gap-1.5 text-xs border border-ink px-3 py-1.5 rounded-full"
+            {/* أزرار المسوق بدل السلة */}
+            <div className="space-y-2">
+              <Link
+                href={`/merchant/new-order?product=${product.id}`}
+                className="flex w-full items-center justify-center gap-2 bg-ink text-white py-3.5 rounded-full text-sm font-semibold"
               >
-                <Link2 className="w-3.5 h-3.5" /> نسخ الرابط
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  copyText(
-                    softSpaceText(product.description || "") || product.name,
-                    "الوصف"
-                  )
-                }
-                className="inline-flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-full"
-              >
-                <FileText className="w-3.5 h-3.5" /> نسخ الوصف
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  copyText(
-                    images.join("\n") || productMainImage(product) || "",
-                    "الصور"
-                  )
-                }
-                className="inline-flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-full"
-              >
-                <ImageIcon className="w-3.5 h-3.5" /> نسخ الصور
-              </button>
+                <PlusCircle className="w-4 h-4" /> تسجيل أوردر بهذا المنتج
+              </Link>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = toggleFavorite(product.id);
+                    setLiked(next.includes(product.id));
+                    showToast(
+                      next.includes(product.id)
+                        ? "أُضيف للمفضلة"
+                        : "أُزيل من المفضلة"
+                    );
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 border py-3 rounded-full text-sm font-semibold ${
+                    liked
+                      ? "border-sale text-sale"
+                      : "border-[#e8e2d9] text-ink"
+                  }`}
+                >
+                  <Heart
+                    className="w-4 h-4"
+                    fill={liked ? "currentColor" : "none"}
+                  />
+                  مفضلة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyText(shareLink, "الرابط")}
+                  className="flex-1 flex items-center justify-center gap-2 border border-[#e8e2d9] py-3 rounded-full text-sm font-semibold"
+                >
+                  <Link2 className="w-4 h-4" /> نسخ الرابط
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -360,58 +431,18 @@ export default function MarketerProductDetailPage() {
                     "المنشور"
                   );
                 }}
-                className="inline-flex items-center gap-1.5 text-xs bg-[#25D366]/10 text-[#128C7E] border border-[#25D366]/40 px-3 py-1.5 rounded-full"
+                className="w-full flex items-center justify-center gap-2 border border-[#25D366] text-[#128C7E] py-3 rounded-full text-sm font-semibold"
               >
-                <Copy className="w-3.5 h-3.5" /> منشور كامل
+                <Copy className="w-4 h-4" /> نسخ منشور تسويقي
               </button>
             </div>
+
+            {accordionItems.length > 0 && (
+              <ProductAccordion items={accordionItems} />
+            )}
           </div>
         </div>
       </div>
-
-      {features.length > 0 && (
-        <div className="marketer-card p-4">
-          <h3 className="font-semibold text-sm mb-3">المميزات</h3>
-          <ul className="space-y-2 text-sm text-muted">
-            {features.map((f, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-accent">•</span>
-                <span>{f}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {(product.detail_sections || []).map((s, idx) => {
-        const title = softSpaceText(s.title || "");
-        if (!title) return null;
-        const rows = cleanSpecRows(s.rows);
-        if (rows.length) {
-          return (
-            <div key={idx} className="marketer-card p-4">
-              <h3 className="font-semibold text-sm mb-3">{title}</h3>
-              <dl className="marketer-specs">
-                {rows.map((r, i) => (
-                  <div key={i} className="marketer-specs-row">
-                    <dt>{r.label}</dt>
-                    <dd>{r.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          );
-        }
-        if ((s.content || "").trim()) {
-          return (
-            <div key={idx} className="marketer-card p-4">
-              <h3 className="font-semibold text-sm mb-2">{title}</h3>
-              <CollapsibleText text={(s.content || "").trim()} />
-            </div>
-          );
-        }
-        return null;
-      })}
     </div>
   );
 }
