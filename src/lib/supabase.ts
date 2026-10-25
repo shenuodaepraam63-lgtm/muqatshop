@@ -7,10 +7,22 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type ProductColor = { name: string; hex: string };
 
-/** قسم تفاصيل حر على المنتج (مثل تاجر: محتويات العبوة، الجمهور...) */
+/** صف مواصفة مرن: اسم الحقل + القيمة (مثل أمازون) */
+export type DetailSpecRow = {
+  label: string;
+  value: string;
+};
+
+/**
+ * قسم تفاصيل حر على المنتج.
+ * - text: محتوى نصي حر
+ * - specs: جدول اسم/قيمة بدون حقول ثابتة
+ */
 export type DetailSection = {
   title: string;
-  content: string;
+  content?: string;
+  kind?: "text" | "specs";
+  rows?: DetailSpecRow[];
 };
 
 export type ProductVariant = {
@@ -48,7 +60,7 @@ export type Product = {
   dimensions: string | null;
   origin_country: string | null;
   care_instructions: string | null;
-  /** أقسام تفاصيل مخصصة: عنوان + محتوى */
+  /** أقسام تفاصيل مخصصة: عنوان + نص أو جدول مواصفات */
   detail_sections?: DetailSection[] | null;
   is_active: boolean;
   is_featured: boolean;
