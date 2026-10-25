@@ -75,6 +75,7 @@ export default function EditProductPage() {
           origin_country: product.origin_country,
           care_instructions: product.care_instructions,
           sale_ends_at: product.sale_ends_at,
+          detail_sections: (product as Product).detail_sections || [],
         }}
       />
     </div>

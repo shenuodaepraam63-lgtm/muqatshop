@@ -168,6 +168,16 @@ export default async function ProductPage({
     accordionItems.push({ title: "تفاصيل إضافية", content: extra.join("\n") });
   }
 
+  const customSections = (product.detail_sections || []).filter(
+    (s) => s?.title?.trim() && s?.content?.trim()
+  );
+  for (const s of customSections) {
+    accordionItems.push({
+      title: s.title.trim(),
+      content: s.content.trim(),
+    });
+  }
+
   if (returnPolicy) {
     accordionItems.push({
       title: "سياسة الاستبدال والاسترجاع",
