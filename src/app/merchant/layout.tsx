@@ -67,7 +67,7 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
 
   if (!ready) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center text-muted text-sm">
+      <div className="min-h-[40vh] flex items-center justify-center text-muted text-sm bg-page">
         جاري التحميل...
       </div>
     );
@@ -90,8 +90,8 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
             onClick={onNavigate}
             className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition ${
               active
-                ? "bg-[#0042EB] text-white font-medium"
-                : "text-[#1a1a1a] hover:bg-[#f0ebe3]"
+                ? "bg-accent text-white font-medium shadow-sm"
+                : "text-ink hover:bg-[#f0ebe3]"
             }`}
           >
             <Icon className="w-4 h-4 shrink-0" strokeWidth={1.75} />
@@ -99,11 +99,11 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
           </Link>
         );
       })}
-      <div className="my-2 border-t border-[#eae6df]" />
+      <div className="my-2 border-t border-[#e8e2d9]" />
       <Link
         href="/"
         onClick={onNavigate}
-        className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#f0ebe3]"
+        className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-ink hover:bg-[#f0ebe3]"
       >
         <Store className="w-4 h-4 shrink-0" strokeWidth={1.75} />
         العودة للمتجر العام
@@ -123,35 +123,35 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
   );
 
   return (
-    <div className="min-h-screen bg-[#f7f5f0]">
-      {/* Top bar mobile */}
-      <header className="lg:hidden sticky top-0 z-40 bg-white border-b border-[#eae6df]">
+    <div className="marketer-shell min-h-screen">
+      <header className="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-[#e8e2d9] shadow-header">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
-            <p className="text-[11px] text-muted uppercase tracking-wide">بوابة المسوق</p>
+            <p className="text-[11px] text-accent font-semibold tracking-wide">
+              بوابة المسوق
+            </p>
             <p className="font-semibold text-sm text-ink truncate max-w-[200px]">{name}</p>
           </div>
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="w-10 h-10 rounded-xl border border-[#eae6df] flex items-center justify-center"
+            className="w-10 h-10 rounded-xl border border-[#e8e2d9] flex items-center justify-center bg-page"
             aria-label="القائمة"
           >
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
         {open && (
-          <div className="border-t border-[#eae6df] bg-white max-h-[70vh] overflow-y-auto">
+          <div className="border-t border-[#e8e2d9] bg-white max-h-[70vh] overflow-y-auto">
             <NavLinks onNavigate={() => setOpen(false)} />
           </div>
         )}
       </header>
 
       <div className="lg:flex lg:min-h-screen">
-        {/* Sidebar desktop */}
-        <aside className="hidden lg:flex lg:flex-col w-64 shrink-0 border-l border-[#eae6df] bg-white sticky top-0 h-screen overflow-y-auto">
-          <div className="px-4 py-5 border-b border-[#eae6df]">
-            <p className="text-[11px] font-semibold text-[#0042EB] tracking-wide">بوابة المسوق</p>
+        <aside className="hidden lg:flex lg:flex-col w-64 shrink-0 border-l border-[#e8e2d9] bg-white sticky top-0 h-screen overflow-y-auto shadow-[ -4px_0_24px_rgba(13,13,18,0.03)]">
+          <div className="px-4 py-5 border-b border-[#e8e2d9]">
+            <p className="text-[11px] font-semibold text-accent tracking-wide">بوابة المسوق</p>
             <p className="font-bold text-ink mt-0.5 truncate">{name}</p>
             <span className="inline-flex mt-2 text-[10px] font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
               مفعّل
@@ -161,7 +161,7 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
         </aside>
 
         <main className="flex-1 min-w-0">
-          <div className="max-w-4xl mx-auto px-4 py-6 md:px-8 md:py-8">{children}</div>
+          <div className="max-w-5xl mx-auto px-4 py-6 md:px-8 md:py-8">{children}</div>
         </main>
       </div>
     </div>

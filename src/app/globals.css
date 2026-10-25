@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --page-bg: #FFFCEE;
+  --page-bg: #fffcee;
   --card-bg: #ede9d9;
   --text: #101010;
   --text-muted: #666666;
   --sale: #f2627b;
-  --accent: #0042EB;
-  --border: #e5e5e5;
+  --accent: #0042eb;
+  --border: #e8e2d9;
   --radius-media: 16px;
   --radius-btn: 40px;
   --header-h: 73px;
@@ -41,8 +41,12 @@ body.admin-mode > main {
 }
 
 @keyframes marquee {
-  0% { transform: translate3d(0, 0, 0); }
-  100% { transform: translate3d(-50%, 0, 0); }
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
 }
 
 .animate-marquee {
@@ -65,8 +69,12 @@ body.admin-mode > main {
 }
 
 @keyframes storyProgress {
-  from { width: 0%; }
-  to { width: 100%; }
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
 }
 
 .story-progress-active {
@@ -93,4 +101,100 @@ body.admin-mode > main {
   .bottom-nav-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
+}
+
+/* —— بوابة المسوق / عرض تفاصيل المنتج —— */
+.marketer-shell {
+  background-color: var(--page-bg);
+  color: var(--text);
+}
+
+.marketer-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.marketer-prose {
+  font-size: 0.875rem;
+  line-height: 1.75;
+  color: var(--text-muted);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.marketer-prose p + p {
+  margin-top: 0.75rem;
+}
+
+.marketer-specs {
+  display: grid;
+  gap: 0;
+}
+
+.marketer-specs-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 38%) 1fr;
+  gap: 0.75rem 1rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #f0ebe3;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  align-items: start;
+}
+
+.marketer-specs-row:last-child {
+  border-bottom: none;
+}
+
+.marketer-specs-row dt {
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.marketer-specs-row dd {
+  color: var(--text-muted);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .marketer-specs-row {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+}
+
+.marketer-collapse-body {
+  max-height: 9.5rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.marketer-collapse-body.is-open {
+  max-height: none;
+}
+
+.marketer-collapse-body:not(.is-open)::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2.5rem;
+  background: linear-gradient(to top, #fff, transparent);
+  pointer-events: none;
+}
+
+.gallery-empty {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #ebe6dc;
+  border-radius: 1rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
 }
