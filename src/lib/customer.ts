@@ -7,6 +7,9 @@ export type CustomerSession = {
   phone: string | null;
 };
 
+/** كل العمليات الحساسة تعتمد رمز تحقق رقمي — مش روابط */
+export type OtpPurpose = "register" | "reset" | "delete" | "login";
+
 const SESSION_KEY = "muqat_customer_session";
 export const CUSTOMER_SESSION_EVENT = "muqat-customer-session";
 
@@ -47,7 +50,7 @@ export function generateOtpCode(): string {
 
 export async function createAndStoreOtp(
   email: string,
-  purpose: "register" | "login" = "register"
+  purpose: OtpPurpose = "register"
 ): Promise<string> {
   const code = generateOtpCode();
   const expires = new Date();
@@ -57,6 +60,7 @@ export async function createAndStoreOtp(
     .from("customer_otps")
     .update({ used: true })
     .eq("email", email.toLowerCase())
+    .eq("purpose", purpose)
     .eq("used", false);
 
   await supabase.from("customer_otps").insert({
@@ -73,7 +77,7 @@ export async function createAndStoreOtp(
 export async function verifyOtp(
   email: string,
   code: string,
-  purpose: "register" | "login" = "register"
+  purpose: OtpPurpose = "register"
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { data } = await supabase
     .from("customer_otps")
@@ -93,4 +97,24 @@ export async function verifyOtp(
 
   await supabase.from("customer_otps").update({ used: true }).eq("id", data.id);
   return { ok: true };
+}
+
+export async function sendCustomerMail(payload: {
+  email: string;
+  name?: string;
+  code?: string;
+  purpose: OtpPurpose | "notice_delete" | "notice_password";
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const r = await fetch("/api/otp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) return { ok: false, error: j.error || "فشل إرسال البريد" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "تعذر الاتصال بخدمة البريد" };
+  }
 }
