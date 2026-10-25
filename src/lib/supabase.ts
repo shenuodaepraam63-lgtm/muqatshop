@@ -48,10 +48,22 @@ export type Product = {
   updated_at?: string;
 };
 
+/** مجموعة رئيسية مثل: إلكترونيات، إكسسوارات */
+export type CategoryGroup = {
+  id: string;
+  name: string;
+  slug: string;
+  image?: string | null;
+  sort_order?: number | null;
+  is_active?: boolean;
+};
+
+/** تصنيف داخل مجموعة */
 export type Category = {
   id: string;
   name: string;
   slug: string;
+  group_id?: string | null;
   image?: string | null;
   sort_order?: number | null;
 };
