@@ -9,6 +9,7 @@ import {
   syncMerchantFromAuthUser,
 } from "@/lib/auth-customer";
 import { hashPassword, saveMerchantSession } from "@/lib/merchant";
+import { clearCustomerSession } from "@/lib/customer";
 import { setSiteRole } from "@/lib/role";
 
 export default function MarketerLoginPage() {
@@ -18,6 +19,12 @@ export default function MarketerLoginPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const enterAsMarketer = () => {
+    // فصل تام: مسح جلسة العميل
+    clearCustomerSession();
+    setSiteRole("merchant");
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +54,7 @@ export default function MarketerLoginPage() {
         setError(synced.error);
         return;
       }
+      enterAsMarketer();
       router.replace("/merchant");
       return;
     }
@@ -90,7 +98,7 @@ export default function MarketerLoginPage() {
       phone: data.phone,
       code: data.code,
     });
-    setSiteRole("merchant");
+    enterAsMarketer();
     setLoading(false);
     router.replace("/merchant");
   };
@@ -116,18 +124,18 @@ export default function MarketerLoginPage() {
   };
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-4 py-12 bg-[#f7f5f0]">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-page">
       <form
         onSubmit={submit}
-        className="bg-white border border-[#eae6df] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-sm"
+        className="bg-white border border-[#e8e2d9] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-sm"
       >
         <div>
-          <p className="text-[11px] font-semibold text-[#0042EB] tracking-wide">
+          <p className="text-[11px] font-semibold text-accent tracking-wide">
             بوابة المسوق
           </p>
           <h1 className="text-xl font-bold mt-1">تسجيل الدخول</h1>
           <p className="text-xs text-muted mt-1">
-            مساحة عمل المسوق — أرباح، طلبات، وكتالوج المنتجات
+            حساب المسوق منفصل تمامًا عن حساب العميل
           </p>
         </div>
         <input
@@ -136,7 +144,7 @@ export default function MarketerLoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="البريد الإلكتروني"
-          className="w-full border rounded-xl px-4 py-3 text-sm"
+          className="w-full border border-[#e8e2d9] rounded-xl px-4 py-3 text-sm"
           dir="ltr"
         />
         <input
@@ -145,7 +153,7 @@ export default function MarketerLoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="كلمة المرور"
-          className="w-full border rounded-xl px-4 py-3 text-sm"
+          className="w-full border border-[#e8e2d9] rounded-xl px-4 py-3 text-sm"
         />
         {error && <p className="text-sm text-sale">{error}</p>}
         {info && <p className="text-sm text-muted">{info}</p>}
@@ -154,7 +162,7 @@ export default function MarketerLoginPage() {
           disabled={loading}
           className="w-full bg-ink text-white py-3 rounded-full text-sm font-semibold disabled:opacity-50"
         >
-          {loading ? "..." : "دخول"}
+          {loading ? "..." : "دخول كمسوق"}
         </button>
         <button
           type="button"
@@ -173,9 +181,10 @@ export default function MarketerLoginPage() {
             إنشاء حساب مسوق
           </Link>
         </p>
-        <p className="text-xs text-center">
-          <Link href="/" className="text-muted hover:underline">
-            العودة للمتجر العام
+        <p className="text-xs text-center text-muted border-t border-[#f0ebe3] pt-3">
+          عميل؟{" "}
+          <Link href="/welcome?tab=customer" className="underline">
+            دخول العملاء من هنا
           </Link>
         </p>
       </form>
