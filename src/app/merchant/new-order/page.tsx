@@ -12,6 +12,7 @@ import {
   type ShippingSettings,
 } from "@/lib/shipping";
 import {
+  getLocalPrice,
   loadMarketerPages,
   type MarketerPage,
 } from "@/lib/marketer-local";
@@ -21,6 +22,12 @@ type Line = {
   qty: number;
   sellPrice: number;
 };
+
+function defaultSell(p: Product): number {
+  const local = getLocalPrice(p.id);
+  if (local != null && local >= Number(p.price)) return local;
+  return Number(p.price) || 0;
+}
 
 function NewOrderInner() {
   const router = useRouter();
@@ -61,9 +68,7 @@ function NewOrderInner() {
         if (preProduct) {
           const p = list.find((x) => x.id === preProduct);
           if (p) {
-            setLines([
-              { product: p, qty: 1, sellPrice: Number(p.price) },
-            ]);
+            setLines([{ product: p, qty: 1, sellPrice: defaultSell(p) }]);
           }
         }
       });
@@ -82,7 +87,7 @@ function NewOrderInner() {
     if (lines.some((l) => l.product.id === p.id)) return;
     setLines((prev) => [
       ...prev,
-      { product: p, qty: 1, sellPrice: Number(p.price) },
+      { product: p, qty: 1, sellPrice: defaultSell(p) },
     ]);
   };
 
@@ -175,7 +180,8 @@ function NewOrderInner() {
     }
   };
 
-  const field = "w-full border border-[#eae6df] rounded-xl px-3 py-2.5 text-sm bg-white";
+  const field =
+    "w-full border border-[#eae6df] rounded-xl px-3 py-2.5 text-sm bg-white";
 
   return (
     <form onSubmit={submit} className="space-y-6">
@@ -187,7 +193,6 @@ function NewOrderInner() {
         </p>
       </div>
 
-      {/* منتجات */}
       <div className="bg-white border border-[#eae6df] rounded-2xl p-4 space-y-3">
         <h2 className="font-semibold text-sm">المنتجات المطلوبة</h2>
         <input
@@ -291,12 +296,8 @@ function NewOrderInner() {
         )}
       </div>
 
-      {/* صفحة تسويقية */}
       <div className="bg-white border border-[#eae6df] rounded-2xl p-4 space-y-2">
         <h2 className="font-semibold text-sm">الصفحة التابعة للأوردر (اختياري)</h2>
-        <p className="text-[11px] text-muted">
-          تصنيف تنظيمي داخلي لتتبع مبيعات وأداء كل صفحة
-        </p>
         <select
           className={field}
           value={pageId}
@@ -311,7 +312,6 @@ function NewOrderInner() {
         </select>
       </div>
 
-      {/* عميل */}
       <div className="bg-white border border-[#eae6df] rounded-2xl p-4 space-y-3">
         <h2 className="font-semibold text-sm">بيانات العميل وعنوان الشحن بمصر</h2>
         <div>
@@ -417,9 +417,6 @@ function NewOrderInner() {
             placeholder="https://maps.google.com/?q=..."
             dir="ltr"
           />
-          <p className="text-[10px] text-muted mt-1">
-            يمكنك لصق رابط مشاركة الموقع من Google Maps لتسهيل وصول المندوب
-          </p>
         </div>
         <div>
           <label className="text-[11px] text-muted">ملاحظات خاصة للمندوب والتوصيل</label>
@@ -428,12 +425,11 @@ function NewOrderInner() {
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="مثال: الاتصال قبل الوصول بنصف ساعة، التسليم بعد الساعة 4 مساءً..."
+            placeholder="مثال: الاتصال قبل الوصول بنصف ساعة..."
           />
         </div>
       </div>
 
-      {/* ملخص */}
       <div className="bg-white border border-[#eae6df] rounded-2xl p-4 space-y-2 text-sm">
         <h2 className="font-semibold">ملخص حساب الأوردر</h2>
         <div className="flex justify-between text-muted">
@@ -445,16 +441,9 @@ function NewOrderInner() {
           <span>{formatPrice(sellSubtotal)}</span>
         </div>
         <div className="flex justify-between text-muted">
-          <span>
-            مصاريف الشحن{governorate ? ` (${governorate})` : ""}
-          </span>
+          <span>مصاريف الشحن{governorate ? ` (${governorate})` : ""}</span>
           <span>{governorate ? formatPrice(shipping) : "—"}</span>
         </div>
-        {governorate && (
-          <p className="text-[11px] text-muted">
-            الشحن تحصيل منفصل للمحافظة (خلال 24 إلى 48 ساعة عادةً)
-          </p>
-        )}
         <div className="flex justify-between font-bold text-base pt-1 border-t border-[#f0ebe3]">
           <span>إجمالي المطلوب من العميل (COD)</span>
           <span>{formatPrice(total)}</span>
@@ -463,12 +452,6 @@ function NewOrderInner() {
           <span>ربح المسوق المبدئي</span>
           <span>+{formatPrice(profit)}</span>
         </div>
-        <p className="text-[11px] text-muted">
-          يُضاف تلقائيًا لحسابك فور تسليم الأوردر وتحصيل الكاش (بعد فترة الانتظار)
-        </p>
-        <p className="text-[11px] text-muted">
-          طريقة التحصيل: الدفع عند الاستلام (Cash on Delivery)
-        </p>
       </div>
 
       {error && <p className="text-sm text-sale">{error}</p>}
