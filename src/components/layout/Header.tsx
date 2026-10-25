@@ -13,22 +13,32 @@ import {
   MERCHANT_SESSION_EVENT,
   type MerchantSession,
 } from "@/lib/merchant";
+import {
+  getCustomerSession,
+  clearCustomerSession,
+  CUSTOMER_SESSION_EVENT,
+  type CustomerSession,
+} from "@/lib/customer";
+import { clearSiteRole } from "@/lib/role";
 
 export function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
   const wishCount = useWishlistStore((s) => s.items.length);
   const [merchant, setMerchant] = useState<MerchantSession | null>(null);
+  const [customer, setCustomer] = useState<CustomerSession | null>(null);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
 
   const refresh = () => {
-    const s = getMerchantSession();
-    setMerchant(s);
-    if (s) {
+    const m = getMerchantSession();
+    const c = getCustomerSession();
+    setMerchant(m);
+    setCustomer(c);
+    if (m) {
       supabase
         .from("merchant_messages")
         .select("id", { count: "exact", head: true })
-        .eq("merchant_id", s.id)
+        .eq("merchant_id", m.id)
         .eq("is_read", false)
         .then(({ count }) => setUnread(count || 0));
     } else {
@@ -39,9 +49,11 @@ export function Header() {
   useEffect(() => {
     refresh();
     window.addEventListener(MERCHANT_SESSION_EVENT, refresh);
+    window.addEventListener(CUSTOMER_SESSION_EVENT, refresh);
     window.addEventListener("focus", refresh);
     return () => {
       window.removeEventListener(MERCHANT_SESSION_EVENT, refresh);
+      window.removeEventListener(CUSTOMER_SESSION_EVENT, refresh);
       window.removeEventListener("focus", refresh);
     };
   }, []);
@@ -53,18 +65,20 @@ export function Header() {
     { href: "/search", label: "بحث" },
   ];
 
-  const merchantLinks = merchant
-    ? [
-        { href: "/merchant", label: "لوحتي" },
-        { href: "/merchant/orders", label: "طلباتي" },
-        { href: "/merchant/wallet", label: "المحفظة" },
-        {
-          href: "/merchant/messages",
-          label: unread > 0 ? `الرسائل (${unread})` : "الرسائل",
-        },
-        { href: "/merchant/profile", label: "حسابي" },
-      ]
-    : [{ href: "/merchant/login", label: "دخول تاجر" }];
+  let accountLinks: { href: string; label: string }[] = [];
+  if (merchant) {
+    accountLinks = [
+      { href: "/merchant", label: "لوحتي" },
+      { href: "/merchant/orders", label: "طلباتي" },
+      { href: "/merchant/wallet", label: "المحفظة" },
+      { href: "/merchant/messages", label: unread > 0 ? `الرسائل (${unread})` : "الرسائل" },
+      { href: "/merchant/profile", label: "حسابي تاجر" },
+    ];
+  } else if (customer) {
+    accountLinks = [{ href: "/account", label: "حسابي" }];
+  } else {
+    accountLinks = [{ href: "/welcome", label: "دخول" }];
+  }
 
   return (
     <header className="sticky top-0 z-40 bg-page/95 backdrop-blur-sm shadow-header">
@@ -73,7 +87,7 @@ export function Header() {
           <button type="button" className="md:hidden p-2 -mr-2" onClick={() => setOpen((v) => !v)} aria-label="القائمة">
             {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
-          <Link href="/" className="shrink-0" aria-label="Muqatshop — الصفحة الرئيسية">
+          <Link href="/" className="shrink-0" aria-label="Muqatshop">
             <BrandLogo size="sm" />
           </Link>
         </div>
@@ -83,32 +97,50 @@ export function Header() {
             <Link key={l.href} href={l.href} className="hover:opacity-70 transition">{l.label}</Link>
           ))}
           <span className="w-px h-4 bg-border" />
-          {merchantLinks.map((l) => (
+          {accountLinks.map((l) => (
             <Link key={l.href} href={l.href} className="hover:opacity-70 transition text-[#0f2744]">{l.label}</Link>
           ))}
-          {merchant && (
-            <button type="button" className="text-xs text-sale" onClick={() => { clearMerchantSession(); window.location.href = "/"; }}>خروج تاجر</button>
+          {(merchant || customer) && (
+            <button
+              type="button"
+              className="text-xs text-sale"
+              onClick={() => {
+                if (merchant) clearMerchantSession();
+                if (customer) clearCustomerSession();
+                clearSiteRole();
+                window.location.href = "/welcome";
+              }}
+            >
+              خروج
+            </button>
           )}
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          {merchant && (
-            <Link href="/merchant" className="hidden sm:flex items-center gap-1 text-xs font-medium bg-[#0f2744] text-white px-2.5 py-1.5 rounded-full max-w-[120px] truncate relative" title={merchant.name}>
+          {(merchant || customer) && (
+            <Link
+              href={merchant ? "/merchant" : "/account"}
+              className="hidden sm:flex items-center gap-1 text-xs font-medium bg-[#0f2744] text-white px-2.5 py-1.5 rounded-full max-w-[120px] truncate relative"
+              title={merchant?.name || customer?.name}
+            >
               <User className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{merchant.name}</span>
-              {unread > 0 && (
-                <span className="absolute -top-1 -left-1 bg-sale text-white text-[9px] min-w-[14px] h-3.5 rounded-full flex items-center justify-center px-0.5">{unread}</span>
-              )}
+              <span className="truncate">{merchant?.name || customer?.name}</span>
             </Link>
           )}
-          <Link href="/search" className="p-2 hover:opacity-70 transition" aria-label="بحث"><Search className="w-6 h-6" strokeWidth={1.5} /></Link>
+          <Link href="/search" className="p-2 hover:opacity-70 transition" aria-label="بحث">
+            <Search className="w-6 h-6" strokeWidth={1.5} />
+          </Link>
           <Link href="/wishlist" className="relative p-2 hover:opacity-70 transition" aria-label="الأمنيات">
             <Heart className="w-6 h-6" strokeWidth={1.5} />
-            {wishCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-sale text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center">{wishCount}</span>}
+            {wishCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-sale text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center">{wishCount}</span>
+            )}
           </Link>
           <Link href="/cart" className="relative p-2 hover:opacity-70 transition" aria-label="السلة">
             <ShoppingBag className="w-6 h-6" strokeWidth={1.5} />
-            {totalItems > 0 && <span className="absolute -top-0.5 -right-0.5 bg-accent text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center">{totalItems}</span>}
+            {totalItems > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-accent text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center">{totalItems}</span>
+            )}
           </Link>
         </div>
       </div>
@@ -119,12 +151,24 @@ export function Header() {
             {mainLinks.map((l) => (
               <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="py-2.5 border-b border-[#f0ebe3]">{l.label}</Link>
             ))}
-            <p className="text-[11px] text-muted pt-3 pb-1">{merchant ? `حساب التاجر · ${merchant.name}` : "التاجر"}</p>
-            {merchantLinks.map((l) => (
+            <p className="text-[11px] text-muted pt-3 pb-1">الحساب</p>
+            {accountLinks.map((l) => (
               <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="py-2.5 border-b border-[#f0ebe3] text-[#0f2744]">{l.label}</Link>
             ))}
-            {merchant && (
-              <button type="button" className="py-2.5 text-right text-sale" onClick={() => { clearMerchantSession(); setOpen(false); window.location.href = "/"; }}>خروج تاجر</button>
+            {(merchant || customer) && (
+              <button
+                type="button"
+                className="py-2.5 text-right text-sale"
+                onClick={() => {
+                  if (merchant) clearMerchantSession();
+                  if (customer) clearCustomerSession();
+                  clearSiteRole();
+                  setOpen(false);
+                  window.location.href = "/welcome";
+                }}
+              >
+                خروج
+              </button>
             )}
           </nav>
         </div>

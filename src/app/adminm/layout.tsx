@@ -36,6 +36,7 @@ export default function AdminmLayout({ children }: { children: React.ReactNode }
   const links = [
     { href: "/adminm", label: "نظرة عامة" },
     { href: "/adminm/merchants", label: "التجار" },
+    { href: "/adminm/applications", label: "طلبات تاجر" },
     { href: "/adminm/orders", label: "طلبات التجار" },
     { href: "/adminm/withdrawals", label: "السحوبات" },
     { href: "/adminm/messages", label: "رسائل" },
@@ -57,7 +58,9 @@ export default function AdminmLayout({ children }: { children: React.ReactNode }
               key={l.href}
               href={l.href}
               className={`shrink-0 text-xs px-3 py-1.5 rounded-full ${
-                pathname === l.href ? "bg-white text-[#0f2744]" : "bg-white/15 text-white"
+                pathname === l.href || pathname?.startsWith(l.href + "/")
+                  ? "bg-white text-[#0f2744]"
+                  : "bg-white/15 text-white"
               }`}
             >
               {l.label}
