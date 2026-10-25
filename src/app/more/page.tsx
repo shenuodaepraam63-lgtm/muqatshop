@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
 import {
   PackageSearch,
   Heart,
@@ -13,12 +14,30 @@ export const metadata = {
   title: "المزيد | Muqatshop",
 };
 
-const sections = [
+type MoreItem = {
+  href: string;
+  label: string;
+  desc: string;
+  icon: LucideIcon;
+  disabled?: boolean;
+};
+
+type MoreSection = {
+  title: string;
+  items: MoreItem[];
+};
+
+const sections: MoreSection[] = [
   {
     title: "التسوق",
     items: [
       { href: "/shop", label: "المتجر", desc: "كل المنتجات", icon: Store },
-      { href: "/categories", label: "التصنيفات", desc: "مجموعات وتصنيفات وفروع", icon: PackageSearch },
+      {
+        href: "/categories",
+        label: "التصنيفات",
+        desc: "مجموعات وتصنيفات وفروع",
+        icon: PackageSearch,
+      },
       { href: "/search", label: "بحث", desc: "ابحث عن منتج", icon: Search },
       { href: "/wishlist", label: "المفضلة", desc: "قائمة الأمنيات", icon: Heart },
     ],
