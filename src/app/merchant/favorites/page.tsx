@@ -44,9 +44,7 @@ export default function MarketerFavoritesPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold">المفضلة</h1>
-        <p className="text-sm text-muted mt-1">
-          افتح المنتج بنفس عرض المتجر الأصلي
-        </p>
+        <p className="text-sm text-muted mt-1">داخل بوابة المسوق فقط</p>
       </div>
 
       {loading ? (
@@ -56,52 +54,35 @@ export default function MarketerFavoritesPage() {
       ) : products.length === 0 ? (
         <div className="bg-white border border-[#e8e2d9] rounded-2xl p-10 text-center space-y-3">
           <Heart className="w-10 h-10 text-muted mx-auto" strokeWidth={1.25} />
-          <p className="text-sm text-muted">لا توجد منتجات في المفضلة بعد</p>
-          <Link
-            href="/merchant/catalog"
-            className="inline-block text-sm text-accent hover:underline"
-          >
-            تصفح الكتالوج
+          <p className="text-sm text-muted">لا توجد منتجات في المفضلة</p>
+          <Link href="/merchant/catalog" className="text-sm text-accent hover:underline">
+            الكتالوج
           </Link>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {products.map((p) => {
             const img = productMainImage(p) || "";
-            const storeHref = `/products/${encodeURIComponent(p.slug)}`;
+            const href = `/merchant/catalog/${p.id}`;
             return (
-              <div
-                key={p.id}
-                className="rounded-2xl overflow-hidden bg-[#f5f1e8] border border-transparent"
-              >
-                <Link href={storeHref} target="_blank" rel="noopener" className="block">
+              <div key={p.id} className="rounded-2xl overflow-hidden bg-[#f5f1e8]">
+                <Link href={href} className="block">
                   <div className="relative aspect-square bg-[#ebe6dc]">
                     {img ? (
-                      <Image
-                        src={img}
-                        alt={p.name}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 50vw, 33vw"
-                      />
+                      <Image src={img} alt={p.name} fill className="object-cover" sizes="50vw" />
                     ) : null}
                   </div>
                   <div className="p-2.5">
-                    <p className="text-sm font-medium line-clamp-2 min-h-[2.5rem]">
-                      {p.name}
-                    </p>
-                    <p className="text-xs text-muted mt-1">
-                      {formatPrice(Number(p.price))}
-                    </p>
+                    <p className="text-sm font-medium line-clamp-2 min-h-[2.5rem]">{p.name}</p>
+                    <p className="text-xs text-muted mt-1">{formatPrice(Number(p.price))}</p>
                   </div>
                 </Link>
                 <div className="px-2.5 pb-3 flex gap-1.5">
                   <Link
-                    href={storeHref}
-                    target="_blank"
+                    href={href}
                     className="flex-1 text-center text-[11px] border border-ink rounded-full py-1.5"
                   >
-                    عرض
+                    تفاصيل
                   </Link>
                   <Link
                     href={`/merchant/new-order?product=${p.id}`}
@@ -109,11 +90,7 @@ export default function MarketerFavoritesPage() {
                   >
                     <PlusCircle className="w-3 h-3" /> أوردر
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => remove(p.id)}
-                    className="text-[11px] text-sale px-1"
-                  >
+                  <button type="button" onClick={() => remove(p.id)} className="text-[11px] text-sale px-1">
                     إزالة
                   </button>
                 </div>
