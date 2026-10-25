@@ -7,9 +7,6 @@ import {
   getCustomerSession,
   saveCustomerSession,
   clearCustomerSession,
-  createAndStoreOtp,
-  verifyOtp,
-  sendCustomerMail,
 } from "@/lib/customer";
 import { clearSiteRole } from "@/lib/role";
 import { supabase } from "@/lib/supabase";
@@ -60,7 +57,6 @@ export default function AccountPage() {
   const [appStatus, setAppStatus] = useState<string | null>(null);
   const [appLoading, setAppLoading] = useState(false);
 
-  // حذف بحساب رمز
   const [deleteStep, setDeleteStep] = useState<"idle" | "code">("idle");
   const [deleteOtp, setDeleteOtp] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -140,61 +136,125 @@ export default function AccountPage() {
     setMsg("تم حفظ بياناتك");
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     clearCustomerSession();
     clearSiteRole();
     router.replace("/welcome");
   };
 
+  /**
+   * يطلب رمزًا رقميًا من Supabase Auth (قالب Reauthentication / OTP)
+   * عبر reauthenticate، مع احتياطي signInWithOtp
+   */
   const requestDeleteCode = async () => {
     setErr("");
     setMsg("");
-    if (!confirm("سيتم إرسال رمز تحقق إلى بريدك لتأكيد حذف الحساب. متابعة؟")) return;
+    if (!confirm("سيتم إرسال رمز تحقق رقمي من Supabase إلى بريدك لتأكيد حذف الحساب. متابعة؟"))
+      return;
+
     setDeleteLoading(true);
-    const code = await createAndStoreOtp(email, "delete");
-    const mail = await sendCustomerMail({
-      email,
-      name,
-      code,
-      purpose: "delete",
-    });
-    setDeleteLoading(false);
-    if (!mail.ok) {
-      setErr(mail.error || "تعذر إرسال رمز الحذف");
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // إن لم تكن جلسة Auth: نطلب OTP بالبريد مباشرة (بدون إنشاء مستخدم جديد)
+    if (!session) {
+      const { error: otpErr } = await supabase.auth.signInWithOtp({
+        email: email.trim().toLowerCase(),
+        options: { shouldCreateUser: false },
+      });
+      setDeleteLoading(false);
+      if (otpErr) {
+        setErr(
+          otpErr.message.includes("Signups not allowed") ||
+            otpErr.message.toLowerCase().includes("user not found")
+            ? "لازم تسجّل دخول بحساب مؤكد من الرابط أولًا، ثم تحذف الحساب"
+            : otpErr.message
+        );
+        return;
+      }
+      setDeleteStep("code");
+      setDeleteOtp("");
+      setMsg("أرسلنا رمزًا رقميًا إلى بريدك عبر Supabase. أدخله لتأكيد الحذف.");
       return;
     }
+
+    // مع جلسة: إعادة مصادقة — يستخدم قالب Reauthentication و{{ .Token }}
+    const { error: reErr } = await supabase.auth.reauthenticate();
+    if (reErr) {
+      // احتياطي: OTP بالبريد
+      const { error: otpErr } = await supabase.auth.signInWithOtp({
+        email: email.trim().toLowerCase(),
+        options: { shouldCreateUser: false },
+      });
+      setDeleteLoading(false);
+      if (otpErr) {
+        setErr(reErr.message || otpErr.message);
+        return;
+      }
+      setDeleteStep("code");
+      setDeleteOtp("");
+      setMsg("أرسلنا رمزًا رقميًا إلى بريدك عبر Supabase. أدخله لتأكيد الحذف.");
+      return;
+    }
+
+    setDeleteLoading(false);
     setDeleteStep("code");
     setDeleteOtp("");
-    setMsg("أرسلنا رمز تحقق إلى بريدك. أدخله لتأكيد الحذف.");
+    setMsg("أرسلنا رمز التحقق الرقمي إلى بريدك (من Supabase). أدخله لتأكيد الحذف النهائي.");
   };
 
   const confirmDelete = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr("");
     setDeleteLoading(true);
-    const res = await verifyOtp(email, deleteOtp, "delete");
-    if (!res.ok) {
+
+    const em = email.trim().toLowerCase();
+    const token = deleteOtp.trim();
+
+    // التحقق من الرمز الرقمي عبر Supabase
+    let verified = false;
+    const attempts: Array<{ type: "email" | "signup" | "recovery" | "invite" }> = [
+      { type: "email" },
+    ];
+
+    for (const a of attempts) {
+      const { error: vErr } = await supabase.auth.verifyOtp({
+        email: em,
+        token,
+        type: a.type,
+      });
+      if (!vErr) {
+        verified = true;
+        break;
+      }
+    }
+
+    if (!verified) {
+      // بعض الإصدارات تستخدم type مرتبط بإعادة المصادقة كـ email فقط؛
+      // إن فشل: رسالة واضحة
       setDeleteLoading(false);
-      setErr(res.error);
+      setErr("رمز التحقق غير صحيح أو منتهي — اطلب رمزًا جديدًا");
       return;
     }
 
+    // حذف بيانات الملف المرتبط بالمتجر
     await supabase.from("merchant_applications").delete().eq("customer_id", customerId);
-    await supabase.from("customer_otps").delete().eq("email", email.toLowerCase());
-    const { error } = await supabase.from("customers").delete().eq("id", customerId);
-    if (error) {
-      setDeleteLoading(false);
-      setErr(error.message);
-      return;
+    await supabase.from("customer_otps").delete().eq("email", em);
+
+    const { error: delErr } = await supabase.from("customers").delete().eq("id", customerId);
+    if (delErr) {
+      // تعطيل بدل الحذف إن فشل
+      await supabase
+        .from("customers")
+        .update({ is_active: false, email_verified: false })
+        .eq("id", customerId);
     }
 
-    // إشعار بعد الحذف (best-effort)
-    await sendCustomerMail({
-      email,
-      name,
-      purpose: "notice_delete",
-    });
-
+    // إنهاء جلسة Auth (حذف مستخدم Auth نفسه يحتاج Service Role من السيرفر)
+    await supabase.auth.signOut();
     clearCustomerSession();
     clearSiteRole();
     setDeleteLoading(false);
@@ -235,7 +295,11 @@ export default function AccountPage() {
   };
 
   if (!ready) {
-    return <div className="max-w-page mx-auto px-4 py-16 text-center text-muted text-sm">جاري التحميل...</div>;
+    return (
+      <div className="max-w-page mx-auto px-4 py-16 text-center text-muted text-sm">
+        جاري التحميل...
+      </div>
+    );
   }
 
   const field = "w-full border border-border rounded-xl px-4 py-2.5 text-sm bg-white";
@@ -244,7 +308,9 @@ export default function AccountPage() {
     <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">حسابي</h1>
-        <Link href="/shop" className="text-sm text-muted">المتجر</Link>
+        <Link href="/shop" className="text-sm text-muted">
+          المتجر
+        </Link>
       </div>
 
       <form onSubmit={save} className="bg-white border border-border rounded-2xl p-5 space-y-3">
@@ -255,7 +321,13 @@ export default function AccountPage() {
         <input className={field} value={name} onChange={(e) => setName(e.target.value)} required />
 
         <label className="block text-sm font-medium">رقم التليفون</label>
-        <input className={field} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01xxxxxxxxx" />
+        <input
+          className={field}
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="01xxxxxxxxx"
+        />
 
         <label className="block text-sm font-medium">البلد</label>
         <select
@@ -268,7 +340,9 @@ export default function AccountPage() {
           }}
         >
           {COUNTRIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
+            <option key={c} value={c}>
+              {c}
+            </option>
           ))}
         </select>
 
@@ -285,14 +359,23 @@ export default function AccountPage() {
             >
               <option value="">اختر المحافظة</option>
               {GOVERNORATE_NAMES.map((g) => (
-                <option key={g} value={g}>{g}</option>
+                <option key={g} value={g}>
+                  {g}
+                </option>
               ))}
             </select>
             <label className="block text-sm font-medium">المركز / القسم</label>
-            <select className={field} value={center} onChange={(e) => setCenter(e.target.value)} disabled={!governorate}>
+            <select
+              className={field}
+              value={center}
+              onChange={(e) => setCenter(e.target.value)}
+              disabled={!governorate}
+            >
               <option value="">{governorate ? "اختر المركز" : "اختر المحافظة أولاً"}</option>
               {centers.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
           </>
@@ -305,10 +388,14 @@ export default function AccountPage() {
         <label className="block text-sm font-medium">الشقة / المبنى</label>
         <input className={field} value={apartment} onChange={(e) => setApartment(e.target.value)} />
 
-        {err && <p className="text-sm text-sale">{err}</p>}
-        {msg && <p className="text-sm text-green-700">{msg}</p>}
+        {err && deleteStep === "idle" && <p className="text-sm text-sale">{err}</p>}
+        {msg && deleteStep === "idle" && <p className="text-sm text-green-700">{msg}</p>}
 
-        <button type="submit" disabled={saving} className="w-full bg-ink text-white py-3 rounded-full text-sm font-semibold disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full bg-ink text-white py-3 rounded-full text-sm font-semibold disabled:opacity-50"
+        >
           {saving ? "..." : "حفظ البيانات"}
         </button>
       </form>
@@ -316,7 +403,9 @@ export default function AccountPage() {
       <div className="bg-white border border-border rounded-2xl p-5 space-y-3">
         <h2 className="font-semibold">طلب حساب تاجر</h2>
         {appStatus === "pending" && (
-          <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">طلبك قيد المراجعة من الإدارة</p>
+          <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+            طلبك قيد المراجعة من الإدارة
+          </p>
         )}
         {appStatus === "approved" && (
           <p className="text-sm text-green-700">تمت الموافقة — سجّل دخول التاجر من /merchant/login</p>
@@ -347,7 +436,8 @@ export default function AccountPage() {
       <div className="bg-white border border-border rounded-2xl p-5 space-y-3">
         <h2 className="font-semibold text-sale">حذف الحساب</h2>
         <p className="text-xs text-muted leading-relaxed">
-          الحذف نهائي. نرسل <strong>رمز تحقق</strong> إلى بريدك قبل التنفيذ، ثم رسالة تأكيد بعد الحذف.
+          الحذف نهائي. يتم إرسال <strong>رمز رقمي</strong> من <strong>Supabase</strong> إلى بريدك
+          (قالب إعادة المصادقة / OTP). بعد إدخال الرمز الصحيح يُحذف ملفك وتُنهى الجلسة.
         </p>
         {deleteStep === "idle" && (
           <button
@@ -356,20 +446,23 @@ export default function AccountPage() {
             onClick={requestDeleteCode}
             className="w-full border border-sale text-sale py-3 rounded-full text-sm font-medium disabled:opacity-50"
           >
-            {deleteLoading ? "..." : "طلب رمز حذف الحساب"}
+            {deleteLoading ? "جاري إرسال الرمز..." : "طلب رمز حذف الحساب"}
           </button>
         )}
         {deleteStep === "code" && (
           <form onSubmit={confirmDelete} className="space-y-3">
+            {msg && <p className="text-sm text-green-700">{msg}</p>}
+            {err && <p className="text-sm text-sale">{err}</p>}
             <input
               inputMode="numeric"
-              maxLength={6}
+              maxLength={8}
               required
               value={deleteOtp}
               onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, ""))}
-              placeholder="رمز التحقق"
-              className={`${field} text-center tracking-widest font-mono`}
+              placeholder="الرمز الرقمي من الإيميل"
+              className={`${field} text-center tracking-widest font-mono text-lg`}
               dir="ltr"
+              autoComplete="one-time-code"
             />
             <button
               type="submit"
@@ -378,8 +471,25 @@ export default function AccountPage() {
             >
               {deleteLoading ? "..." : "تأكيد الحذف النهائي"}
             </button>
-            <button type="button" className="w-full text-xs text-muted" onClick={() => setDeleteStep("idle")}>
+            <button
+              type="button"
+              className="w-full text-xs text-muted"
+              onClick={() => {
+                setDeleteStep("idle");
+                setDeleteOtp("");
+                setErr("");
+                setMsg("");
+              }}
+            >
               إلغاء
+            </button>
+            <button
+              type="button"
+              className="w-full text-xs underline text-muted"
+              disabled={deleteLoading}
+              onClick={requestDeleteCode}
+            >
+              إعادة إرسال الرمز
             </button>
           </form>
         )}
@@ -392,7 +502,11 @@ export default function AccountPage() {
         >
           نسيت / تغيير كلمة المرور
         </Link>
-        <button type="button" onClick={logout} className="w-full bg-[#f0ebe3] py-3 rounded-full text-sm font-medium">
+        <button
+          type="button"
+          onClick={logout}
+          className="w-full bg-[#f0ebe3] py-3 rounded-full text-sm font-medium"
+        >
           تسجيل الخروج
         </button>
       </div>
