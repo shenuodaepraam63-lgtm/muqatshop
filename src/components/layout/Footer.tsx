@@ -24,8 +24,13 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/groups" className="hover:text-ink transition">
-                  الأقسام
+                <Link href="/categories" className="hover:text-ink transition">
+                  التصنيفات
+                </Link>
+              </li>
+              <li>
+                <Link href="/more" className="hover:text-ink transition">
+                  المزيد
                 </Link>
               </li>
               <li>

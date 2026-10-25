@@ -60,9 +60,8 @@ export function Header() {
 
   const mainLinks = [
     { href: "/shop", label: "المتجر" },
-    { href: "/groups", label: "الأقسام" },
-    { href: "/track", label: "تتبع طلب" },
-    { href: "/search", label: "بحث" },
+    { href: "/categories", label: "التصنيفات" },
+    { href: "/more", label: "المزيد" },
   ];
 
   let accountLinks: { href: string; label: string }[] = [];

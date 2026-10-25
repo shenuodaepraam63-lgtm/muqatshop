@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, ShoppingBag, LayoutGrid } from "lucide-react";
+import { Home, ShoppingBag, LayoutGrid, Layers, MoreHorizontal } from "lucide-react";
 import { useCartStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "الرئيسية", icon: Home },
   { href: "/shop", label: "المتجر", icon: LayoutGrid },
-  { href: "/search", label: "بحث", icon: Search },
+  { href: "/categories", label: "التصنيفات", icon: Layers },
+  { href: "/more", label: "المزيد", icon: MoreHorizontal },
   { href: "/cart", label: "السلة", icon: ShoppingBag },
 ];
 

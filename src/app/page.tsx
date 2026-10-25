@@ -24,32 +24,38 @@ async function getProducts(): Promise<Product[]> {
   }
 }
 
-async function getCategories() {
+async function getGroups() {
   const { data } = await supabase
-    .from("categories")
+    .from("category_groups")
     .select("id, name, slug")
+    .eq("is_active", true)
     .order("sort_order");
   return data || [];
 }
 
 export default async function HomePage() {
-  const [products, categories] = await Promise.all([getProducts(), getCategories()]);
+  const [products, groups] = await Promise.all([getProducts(), getGroups()]);
 
   return (
     <div>
       <Hero />
 
-      {categories.length > 0 && (
+      {groups.length > 0 && (
         <section className="max-w-page mx-auto px-4 md:px-8 mt-10">
-          <h2 className="text-xl md:text-2xl font-bold mb-4">تسوق حسب القسم</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl md:text-2xl font-bold">تسوق حسب المجموعة</h2>
+            <Link href="/categories" className="text-sm text-muted underline">
+              كل التصنيفات
+            </Link>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            {categories.map((c) => (
+            {groups.map((g) => (
               <Link
-                key={c.id}
-                href={`/categories/${c.slug}`}
+                key={g.id}
+                href={`/groups/${encodeURIComponent(g.slug)}`}
                 className="rounded-2xl bg-[#f5f1e8] border border-[#e8e2d9] px-4 py-6 text-center hover:shadow-md transition"
               >
-                <span className="font-semibold text-ink">{c.name}</span>
+                <span className="font-semibold text-ink">{g.name}</span>
               </Link>
             ))}
             <Link
