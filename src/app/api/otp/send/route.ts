@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-/**
- * إرسال OTP بالبريد عبر Resend إن وُجد المفتاح.
- * بدون مفتاح: يُرجع ok مع debugCode فقط إذا OTP_DEBUG=1 (للاختبار).
- */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -39,23 +35,17 @@ export async function POST(req: NextRequest) {
       });
       if (!r.ok) {
         const t = await r.text();
-        return NextResponse.json(
-          { ok: false, error: "فشل إرسال البريد", detail: t },
-          { status: 502 }
-        );
+        return NextResponse.json({ ok: false, error: "فشل إرسال البريد", detail: t }, { status: 502 });
       }
       return NextResponse.json({ ok: true, sent: true });
     }
 
-    // وضع الاختبار بدون Resend
-    const debug = process.env.OTP_DEBUG === "1" || process.env.NEXT_PUBLIC_OTP_DEBUG === "1";
+    // بدون Resend: وضع اختبار — يظهر الرمز في الواجهة
     return NextResponse.json({
       ok: true,
       sent: false,
-      ...(debug ? { debugCode: code } : {}),
-      message: debug
-        ? undefined
-        : "لم يُضبط إرسال البريد بعد. أضف RESEND_API_KEY أو OTP_DEBUG=1 للاختبار",
+      debugCode: code,
+      message: "أضف RESEND_API_KEY لإرسال البريد الحقيقي",
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "خطأ";
