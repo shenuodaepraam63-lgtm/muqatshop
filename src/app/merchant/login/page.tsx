@@ -11,7 +11,7 @@ import {
 import { hashPassword, saveMerchantSession } from "@/lib/merchant";
 import { setSiteRole } from "@/lib/role";
 
-export default function MerchantLoginPage() {
+export default function MarketerLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,7 +26,6 @@ export default function MerchantLoginPage() {
     setLoading(true);
     const em = email.trim().toLowerCase();
 
-    // 1) محاولة Supabase Auth (تجار مؤكدون بالرابط)
     const { error: authErr } = await supabase.auth.signInWithPassword({
       email: em,
       password,
@@ -52,7 +51,6 @@ export default function MerchantLoginPage() {
       return;
     }
 
-    // 2) توافق قديم: تجار بـ password_hash فقط (قبل تأكيد البريد)
     const hash = await hashPassword(password);
     const { data } = await supabase
       .from("merchants")
@@ -77,10 +75,11 @@ export default function MerchantLoginPage() {
       return;
     }
 
-    // إن كان غير مؤكد بالإيميل الجديد — نطلب إعادة إرسال رابط عبر Auth إن أمكن
     if (data.email_verified === false) {
       setLoading(false);
-      setError("يجب تأكيد البريد أولًا. سجّل من جديد بنفس البريد أو تواصل مع الإدارة.");
+      setError(
+        "يجب تأكيد البريد أولًا. سجّل من جديد بنفس البريد أو تواصل مع الإدارة."
+      );
       return;
     }
 
@@ -117,12 +116,20 @@ export default function MerchantLoginPage() {
   };
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
+    <div className="min-h-[70vh] flex items-center justify-center px-4 py-12 bg-[#f7f5f0]">
       <form
         onSubmit={submit}
-        className="bg-white border border-[#e8e2d9] rounded-2xl p-6 w-full max-w-md space-y-4"
+        className="bg-white border border-[#eae6df] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-sm"
       >
-        <h1 className="text-xl font-bold">دخول تاجر</h1>
+        <div>
+          <p className="text-[11px] font-semibold text-[#0042EB] tracking-wide">
+            بوابة المسوق
+          </p>
+          <h1 className="text-xl font-bold mt-1">تسجيل الدخول</h1>
+          <p className="text-xs text-muted mt-1">
+            مساحة عمل المسوق — أرباح، طلبات، وكتالوج المنتجات
+          </p>
+        </div>
         <input
           type="email"
           required
@@ -155,12 +162,20 @@ export default function MerchantLoginPage() {
           className="w-full text-xs text-muted underline"
           disabled={loading}
         >
-          نسيت كلمة المرور؟ (رابط على البريد)
+          نسيت كلمة المرور؟
         </button>
         <p className="text-xs text-center text-muted">
-          تاجر جديد؟{" "}
-          <Link href="/merchant/register" className="underline font-medium text-ink">
-            إنشاء حساب وتأكيد البريد
+          مسوق جديد؟{" "}
+          <Link
+            href="/merchant/register"
+            className="underline font-medium text-ink"
+          >
+            إنشاء حساب مسوق
+          </Link>
+        </p>
+        <p className="text-xs text-center">
+          <Link href="/" className="text-muted hover:underline">
+            العودة للمتجر العام
           </Link>
         </p>
       </form>
