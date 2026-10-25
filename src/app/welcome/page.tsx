@@ -139,7 +139,6 @@ function WelcomeInner() {
     setLoading(true);
     const em = email.trim().toLowerCase();
 
-    // يوجّه مباشرة لصفحة تعيين كلمة المرور (تدعم code و hash)
     const { error: err } = await supabase.auth.resetPasswordForEmail(em, {
       redirectTo: authRedirectTo("/auth/reset-password"),
     });
@@ -169,7 +168,7 @@ function WelcomeInner() {
             [
               { id: "guest" as Tab, label: "زائر" },
               { id: "customer" as Tab, label: "عميل" },
-              { id: "merchant" as Tab, label: "تاجر" },
+              { id: "merchant" as Tab, label: "مسوق" },
             ] as const
           ).map((t) => (
             <button
@@ -353,12 +352,21 @@ function WelcomeInner() {
 
           {tab === "merchant" && (
             <>
-              <h1 className="text-lg font-bold text-center">حساب تاجر</h1>
+              <h1 className="text-lg font-bold text-center">بوابة المسوق</h1>
+              <p className="text-sm text-muted text-center leading-relaxed">
+                سجّل أوردرات عملائك، حدد سعر البيع، وتابع أرباحك بعد التسليم.
+              </p>
               <a
                 href="/merchant/login"
                 className="block w-full text-center bg-ink text-white py-3.5 rounded-full text-sm font-semibold"
               >
-                دخول تاجر
+                دخول مسوق
+              </a>
+              <a
+                href="/merchant/register"
+                className="block w-full text-center border border-ink py-3 rounded-full text-sm font-semibold"
+              >
+                إنشاء حساب مسوق
               </a>
             </>
           )}

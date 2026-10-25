@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { authRedirectTo, syncMerchantFromAuthUser } from "@/lib/auth-customer";
 
-export default function MerchantRegisterPage() {
+export default function MarketerRegisterPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -39,7 +39,7 @@ export default function MerchantRegisterPage() {
 
     if (taken?.email_verified) {
       setLoading(false);
-      setError("البريد مسجّل كتاجر بالفعل — سجّل الدخول");
+      setError("البريد مسجّل كمسوق بالفعل — سجّل الدخول");
       return;
     }
 
@@ -68,7 +68,6 @@ export default function MerchantRegisterPage() {
       return;
     }
 
-    // تأكيد فوري إن كان الإيميل التلقائي معطلًا
     if (data.session) {
       const synced = await syncMerchantFromAuthUser({
         name: name.trim(),
@@ -85,20 +84,25 @@ export default function MerchantRegisterPage() {
 
     setLoading(false);
     setInfo(
-      "أرسلنا رابط تأكيد إلى بريدك. افتح الرسالة واضغط زر التأكيد لإكمال تسجيل التاجر."
+      "أرسلنا رابط تأكيد إلى بريدك. افتح الرسالة واضغط زر التأكيد لإكمال تسجيل المسوق."
     );
   };
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
+    <div className="min-h-[70vh] flex items-center justify-center px-4 py-12 bg-[#f7f5f0]">
       <form
         onSubmit={submit}
-        className="bg-white border border-[#e8e2d9] rounded-2xl p-6 w-full max-w-md space-y-4"
+        className="bg-white border border-[#eae6df] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-sm"
       >
-        <h1 className="text-xl font-bold">تسجيل تاجر</h1>
-        <p className="text-sm text-muted">
-          بعد التسجيل لازم تأكد بريدك من خلال <strong>الرابط</strong> اللي هيوصلك على الإيميل.
-        </p>
+        <div>
+          <p className="text-[11px] font-semibold text-[#0042EB] tracking-wide">
+            بوابة المسوق
+          </p>
+          <h1 className="text-xl font-bold mt-1">إنشاء حساب مسوق</h1>
+          <p className="text-sm text-muted mt-1">
+            بعد التسجيل أكّد بريدك من خلال الرابط اللي هيوصلك على الإيميل.
+          </p>
+        </div>
         <input
           required
           value={name}
@@ -126,7 +130,7 @@ export default function MerchantRegisterPage() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="كلمة المرور"
+          placeholder="كلمة المرور (6+ أحرف)"
           className="w-full border rounded-xl px-4 py-3 text-sm"
         />
         {error && <p className="text-sm text-sale">{error}</p>}
@@ -142,6 +146,11 @@ export default function MerchantRegisterPage() {
           لديك حساب؟{" "}
           <Link href="/merchant/login" className="underline font-medium text-ink">
             تسجيل الدخول
+          </Link>
+        </p>
+        <p className="text-xs text-center">
+          <Link href="/" className="text-muted hover:underline">
+            العودة للمتجر العام
           </Link>
         </p>
       </form>
