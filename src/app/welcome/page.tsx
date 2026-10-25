@@ -6,7 +6,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import { setSiteRole } from "@/lib/role";
 import { getCustomerSession } from "@/lib/customer";
 import { supabase } from "@/lib/supabase";
-import { getMerchantSession } from "@/lib/merchant";
+import { clearMerchantSession, getMerchantSession } from "@/lib/merchant";
 import { authRedirectTo, syncCustomerFromAuthUser } from "@/lib/auth-customer";
 
 type Tab = "guest" | "customer" | "merchant";
@@ -29,9 +29,10 @@ function WelcomeInner() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // مسوق مسجّل → بوابة المسوق فقط (مش المتجر كعميل)
     if (getMerchantSession()) {
       setSiteRole("merchant");
-      router.replace(next.startsWith("/") ? next : "/");
+      router.replace("/merchant");
       return;
     }
     if (getCustomerSession()) {
@@ -41,8 +42,18 @@ function WelcomeInner() {
   }, [router, next]);
 
   const goGuest = () => {
+    clearMerchantSession();
     setSiteRole("guest");
     router.replace("/");
+  };
+
+  const afterCustomerAuth = async (opts?: { name?: string }) => {
+    clearMerchantSession();
+    setSiteRole("customer");
+    const synced = await syncCustomerFromAuthUser(
+      opts?.name ? { name: opts.name } : undefined
+    );
+    return synced;
   };
 
   const register = async (e: React.FormEvent) => {
@@ -82,7 +93,7 @@ function WelcomeInner() {
     }
 
     if (data.session) {
-      const synced = await syncCustomerFromAuthUser({ name: name.trim() });
+      const synced = await afterCustomerAuth({ name: name.trim() });
       setLoading(false);
       if (!synced.ok) {
         setError(synced.error);
@@ -123,7 +134,7 @@ function WelcomeInner() {
       return;
     }
 
-    const synced = await syncCustomerFromAuthUser();
+    const synced = await afterCustomerAuth();
     setLoading(false);
     if (!synced.ok) {
       setError(synced.error);
@@ -157,7 +168,7 @@ function WelcomeInner() {
     "w-full border border-[#e8e2d9] rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ink/20 bg-white";
 
   return (
-    <div className="min-h-screen bg-[#f8f5f0] flex flex-col items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-page flex flex-col items-center justify-center px-4 py-10">
       <div className="mb-8">
         <BrandLogo size="md" />
       </div>
@@ -180,7 +191,9 @@ function WelcomeInner() {
                 setInfo("");
               }}
               className={`py-3.5 text-sm font-semibold transition ${
-                tab === t.id ? "bg-ink text-white" : "bg-[#faf8f5] text-muted hover:text-ink"
+                tab === t.id
+                  ? "bg-ink text-white"
+                  : "bg-[#faf8f5] text-muted hover:text-ink"
               }`}
             >
               {t.label}
@@ -220,7 +233,9 @@ function WelcomeInner() {
                   <button
                     type="button"
                     className={`flex-1 py-2 rounded-full ${
-                      custMode === "login" ? "bg-white font-semibold shadow-sm" : ""
+                      custMode === "login"
+                        ? "bg-white font-semibold shadow-sm"
+                        : ""
                     }`}
                     onClick={() => setCustMode("login")}
                   >
@@ -229,7 +244,9 @@ function WelcomeInner() {
                   <button
                     type="button"
                     className={`flex-1 py-2 rounded-full ${
-                      custMode === "register" ? "bg-white font-semibold shadow-sm" : ""
+                      custMode === "register"
+                        ? "bg-white font-semibold shadow-sm"
+                        : ""
                     }`}
                     onClick={() => setCustMode("register")}
                   >
@@ -263,7 +280,7 @@ function WelcomeInner() {
                     disabled={loading}
                     className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold disabled:opacity-50"
                   >
-                    {loading ? "..." : "دخول"}
+                    {loading ? "..." : "دخول كعميل"}
                   </button>
                   <button
                     type="button"
@@ -305,7 +322,9 @@ function WelcomeInner() {
                     className={field}
                   />
                   {error && <p className="text-sm text-sale">{error}</p>}
-                  {info && <p className="text-sm text-muted leading-relaxed">{info}</p>}
+                  {info && (
+                    <p className="text-sm text-muted leading-relaxed">{info}</p>
+                  )}
                   <button
                     type="submit"
                     disabled={loading}
@@ -330,7 +349,9 @@ function WelcomeInner() {
                     className={field}
                   />
                   {error && <p className="text-sm text-sale">{error}</p>}
-                  {info && <p className="text-sm text-muted leading-relaxed">{info}</p>}
+                  {info && (
+                    <p className="text-sm text-muted leading-relaxed">{info}</p>
+                  )}
                   <button
                     type="submit"
                     disabled={loading}
@@ -354,7 +375,7 @@ function WelcomeInner() {
             <>
               <h1 className="text-lg font-bold text-center">بوابة المسوق</h1>
               <p className="text-sm text-muted text-center leading-relaxed">
-                سجّل أوردرات عملائك، حدد سعر البيع، وتابع أرباحك بعد التسليم.
+                حساب منفصل عن العميل — كتالوج، أوردرات، وأرباح جوه البوابة فقط.
               </p>
               <a
                 href="/merchant/login"
@@ -380,7 +401,9 @@ export default function WelcomePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-muted text-sm">...</div>
+        <div className="min-h-screen flex items-center justify-center text-muted text-sm">
+          ...
+        </div>
       }
     >
       <WelcomeInner />
