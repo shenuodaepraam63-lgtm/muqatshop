@@ -45,7 +45,7 @@ export default function MarketerFavoritesPage() {
       <div>
         <h1 className="text-xl font-bold">المفضلة</h1>
         <p className="text-sm text-muted mt-1">
-          منتجات حفظتها من الكتالوج للرجوع السريع
+          افتح المنتج بنفس عرض المتجر الأصلي
         </p>
       </div>
 
@@ -54,12 +54,12 @@ export default function MarketerFavoritesPage() {
           <Loader2 className="w-6 h-6 animate-spin" />
         </div>
       ) : products.length === 0 ? (
-        <div className="bg-white border border-[#eae6df] rounded-2xl p-10 text-center space-y-3">
+        <div className="bg-white border border-[#e8e2d9] rounded-2xl p-10 text-center space-y-3">
           <Heart className="w-10 h-10 text-muted mx-auto" strokeWidth={1.25} />
           <p className="text-sm text-muted">لا توجد منتجات في المفضلة بعد</p>
           <Link
             href="/merchant/catalog"
-            className="inline-block text-sm text-[#0042EB] hover:underline"
+            className="inline-block text-sm text-accent hover:underline"
           >
             تصفح الكتالوج
           </Link>
@@ -68,12 +68,13 @@ export default function MarketerFavoritesPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {products.map((p) => {
             const img = productMainImage(p) || "";
+            const storeHref = `/products/${encodeURIComponent(p.slug)}`;
             return (
               <div
                 key={p.id}
-                className="rounded-2xl overflow-hidden bg-white border border-[#eae6df]"
+                className="rounded-2xl overflow-hidden bg-[#f5f1e8] border border-transparent"
               >
-                <Link href={`/merchant/catalog/${p.id}`} className="block">
+                <Link href={storeHref} target="_blank" rel="noopener" className="block">
                   <div className="relative aspect-square bg-[#ebe6dc]">
                     {img ? (
                       <Image
@@ -96,6 +97,13 @@ export default function MarketerFavoritesPage() {
                 </Link>
                 <div className="px-2.5 pb-3 flex gap-1.5">
                   <Link
+                    href={storeHref}
+                    target="_blank"
+                    className="flex-1 text-center text-[11px] border border-ink rounded-full py-1.5"
+                  >
+                    عرض
+                  </Link>
+                  <Link
                     href={`/merchant/new-order?product=${p.id}`}
                     className="flex-1 text-center text-[11px] bg-ink text-white rounded-full py-1.5 inline-flex items-center justify-center gap-0.5"
                   >
@@ -104,7 +112,7 @@ export default function MarketerFavoritesPage() {
                   <button
                     type="button"
                     onClick={() => remove(p.id)}
-                    className="text-[11px] text-sale px-2"
+                    className="text-[11px] text-sale px-1"
                   >
                     إزالة
                   </button>
