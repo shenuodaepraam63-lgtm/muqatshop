@@ -10,12 +10,13 @@ import {
   createAndStoreOtp,
   verifyOtp,
   getCustomerSession,
+  sendCustomerMail,
 } from "@/lib/customer";
 import { supabase } from "@/lib/supabase";
 import { getMerchantSession } from "@/lib/merchant";
 
 type Tab = "guest" | "customer" | "merchant";
-type CustMode = "login" | "register" | "otp";
+type CustMode = "login" | "register" | "otp" | "forgot" | "forgot_otp";
 
 function WelcomeInner() {
   const router = useRouter();
@@ -23,12 +24,16 @@ function WelcomeInner() {
   const next = sp.get("next") || "/";
 
   const [tab, setTab] = useState<Tab>((sp.get("tab") as Tab) || "customer");
-  const [custMode, setCustMode] = useState<CustMode>("login");
+  const [custMode, setCustMode] = useState<CustMode>(
+    sp.get("mode") === "forgot" ? "forgot" : "login"
+  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
+  const [otpPurpose, setOtpPurpose] = useState<"register" | "reset">("register");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
@@ -48,16 +53,6 @@ function WelcomeInner() {
   const goGuest = () => {
     setSiteRole("guest");
     router.replace("/");
-  };
-
-  const sendOtpMail = async (em: string, code: string, nm: string) => {
-    const r = await fetch("/api/otp/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: em, code, name: nm }),
-    });
-    const j = await r.json();
-    return j as { ok: boolean; error?: string; sent?: boolean };
   };
 
   const register = async (e: React.FormEvent) => {
@@ -109,20 +104,27 @@ function WelcomeInner() {
     }
 
     const code = await createAndStoreOtp(em, "register");
-    const mail = await sendOtpMail(em, code, name.trim());
+    const mail = await sendCustomerMail({
+      email: em,
+      name: name.trim(),
+      code,
+      purpose: "register",
+    });
     if (!mail.ok) {
       setLoading(false);
-      setError(mail.error || "تعذر إرسال رمز التحقق إلى بريدك");
+      setError(mail.error || "تعذر إرسال رمز التحقق");
       return;
     }
 
     setPendingEmail(em);
+    setOtpPurpose("register");
+    setOtp("");
     setCustMode("otp");
     setInfo("أرسلنا رمز تحقق إلى بريدك. أدخله لإتمام التسجيل.");
     setLoading(false);
   };
 
-  const confirmOtp = async (e: React.FormEvent) => {
+  const confirmRegisterOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -184,13 +186,20 @@ function WelcomeInner() {
     }
     if (!data.email_verified) {
       const code = await createAndStoreOtp(em, "register");
-      const mail = await sendOtpMail(em, code, data.name);
+      const mail = await sendCustomerMail({
+        email: em,
+        name: data.name,
+        code,
+        purpose: "register",
+      });
       setLoading(false);
       if (!mail.ok) {
         setError(mail.error || "تعذر إرسال رمز التحقق");
         return;
       }
       setPendingEmail(em);
+      setOtpPurpose("register");
+      setOtp("");
       setCustMode("otp");
       setInfo("حسابك غير مفعّل — أدخل رمز التحقق المرسل لبريدك");
       return;
@@ -205,6 +214,92 @@ function WelcomeInner() {
     setSiteRole("customer");
     setLoading(false);
     router.replace(next.startsWith("/") ? next : "/");
+  };
+
+  const startForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setInfo("");
+    setLoading(true);
+    const em = email.trim().toLowerCase();
+    const { data } = await supabase
+      .from("customers")
+      .select("id, name, email_verified")
+      .eq("email", em)
+      .maybeSingle();
+
+    if (!data || !data.email_verified) {
+      setLoading(false);
+      // لا نكشف إن الإيميل موجود أم لا بشكل صريح قدر الإمكان
+      setError("إذا كان الحساب موجودًا سنرسل رمز التحقق للبريد");
+      if (!data) {
+        setLoading(false);
+        return;
+      }
+    }
+
+    const code = await createAndStoreOtp(em, "reset");
+    const mail = await sendCustomerMail({
+      email: em,
+      name: data?.name || "عميل",
+      code,
+      purpose: "reset",
+    });
+    setLoading(false);
+    if (!mail.ok) {
+      setError(mail.error || "تعذر إرسال رمز التحقق");
+      return;
+    }
+    setPendingEmail(em);
+    setOtpPurpose("reset");
+    setOtp("");
+    setNewPassword("");
+    setCustMode("forgot_otp");
+    setInfo("أرسلنا رمز تحقق إلى بريدك. أدخله مع كلمة المرور الجديدة.");
+  };
+
+  const confirmReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (newPassword.length < 6) {
+      setError("كلمة المرور الجديدة 6 أحرف على الأقل");
+      return;
+    }
+    setLoading(true);
+    const em = pendingEmail || email.trim().toLowerCase();
+    const res = await verifyOtp(em, otp, "reset");
+    if (!res.ok) {
+      setLoading(false);
+      setError(res.error);
+      return;
+    }
+
+    const hash = await hashPassword(newPassword);
+    const { data: cust, error: upErr } = await supabase
+      .from("customers")
+      .update({ password_hash: hash })
+      .eq("email", em)
+      .select("id, name, email")
+      .maybeSingle();
+
+    if (upErr || !cust) {
+      setLoading(false);
+      setError(upErr?.message || "تعذر تحديث كلمة المرور");
+      return;
+    }
+
+    await sendCustomerMail({
+      email: em,
+      name: cust.name,
+      purpose: "notice_password",
+    });
+
+    setLoading(false);
+    setInfo("تم تغيير كلمة المرور. سجّل الدخول الآن.");
+    setPassword("");
+    setNewPassword("");
+    setOtp("");
+    setCustMode("login");
   };
 
   const field =
@@ -252,24 +347,35 @@ function WelcomeInner() {
               <button type="button" onClick={goGuest} className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold">
                 دخول كزائر
               </button>
-              <button type="button" onClick={() => setTab("customer")} className="w-full text-sm text-muted underline">
-                لدي حساب عميل
-              </button>
             </>
           )}
 
           {tab === "customer" && (
             <>
               <h1 className="text-lg font-bold text-center">
-                {custMode === "otp" ? "تأكيد البريد" : custMode === "register" ? "إنشاء حساب عميل" : "دخول عميل"}
+                {custMode === "otp"
+                  ? "تأكيد البريد"
+                  : custMode === "forgot" || custMode === "forgot_otp"
+                    ? "استعادة كلمة المرور"
+                    : custMode === "register"
+                      ? "إنشاء حساب عميل"
+                      : "دخول عميل"}
               </h1>
 
-              {custMode !== "otp" && (
+              {(custMode === "login" || custMode === "register") && (
                 <div className="flex rounded-full bg-[#f0ebe3] p-1 text-sm">
-                  <button type="button" className={`flex-1 py-2 rounded-full ${custMode === "login" ? "bg-white font-semibold shadow-sm" : ""}`} onClick={() => setCustMode("login")}>
+                  <button
+                    type="button"
+                    className={`flex-1 py-2 rounded-full ${custMode === "login" ? "bg-white font-semibold shadow-sm" : ""}`}
+                    onClick={() => setCustMode("login")}
+                  >
                     دخول
                   </button>
-                  <button type="button" className={`flex-1 py-2 rounded-full ${custMode === "register" ? "bg-white font-semibold shadow-sm" : ""}`} onClick={() => setCustMode("register")}>
+                  <button
+                    type="button"
+                    className={`flex-1 py-2 rounded-full ${custMode === "register" ? "bg-white font-semibold shadow-sm" : ""}`}
+                    onClick={() => setCustMode("register")}
+                  >
                     حساب جديد
                   </button>
                 </div>
@@ -283,6 +389,9 @@ function WelcomeInner() {
                   {info && <p className="text-sm text-muted">{info}</p>}
                   <button type="submit" disabled={loading} className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold disabled:opacity-50">
                     {loading ? "..." : "دخول"}
+                  </button>
+                  <button type="button" className="w-full text-xs text-muted underline" onClick={() => { setCustMode("forgot"); setError(""); setInfo(""); }}>
+                    نسيت كلمة المرور؟
                   </button>
                 </form>
               )}
@@ -300,10 +409,56 @@ function WelcomeInner() {
                 </form>
               )}
 
-              {custMode === "otp" && (
-                <form onSubmit={confirmOtp} className="space-y-3">
+              {custMode === "forgot" && (
+                <form onSubmit={startForgot} className="space-y-3">
+                  <p className="text-sm text-muted text-center">سنرسل <strong>رمز تحقق</strong> إلى بريدك (وليس رابطًا).</p>
+                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="البريد الإلكتروني" className={field} />
+                  {error && <p className="text-sm text-sale">{error}</p>}
+                  {info && <p className="text-sm text-muted">{info}</p>}
+                  <button type="submit" disabled={loading} className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold disabled:opacity-50">
+                    {loading ? "..." : "إرسال رمز التحقق"}
+                  </button>
+                  <button type="button" className="w-full text-xs text-muted" onClick={() => setCustMode("login")}>
+                    العودة لتسجيل الدخول
+                  </button>
+                </form>
+              )}
+
+              {custMode === "forgot_otp" && (
+                <form onSubmit={confirmReset} className="space-y-3">
                   <p className="text-sm text-muted text-center">
                     أدخل الرمز المرسل إلى <strong dir="ltr">{pendingEmail}</strong>
+                  </p>
+                  <input
+                    inputMode="numeric"
+                    maxLength={6}
+                    required
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    placeholder="000000"
+                    className={`${field} text-center text-xl tracking-[0.4em] font-mono`}
+                    dir="ltr"
+                  />
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="كلمة المرور الجديدة"
+                    className={field}
+                  />
+                  {error && <p className="text-sm text-sale">{error}</p>}
+                  {info && <p className="text-sm text-muted">{info}</p>}
+                  <button type="submit" disabled={loading || otp.length < 6} className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold disabled:opacity-50">
+                    {loading ? "..." : "تأكيد وتغيير كلمة المرور"}
+                  </button>
+                </form>
+              )}
+
+              {custMode === "otp" && (
+                <form onSubmit={confirmRegisterOtp} className="space-y-3">
+                  <p className="text-sm text-muted text-center">
+                    أدخل <strong>رمز التحقق</strong> المرسل إلى <strong dir="ltr">{pendingEmail}</strong>
                   </p>
                   <input
                     inputMode="numeric"
@@ -326,8 +481,13 @@ function WelcomeInner() {
                     onClick={async () => {
                       setError("");
                       const em = pendingEmail || email;
-                      const code = await createAndStoreOtp(em, "register");
-                      const mail = await sendOtpMail(em, code, name || "عميل");
+                      const code = await createAndStoreOtp(em, otpPurpose);
+                      const mail = await sendCustomerMail({
+                        email: em,
+                        name: name || "عميل",
+                        code,
+                        purpose: otpPurpose,
+                      });
                       if (!mail.ok) setError(mail.error || "فشل إعادة الإرسال");
                       else setInfo("تم إرسال رمز جديد إلى بريدك");
                     }}
@@ -342,12 +502,11 @@ function WelcomeInner() {
           {tab === "merchant" && (
             <>
               <h1 className="text-lg font-bold text-center">حساب تاجر</h1>
-              <p className="text-sm text-muted text-center">نفس المتجر مع صلاحيات رفع السعر والمحفظة</p>
               <a href="/merchant/login" className="block w-full text-center bg-ink text-white py-3.5 rounded-full text-sm font-semibold">
                 دخول تاجر
               </a>
-              <p className="text-xs text-muted text-center leading-relaxed">
-                لو عندك حساب عميل، قدّم طلب تاجر من <strong>حسابي</strong> بعد تسجيل الدخول — الموافقة من الإدارة.
+              <p className="text-xs text-muted text-center">
+                العميل يقدّم طلب تاجر من صفحة <strong>حسابي</strong> بعد تسجيل الدخول.
               </p>
             </>
           )}

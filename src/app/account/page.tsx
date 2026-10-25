@@ -7,8 +7,11 @@ import {
   getCustomerSession,
   saveCustomerSession,
   clearCustomerSession,
+  createAndStoreOtp,
+  verifyOtp,
+  sendCustomerMail,
 } from "@/lib/customer";
-import { clearSiteRole, setSiteRole } from "@/lib/role";
+import { clearSiteRole } from "@/lib/role";
 import { supabase } from "@/lib/supabase";
 import {
   EGYPT_GOVERNORATES,
@@ -56,6 +59,11 @@ export default function AccountPage() {
   const [appNote, setAppNote] = useState("");
   const [appStatus, setAppStatus] = useState<string | null>(null);
   const [appLoading, setAppLoading] = useState(false);
+
+  // حذف بحساب رمز
+  const [deleteStep, setDeleteStep] = useState<"idle" | "code">("idle");
+  const [deleteOtp, setDeleteOtp] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const centers = useMemo(() => {
     if (country !== "مصر" || !governorate) return [];
@@ -138,14 +146,59 @@ export default function AccountPage() {
     router.replace("/welcome");
   };
 
-  const deleteAccount = async () => {
-    if (!confirm("حذف الحساب نهائيًا؟ لا يمكن التراجع.")) return;
-    if (!confirm("متأكد؟ سيتم حذف بيانات ملفك وطلبات التحويل لتاجر.")) return;
+  const requestDeleteCode = async () => {
+    setErr("");
+    setMsg("");
+    if (!confirm("سيتم إرسال رمز تحقق إلى بريدك لتأكيد حذف الحساب. متابعة؟")) return;
+    setDeleteLoading(true);
+    const code = await createAndStoreOtp(email, "delete");
+    const mail = await sendCustomerMail({
+      email,
+      name,
+      code,
+      purpose: "delete",
+    });
+    setDeleteLoading(false);
+    if (!mail.ok) {
+      setErr(mail.error || "تعذر إرسال رمز الحذف");
+      return;
+    }
+    setDeleteStep("code");
+    setDeleteOtp("");
+    setMsg("أرسلنا رمز تحقق إلى بريدك. أدخله لتأكيد الحذف.");
+  };
+
+  const confirmDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr("");
+    setDeleteLoading(true);
+    const res = await verifyOtp(email, deleteOtp, "delete");
+    if (!res.ok) {
+      setDeleteLoading(false);
+      setErr(res.error);
+      return;
+    }
+
     await supabase.from("merchant_applications").delete().eq("customer_id", customerId);
-    await supabase.from("customers").delete().eq("id", customerId);
+    await supabase.from("customer_otps").delete().eq("email", email.toLowerCase());
+    const { error } = await supabase.from("customers").delete().eq("id", customerId);
+    if (error) {
+      setDeleteLoading(false);
+      setErr(error.message);
+      return;
+    }
+
+    // إشعار بعد الحذف (best-effort)
+    await sendCustomerMail({
+      email,
+      name,
+      purpose: "notice_delete",
+    });
+
     clearCustomerSession();
     clearSiteRole();
-    router.replace("/welcome");
+    setDeleteLoading(false);
+    router.replace("/welcome?tab=customer");
   };
 
   const applyMerchant = async () => {
@@ -266,7 +319,7 @@ export default function AccountPage() {
           <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">طلبك قيد المراجعة من الإدارة</p>
         )}
         {appStatus === "approved" && (
-          <p className="text-sm text-green-700">تمت الموافقة — سجّل دخول التاجر من القائمة أو /merchant/login</p>
+          <p className="text-sm text-green-700">تمت الموافقة — سجّل دخول التاجر من /merchant/login</p>
         )}
         {appStatus === "rejected" && (
           <p className="text-sm text-sale">تم رفض الطلب السابق — يمكنك التقديم مرة أخرى</p>
@@ -291,12 +344,56 @@ export default function AccountPage() {
         )}
       </div>
 
+      <div className="bg-white border border-border rounded-2xl p-5 space-y-3">
+        <h2 className="font-semibold text-sale">حذف الحساب</h2>
+        <p className="text-xs text-muted leading-relaxed">
+          الحذف نهائي. نرسل <strong>رمز تحقق</strong> إلى بريدك قبل التنفيذ، ثم رسالة تأكيد بعد الحذف.
+        </p>
+        {deleteStep === "idle" && (
+          <button
+            type="button"
+            disabled={deleteLoading}
+            onClick={requestDeleteCode}
+            className="w-full border border-sale text-sale py-3 rounded-full text-sm font-medium disabled:opacity-50"
+          >
+            {deleteLoading ? "..." : "طلب رمز حذف الحساب"}
+          </button>
+        )}
+        {deleteStep === "code" && (
+          <form onSubmit={confirmDelete} className="space-y-3">
+            <input
+              inputMode="numeric"
+              maxLength={6}
+              required
+              value={deleteOtp}
+              onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, ""))}
+              placeholder="رمز التحقق"
+              className={`${field} text-center tracking-widest font-mono`}
+              dir="ltr"
+            />
+            <button
+              type="submit"
+              disabled={deleteLoading || deleteOtp.length < 6}
+              className="w-full bg-sale text-white py-3 rounded-full text-sm font-semibold disabled:opacity-50"
+            >
+              {deleteLoading ? "..." : "تأكيد الحذف النهائي"}
+            </button>
+            <button type="button" className="w-full text-xs text-muted" onClick={() => setDeleteStep("idle")}>
+              إلغاء
+            </button>
+          </form>
+        )}
+      </div>
+
       <div className="space-y-2">
+        <Link
+          href="/welcome?tab=customer&mode=forgot"
+          className="block w-full text-center border border-border py-3 rounded-full text-sm"
+        >
+          نسيت / تغيير كلمة المرور
+        </Link>
         <button type="button" onClick={logout} className="w-full bg-[#f0ebe3] py-3 rounded-full text-sm font-medium">
           تسجيل الخروج
-        </button>
-        <button type="button" onClick={deleteAccount} className="w-full text-sale text-sm py-2">
-          حذف الحساب نهائيًا
         </button>
       </div>
     </div>
