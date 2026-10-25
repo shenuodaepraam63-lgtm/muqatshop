@@ -58,12 +58,14 @@ export type CategoryGroup = {
   is_active?: boolean;
 };
 
-/** تصنيف داخل مجموعة */
+/** تصنيف داخل مجموعة — يدعم فروع متداخلة عبر parent_id */
 export type Category = {
   id: string;
   name: string;
   slug: string;
   group_id?: string | null;
+  /** تصنيف أب (فرع فرعي) — null = تصنيف مباشر تحت المجموعة */
+  parent_id?: string | null;
   image?: string | null;
   sort_order?: number | null;
 };
@@ -142,4 +144,23 @@ export function variantPrice(
     return Number(v.price);
   }
   return Number(product.price) || 0;
+}
+
+/** يجمع معرّفات التصنيف + كل الفروع تحته (لجلب المنتجات) */
+export function collectCategoryIdsWithDescendants(
+  rootId: string,
+  all: { id: string; parent_id?: string | null }[]
+): string[] {
+  const ids = new Set<string>([rootId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const c of all) {
+      if (c.parent_id && ids.has(c.parent_id) && !ids.has(c.id)) {
+        ids.add(c.id);
+        changed = true;
+      }
+    }
+  }
+  return Array.from(ids);
 }

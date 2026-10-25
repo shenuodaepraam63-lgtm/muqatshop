@@ -1,7 +1,9 @@
-import { supabase, type Product } from "@/lib/supabase";
+import { supabase, type Product, collectCategoryIdsWithDescendants } from "@/lib/supabase";
 
 export type ShopFilters = {
   categoryId?: string | null;
+  /** عند true يضم منتجات الفروع الفرعية للتصنيف */
+  includeDescendants?: boolean;
   q?: string | null;
   type?: string | null;
   stock?: string | null;
@@ -12,7 +14,20 @@ export type ShopFilters = {
 export async function fetchShopProducts(f: ShopFilters): Promise<Product[]> {
   let req = supabase.from("products").select("*").eq("is_active", true);
 
-  if (f.categoryId) req = req.eq("category_id", f.categoryId);
+  if (f.categoryId) {
+    if (f.includeDescendants) {
+      const { data: allCats } = await supabase
+        .from("categories")
+        .select("id, parent_id");
+      const ids = collectCategoryIdsWithDescendants(
+        f.categoryId,
+        (allCats as { id: string; parent_id?: string | null }[]) || []
+      );
+      req = req.in("category_id", ids);
+    } else {
+      req = req.eq("category_id", f.categoryId);
+    }
+  }
   if (f.type && f.type !== "all") req = req.eq("product_type", f.type);
   if (f.q?.trim()) {
     const t = f.q.trim();
