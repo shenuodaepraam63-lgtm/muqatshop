@@ -4,18 +4,17 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { syncCustomerFromAuthUser } from "@/lib/auth-customer";
+import {
+  syncCustomerFromAuthUser,
+  syncMerchantFromAuthUser,
+} from "@/lib/auth-customer";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 
-/**
- * يستقبل روابط البريد من Supabase Auth:
- * - Confirm sign up → ?code=... أو hash tokens
- * - أنواع أخرى عبر type في الـ query/hash
- */
 function CallbackInner() {
   const router = useRouter();
   const sp = useSearchParams();
   const next = sp.get("next") || "/";
+  const roleParam = sp.get("role"); // merchant | customer
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [message, setMessage] = useState("جاري تأكيد الرابط...");
 
@@ -30,7 +29,6 @@ function CallbackInner() {
         const token_hash = url.searchParams.get("token_hash");
         const type = url.searchParams.get("type");
 
-        // PKCE / code flow
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
@@ -41,7 +39,6 @@ function CallbackInner() {
           });
           if (error) throw error;
         } else {
-          // Implicit: tokens in hash (#access_token=...)
           const hash = url.hash?.replace(/^#/, "") || "";
           const params = new URLSearchParams(hash);
           const access_token = params.get("access_token");
@@ -64,7 +61,6 @@ function CallbackInner() {
 
         if (cancelled) return;
 
-        // استعادة كلمة المرور: حوّل لصفحة تعيين كلمة جديدة
         const hashType = new URLSearchParams(
           (typeof window !== "undefined" ? window.location.hash : "").replace(/^#/, "")
         ).get("type");
@@ -75,6 +71,26 @@ function CallbackInner() {
           setStatus("ok");
           setMessage("تم التحقق — سيتم فتح صفحة كلمة المرور الجديدة");
           router.replace("/auth/reset-password");
+          return;
+        }
+
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const metaRole =
+          roleParam ||
+          (typeof user?.user_metadata?.role === "string"
+            ? user.user_metadata.role
+            : "customer");
+
+        if (metaRole === "merchant") {
+          const synced = await syncMerchantFromAuthUser();
+          if (!synced.ok) throw new Error(synced.error);
+          setStatus("ok");
+          setMessage("تم تأكيد بريد التاجر بنجاح");
+          setTimeout(() => {
+            router.replace(next.startsWith("/") ? next : "/merchant");
+          }, 800);
           return;
         }
 
@@ -96,7 +112,7 @@ function CallbackInner() {
     return () => {
       cancelled = true;
     };
-  }, [router, next, sp]);
+  }, [router, next, sp, roleParam]);
 
   return (
     <div className="min-h-screen bg-[#f8f5f0] flex flex-col items-center justify-center px-4">
@@ -105,11 +121,14 @@ function CallbackInner() {
         <p className={`text-sm ${status === "error" ? "text-sale" : "text-ink"}`}>{message}</p>
         {status === "error" && (
           <div className="space-y-2 pt-2">
-            <Link href="/welcome?tab=customer" className="block text-sm font-semibold underline">
-              العودة لتسجيل الدخول
+            <Link href="/welcome?tab=merchant" className="block text-sm font-semibold underline">
+              دخول تاجر
             </Link>
-            <Link href="/welcome?tab=customer&mode=forgot" className="block text-xs text-muted">
-              طلب رابط جديد لاستعادة كلمة المرور
+            <Link href="/merchant/register" className="block text-xs text-muted">
+              تسجيل تاجر من جديد
+            </Link>
+            <Link href="/welcome?tab=customer" className="block text-xs text-muted">
+              دخول عميل
             </Link>
           </div>
         )}
