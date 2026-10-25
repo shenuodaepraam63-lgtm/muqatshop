@@ -7,6 +7,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type ProductColor = { name: string; hex: string };
 
+/** قسم تفاصيل حر على المنتج (مثل تاجر: محتويات العبوة، الجمهور...) */
+export type DetailSection = {
+  title: string;
+  content: string;
+};
+
 export type ProductVariant = {
   size?: string | null;
   color?: string | null;
@@ -42,6 +48,8 @@ export type Product = {
   dimensions: string | null;
   origin_country: string | null;
   care_instructions: string | null;
+  /** أقسام تفاصيل مخصصة: عنوان + محتوى */
+  detail_sections?: DetailSection[] | null;
   is_active: boolean;
   is_featured: boolean;
   created_at?: string;
