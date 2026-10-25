@@ -24,13 +24,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/categories/mugs" className="hover:text-ink transition">
-                  مجات
-                </Link>
-              </li>
-              <li>
-                <Link href="/categories/clothing" className="hover:text-ink transition">
-                  ملابس
+                <Link href="/groups" className="hover:text-ink transition">
+                  الأقسام
                 </Link>
               </li>
               <li>
