@@ -23,11 +23,13 @@ export default async function GroupPage({
 
   const { data: categories } = await supabase
     .from("categories")
-    .select("id, name, slug")
+    .select("id, name, slug, parent_id")
     .eq("group_id", group.id)
     .order("sort_order");
 
-  const catIds = (categories || []).map((c) => c.id);
+  const allCats = categories || [];
+  const roots = allCats.filter((c) => !c.parent_id);
+  const catIds = allCats.map((c) => c.id);
 
   let products: {
     id: string;
@@ -55,15 +57,19 @@ export default async function GroupPage({
   }
 
   const catName = (id: string | null) =>
-    categories?.find((c) => c.id === id)?.name || group.name;
+    allCats.find((c) => c.id === id)?.name || group.name;
 
   return (
     <div className="bg-page min-h-screen">
       <div className="bg-[#e8e2d4] text-[11px] tracking-wide uppercase text-muted">
         <div className="max-w-page mx-auto px-4 md:px-8 py-2.5 flex flex-wrap gap-1 items-center">
-          <Link href="/" className="hover:text-ink">الرئيسية</Link>
+          <Link href="/" className="hover:text-ink">
+            الرئيسية
+          </Link>
           <span>/</span>
-          <Link href="/groups" className="hover:text-ink">الأقسام</Link>
+          <Link href="/groups" className="hover:text-ink">
+            الأقسام
+          </Link>
           <span>/</span>
           <span className="text-ink">{group.name}</span>
         </div>
@@ -72,17 +78,43 @@ export default async function GroupPage({
       <div className="max-w-page mx-auto px-4 md:px-8 py-8">
         <h1 className="text-2xl md:text-3xl font-bold mb-6">{group.name}</h1>
 
-        {(categories || []).length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-8">
-            {(categories || []).map((c) => (
-              <Link
-                key={c.id}
-                href={`/categories/${encodeURIComponent(c.slug)}`}
-                className="text-sm px-4 py-2 rounded-full bg-[#f0ebe3] hover:bg-ink hover:text-white transition"
-              >
-                {c.name}
-              </Link>
-            ))}
+        {roots.length > 0 && (
+          <div className="space-y-6 mb-10">
+            {roots.map((root) => {
+              const kids = allCats.filter((c) => c.parent_id === root.id);
+              return (
+                <div key={root.id}>
+                  <div className="flex items-center justify-between mb-2">
+                    <Link
+                      href={`/categories/${encodeURIComponent(root.slug)}`}
+                      className="font-semibold hover:underline"
+                    >
+                      {root.name}
+                    </Link>
+                  </div>
+                  {kids.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {kids.map((c) => (
+                        <Link
+                          key={c.id}
+                          href={`/categories/${encodeURIComponent(c.slug)}`}
+                          className="text-sm px-4 py-2 rounded-full bg-[#f0ebe3] hover:bg-ink hover:text-white transition"
+                        >
+                          {c.name}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/categories/${encodeURIComponent(root.slug)}`}
+                      className="text-sm px-4 py-2 rounded-full bg-[#f0ebe3] hover:bg-ink hover:text-white transition inline-block"
+                    >
+                      عرض المنتجات
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -97,7 +129,9 @@ export default async function GroupPage({
                 name={p.name}
                 slug={p.slug}
                 price={Number(p.price)}
-                compareAtPrice={p.compare_at_price != null ? Number(p.compare_at_price) : null}
+                compareAtPrice={
+                  p.compare_at_price != null ? Number(p.compare_at_price) : null
+                }
                 saleEndsAt={p.sale_ends_at}
                 image={productMainImage(p) || ""}
                 category={catName(p.category_id)}

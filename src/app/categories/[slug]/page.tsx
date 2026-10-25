@@ -18,7 +18,10 @@ async function getCategory(slug: string): Promise<Category | null> {
 }
 
 async function getAllCategories() {
-  const { data } = await supabase.from("categories").select("id, name, slug").order("sort_order");
+  const { data } = await supabase
+    .from("categories")
+    .select("id, name, slug, parent_id, group_id")
+    .order("sort_order");
   return data || [];
 }
 
@@ -37,12 +40,18 @@ export default async function CategoryPage({
   const [products, categories] = await Promise.all([
     fetchShopProducts({
       categoryId: category.id,
+      includeDescendants: true,
       sort: sp.sort,
       stock: sp.stock,
       type: sp.type,
     }),
     getAllCategories(),
   ]);
+
+  const children = categories.filter((c) => c.parent_id === category.id);
+  const parent = category.parent_id
+    ? categories.find((c) => c.id === category.parent_id)
+    : null;
 
   return (
     <div className="bg-page min-h-screen">
@@ -55,6 +64,17 @@ export default async function CategoryPage({
           <Link href="/shop" className="hover:text-ink">
             المتجر
           </Link>
+          {parent && (
+            <>
+              <span>/</span>
+              <Link
+                href={`/categories/${encodeURIComponent(parent.slug)}`}
+                className="hover:text-ink"
+              >
+                {parent.name}
+              </Link>
+            </>
+          )}
           <span>/</span>
           <span className="text-ink">{category.name}</span>
         </div>
@@ -64,10 +84,28 @@ export default async function CategoryPage({
         <h1 className="text-2xl md:text-3xl font-bold mb-2">{category.name}</h1>
         <p className="text-sm text-muted mb-6">{products.length} منتج</p>
 
+        {children.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-8">
+            {children.map((c) => (
+              <Link
+                key={c.id}
+                href={`/categories/${encodeURIComponent(c.slug)}`}
+                className="text-sm px-4 py-2 rounded-full bg-[#f0ebe3] hover:bg-ink hover:text-white transition"
+              >
+                {c.name}
+              </Link>
+            ))}
+          </div>
+        )}
+
         <Suspense fallback={null}>
           <ProductFilters
             showCategory
-            categories={categories}
+            categories={categories.map((c) => ({
+              id: c.id,
+              name: c.name,
+              slug: c.slug,
+            }))}
             activeCategory={category.slug}
           />
         </Suspense>

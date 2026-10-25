@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase, type Category, type CategoryGroup } from "@/lib/supabase";
-import { Plus, Trash2, Loader2, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Check, X, ChevronLeft } from "lucide-react";
 
 function slugify(text: string) {
   return text
@@ -23,6 +23,7 @@ export default function CategoriesAdminPage() {
   const [cName, setCName] = useState("");
   const [cSlug, setCSlug] = useState("");
   const [cGroupId, setCGroupId] = useState("");
+  const [cParentId, setCParentId] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -32,6 +33,7 @@ export default function CategoriesAdminPage() {
   const [editCat, setEditCat] = useState<string | null>(null);
   const [editCName, setEditCName] = useState("");
   const [editCGroup, setEditCGroup] = useState("");
+  const [editCParent, setEditCParent] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -48,6 +50,10 @@ export default function CategoriesAdminPage() {
   useEffect(() => {
     load();
   }, []);
+
+  const parentsInGroup = categories.filter(
+    (c) => c.group_id === cGroupId && !c.parent_id
+  );
 
   const addGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,16 +82,31 @@ export default function CategoriesAdminPage() {
     }
     setSaving(true);
     setError("");
+    const parent = cParentId || null;
+    const siblings = categories.filter(
+      (x) =>
+        x.group_id === cGroupId &&
+        (x.parent_id || null) === parent
+    );
     const { error: err } = await supabase.from("categories").insert({
       name: cName.trim(),
       slug: cSlug.trim() || slugify(cName),
       group_id: cGroupId,
-      sort_order: categories.filter((x) => x.group_id === cGroupId).length,
+      parent_id: parent,
+      sort_order: siblings.length,
     });
-    if (err) setError(err.message.includes("unique") ? "رابط التصنيف مستخدم" : err.message);
-    else {
+    if (err) {
+      if (err.message.includes("parent_id")) {
+        setError(
+          "عمود parent_id غير موجود في قاعدة البيانات. شغّل SQL الموجود في README_NESTED_CATEGORIES.md"
+        );
+      } else {
+        setError(err.message.includes("unique") ? "رابط التصنيف مستخدم" : err.message);
+      }
+    } else {
       setCName("");
       setCSlug("");
+      setCParentId("");
       await load();
     }
     setSaving(false);
@@ -101,14 +122,21 @@ export default function CategoriesAdminPage() {
   };
 
   const saveCatEdit = async (id: string) => {
-    await supabase
+    const parent = editCParent || null;
+    if (parent === id) {
+      setError("لا يمكن أن يكون التصنيف أباً لنفسه");
+      return;
+    }
+    const { error: err } = await supabase
       .from("categories")
       .update({
         name: editCName.trim(),
         slug: slugify(editCName),
         group_id: editCGroup || null,
+        parent_id: parent,
       })
       .eq("id", id);
+    if (err) setError(err.message);
     setEditCat(null);
     load();
   };
@@ -120,9 +148,123 @@ export default function CategoriesAdminPage() {
   };
 
   const removeCat = async (id: string) => {
-    if (!confirm("حذف التصنيف؟")) return;
+    const children = categories.filter((c) => c.parent_id === id);
+    if (children.length) {
+      if (
+        !confirm(
+          `هذا التصنيف فيه ${children.length} فرع. الحذف هيمسح الروابط الأبوية للفروع (مش هيمسح الفروع نفسها). متابعة؟`
+        )
+      )
+        return;
+      await supabase.from("categories").update({ parent_id: null }).eq("parent_id", id);
+    } else if (!confirm("حذف التصنيف؟")) return;
     await supabase.from("categories").delete().eq("id", id);
     load();
+  };
+
+  const renderCatRow = (c: Category, depth: number) => {
+    const kids = categories
+      .filter((x) => x.parent_id === c.id)
+      .sort(
+        (a, b) =>
+          (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
+          a.name.localeCompare(b.name, "ar")
+      );
+
+    return (
+      <div key={c.id}>
+        <li
+          className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-[#faf8f5]"
+          style={{ paddingInlineStart: `${8 + depth * 16}px` }}
+        >
+          {editCat === c.id ? (
+            <>
+              <input
+                value={editCName}
+                onChange={(e) => setEditCName(e.target.value)}
+                className="flex-1 border rounded-lg px-2 py-1 text-sm"
+              />
+              <select
+                value={editCGroup}
+                onChange={(e) => {
+                  setEditCGroup(e.target.value);
+                  setEditCParent("");
+                }}
+                className="border rounded-lg text-sm px-2 py-1"
+              >
+                {groups.map((gg) => (
+                  <option key={gg.id} value={gg.id}>
+                    {gg.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={editCParent}
+                onChange={(e) => setEditCParent(e.target.value)}
+                className="border rounded-lg text-sm px-2 py-1 max-w-[140px]"
+              >
+                <option value="">بدون أب (جذر)</option>
+                {categories
+                  .filter(
+                    (x) =>
+                      x.group_id === editCGroup &&
+                      x.id !== c.id &&
+                      !x.parent_id
+                  )
+                  .map((x) => (
+                    <option key={x.id} value={x.id}>
+                      تحت: {x.name}
+                    </option>
+                  ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => saveCatEdit(c.id)}
+                className="p-1 text-green-700"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button type="button" onClick={() => setEditCat(null)} className="p-1">
+                <X className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              {depth > 0 && (
+                <ChevronLeft className="w-3.5 h-3.5 text-muted shrink-0 rotate-180" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{c.name}</p>
+                <p className="text-[11px] text-muted" dir="ltr">
+                  /categories/{c.slug}
+                  {c.parent_id ? " · فرع" : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditCat(c.id);
+                  setEditCName(c.name);
+                  setEditCGroup(c.group_id || "");
+                  setEditCParent(c.parent_id || "");
+                }}
+                className="p-1.5 text-muted"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => removeCat(c.id)}
+                className="p-1.5 text-muted hover:text-sale"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </li>
+        {kids.map((k) => renderCatRow(k, depth + 1))}
+      </div>
+    );
   };
 
   return (
@@ -130,7 +272,7 @@ export default function CategoriesAdminPage() {
       <div>
         <h1 className="text-2xl font-bold text-ink">المجموعات والتصنيفات</h1>
         <p className="text-sm text-muted mt-1">
-          مجموعة (مثل إلكترونيات) → تصنيفات داخلها → عند رفع المنتج تختار التصنيف
+          مجموعة → تصنيف → فروع فرعية (مثال: ملابس → ملابس منزلية → بيجامات)
         </p>
       </div>
 
@@ -138,7 +280,6 @@ export default function CategoriesAdminPage() {
         <div className="text-sm text-sale bg-sale/10 rounded-lg px-3 py-2">{error}</div>
       )}
 
-      {/* Groups */}
       <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
         <h2 className="font-semibold">1) المجموعات الرئيسية</h2>
         <form onSubmit={addGroup} className="flex flex-wrap gap-3 items-end">
@@ -151,15 +292,24 @@ export default function CategoriesAdminPage() {
                 setGSlug(slugify(e.target.value));
               }}
               className="w-full border rounded-xl px-3 py-2 text-sm"
-              placeholder="مثال: إلكترونيات"
+              placeholder="مثال: ملابس"
               required
             />
           </div>
           <div className="w-36">
             <label className="block text-xs text-muted mb-1">الرابط</label>
-            <input value={gSlug} onChange={(e) => setGSlug(e.target.value)} className="w-full border rounded-xl px-3 py-2 text-sm" dir="ltr" />
+            <input
+              value={gSlug}
+              onChange={(e) => setGSlug(e.target.value)}
+              className="w-full border rounded-xl px-3 py-2 text-sm"
+              dir="ltr"
+            />
           </div>
-          <button type="submit" disabled={saving} className="flex items-center gap-1 bg-ink text-white text-sm px-4 py-2 rounded-xl">
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-1 bg-ink text-white text-sm px-4 py-2 rounded-xl"
+          >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             إضافة مجموعة
           </button>
@@ -173,21 +323,50 @@ export default function CategoriesAdminPage() {
               <li key={g.id} className="py-3 flex items-center gap-2">
                 {editGroup === g.id ? (
                   <>
-                    <input value={editGName} onChange={(e) => setEditGName(e.target.value)} className="flex-1 border rounded-lg px-2 py-1 text-sm" />
-                    <button type="button" onClick={() => saveGroupEdit(g.id)} className="p-1.5 text-green-700"><Check className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => setEditGroup(null)} className="p-1.5"><X className="w-4 h-4" /></button>
+                    <input
+                      value={editGName}
+                      onChange={(e) => setEditGName(e.target.value)}
+                      className="flex-1 border rounded-lg px-2 py-1 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => saveGroupEdit(g.id)}
+                      className="p-1.5 text-green-700"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button type="button" onClick={() => setEditGroup(null)} className="p-1.5">
+                      <X className="w-4 h-4" />
+                    </button>
                   </>
                 ) : (
                   <>
                     <div className="flex-1">
                       <p className="font-medium">{g.name}</p>
-                      <p className="text-xs text-muted" dir="ltr">/groups/{g.slug}</p>
+                      <p className="text-xs text-muted" dir="ltr">
+                        /groups/{g.slug}
+                      </p>
                     </div>
                     <span className="text-xs text-muted">
                       {categories.filter((c) => c.group_id === g.id).length} تصنيف
                     </span>
-                    <button type="button" onClick={() => { setEditGroup(g.id); setEditGName(g.name); }} className="p-2 text-muted"><Pencil className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => removeGroup(g.id)} className="p-2 text-muted hover:text-sale"><Trash2 className="w-4 h-4" /></button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditGroup(g.id);
+                        setEditGName(g.name);
+                      }}
+                      className="p-2 text-muted"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeGroup(g.id)}
+                      className="p-2 text-muted hover:text-sale"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </>
                 )}
               </li>
@@ -196,21 +375,45 @@ export default function CategoriesAdminPage() {
         )}
       </section>
 
-      {/* Categories */}
       <section className="bg-white rounded-2xl border border-border p-5 space-y-4">
-        <h2 className="font-semibold">2) التصنيفات داخل المجموعة</h2>
+        <h2 className="font-semibold">2) التصنيفات والفروع</h2>
         <form onSubmit={addCategory} className="flex flex-wrap gap-3 items-end">
           <div className="min-w-[140px]">
             <label className="block text-xs text-muted mb-1">المجموعة</label>
-            <select value={cGroupId} onChange={(e) => setCGroupId(e.target.value)} className="w-full border rounded-xl px-3 py-2 text-sm bg-white" required>
+            <select
+              value={cGroupId}
+              onChange={(e) => {
+                setCGroupId(e.target.value);
+                setCParentId("");
+              }}
+              className="w-full border rounded-xl px-3 py-2 text-sm bg-white"
+              required
+            >
               <option value="">اختر</option>
               {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-[140px]">
+            <label className="block text-xs text-muted mb-1">تحت تصنيف (اختياري)</label>
+            <select
+              value={cParentId}
+              onChange={(e) => setCParentId(e.target.value)}
+              className="w-full border rounded-xl px-3 py-2 text-sm bg-white"
+            >
+              <option value="">— جذر (مباشر تحت المجموعة)</option>
+              {parentsInGroup.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
           </div>
           <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs text-muted mb-1">اسم التصنيف</label>
+            <label className="block text-xs text-muted mb-1">اسم التصنيف / الفرع</label>
             <input
               value={cName}
               onChange={(e) => {
@@ -218,67 +421,46 @@ export default function CategoriesAdminPage() {
                 setCSlug(slugify(e.target.value));
               }}
               className="w-full border rounded-xl px-3 py-2 text-sm"
-              placeholder="مثال: سماعات"
+              placeholder="مثال: ملابس منزلية أو بيجامات"
               required
             />
           </div>
           <div className="w-36">
             <label className="block text-xs text-muted mb-1">الرابط</label>
-            <input value={cSlug} onChange={(e) => setCSlug(e.target.value)} className="w-full border rounded-xl px-3 py-2 text-sm" dir="ltr" />
+            <input
+              value={cSlug}
+              onChange={(e) => setCSlug(e.target.value)}
+              className="w-full border rounded-xl px-3 py-2 text-sm"
+              dir="ltr"
+            />
           </div>
-          <button type="submit" disabled={saving} className="flex items-center gap-1 bg-ink text-white text-sm px-4 py-2 rounded-xl">
-            <Plus className="w-4 h-4" /> إضافة تصنيف
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-1 bg-ink text-white text-sm px-4 py-2 rounded-xl"
+          >
+            <Plus className="w-4 h-4" /> إضافة
           </button>
         </form>
 
         <div className="space-y-6">
           {groups.map((g) => {
-            const cats = categories.filter((c) => c.group_id === g.id);
+            const roots = categories
+              .filter((c) => c.group_id === g.id && !c.parent_id)
+              .sort(
+                (a, b) =>
+                  (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
+                  a.name.localeCompare(b.name, "ar")
+              );
             return (
               <div key={g.id}>
-                <h3 className="text-sm font-semibold text-muted mb-2 border-b pb-1">{g.name}</h3>
-                {cats.length === 0 ? (
+                <h3 className="text-sm font-semibold text-muted mb-2 border-b pb-1">
+                  {g.name}
+                </h3>
+                {roots.length === 0 ? (
                   <p className="text-xs text-muted">لا تصنيفات بعد</p>
                 ) : (
-                  <ul className="space-y-1">
-                    {cats.map((c) => (
-                      <li key={c.id} className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-[#faf8f5]">
-                        {editCat === c.id ? (
-                          <>
-                            <input value={editCName} onChange={(e) => setEditCName(e.target.value)} className="flex-1 border rounded-lg px-2 py-1 text-sm" />
-                            <select value={editCGroup} onChange={(e) => setEditCGroup(e.target.value)} className="border rounded-lg text-sm px-2 py-1">
-                              {groups.map((gg) => (
-                                <option key={gg.id} value={gg.id}>{gg.name}</option>
-                              ))}
-                            </select>
-                            <button type="button" onClick={() => saveCatEdit(c.id)} className="p-1 text-green-700"><Check className="w-4 h-4" /></button>
-                            <button type="button" onClick={() => setEditCat(null)} className="p-1"><X className="w-4 h-4" /></button>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{c.name}</p>
-                              <p className="text-[11px] text-muted" dir="ltr">/categories/{c.slug}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditCat(c.id);
-                                setEditCName(c.name);
-                                setEditCGroup(c.group_id || g.id);
-                              }}
-                              className="p-1.5 text-muted"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button type="button" onClick={() => removeCat(c.id)} className="p-1.5 text-muted hover:text-sale">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                  <ul className="space-y-0">{roots.map((c) => renderCatRow(c, 0))}</ul>
                 )}
               </div>
             );
@@ -287,12 +469,20 @@ export default function CategoriesAdminPage() {
             <div>
               <h3 className="text-sm font-semibold text-muted mb-2">بدون مجموعة</h3>
               <ul>
-                {categories.filter((c) => !c.group_id).map((c) => (
-                  <li key={c.id} className="text-sm py-1 flex justify-between">
-                    <span>{c.name}</span>
-                    <button type="button" onClick={() => removeCat(c.id)} className="text-sale text-xs">حذف</button>
-                  </li>
-                ))}
+                {categories
+                  .filter((c) => !c.group_id)
+                  .map((c) => (
+                    <li key={c.id} className="text-sm py-1 flex justify-between">
+                      <span>{c.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeCat(c.id)}
+                        className="text-sale text-xs"
+                      >
+                        حذف
+                      </button>
+                    </li>
+                  ))}
               </ul>
             </div>
           )}
