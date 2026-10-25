@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getSiteRole, getCustomerSession } from "@/lib/role";
-import { getCustomerSession as getCust } from "@/lib/customer";
+import { getSiteRole, setSiteRole } from "@/lib/role";
+import { getCustomerSession } from "@/lib/customer";
 import { getMerchantSession } from "@/lib/merchant";
-import { setSiteRole } from "@/lib/role";
 
 const PUBLIC_PREFIXES = [
   "/welcome",
@@ -26,13 +25,12 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
       (p) => path === p || path.startsWith(p + "/")
     );
 
-    // مزامنة الدور من الجلسات الموجودة
     if (getMerchantSession()) {
       setSiteRole("merchant");
       setReady(true);
       return;
     }
-    if (getCust()) {
+    if (getCustomerSession()) {
       setSiteRole("customer");
       setReady(true);
       return;
