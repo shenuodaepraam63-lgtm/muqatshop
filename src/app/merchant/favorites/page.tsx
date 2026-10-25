@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { Heart, Loader2 } from "lucide-react";
+import { Heart, Loader2, PlusCircle } from "lucide-react";
 import { supabase, productMainImage, type Product } from "@/lib/supabase";
 import { getMerchantSession } from "@/lib/merchant";
 import { formatPrice } from "@/lib/utils";
@@ -44,7 +45,7 @@ export default function MarketerFavoritesPage() {
       <div>
         <h1 className="text-xl font-bold">المفضلة</h1>
         <p className="text-sm text-muted mt-1">
-          أضف منتجات من الكتالوج بزر القلب للرجوع السريع
+          منتجات حفظتها من الكتالوج للرجوع السريع
         </p>
       </div>
 
@@ -60,41 +61,50 @@ export default function MarketerFavoritesPage() {
             href="/merchant/catalog"
             className="inline-block text-sm text-[#0042EB] hover:underline"
           >
-            تصفح الكتالوج وأضف للمفضلة
+            تصفح الكتالوج
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {products.map((p) => {
             const img = productMainImage(p) || "";
             return (
               <div
                 key={p.id}
-                className="bg-white border border-[#eae6df] rounded-2xl p-3 flex gap-3 items-center"
+                className="rounded-2xl overflow-hidden bg-white border border-[#eae6df]"
               >
-                <div className="w-16 h-16 rounded-xl bg-[#f5f1e8] overflow-hidden shrink-0">
-                  {img ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                  ) : null}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm line-clamp-2">{p.name}</p>
-                  <p className="text-xs text-muted mt-0.5">
-                    السعر الأساسي: {formatPrice(Number(p.price))}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1 shrink-0">
+                <Link href={`/merchant/catalog/${p.id}`} className="block">
+                  <div className="relative aspect-square bg-[#ebe6dc]">
+                    {img ? (
+                      <Image
+                        src={img}
+                        alt={p.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 50vw, 33vw"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="p-2.5">
+                    <p className="text-sm font-medium line-clamp-2 min-h-[2.5rem]">
+                      {p.name}
+                    </p>
+                    <p className="text-xs text-muted mt-1">
+                      {formatPrice(Number(p.price))}
+                    </p>
+                  </div>
+                </Link>
+                <div className="px-2.5 pb-3 flex gap-1.5">
                   <Link
                     href={`/merchant/new-order?product=${p.id}`}
-                    className="text-xs bg-ink text-white px-3 py-1.5 rounded-full text-center"
+                    className="flex-1 text-center text-[11px] bg-ink text-white rounded-full py-1.5 inline-flex items-center justify-center gap-0.5"
                   >
-                    أوردر
+                    <PlusCircle className="w-3 h-3" /> أوردر
                   </Link>
                   <button
                     type="button"
                     onClick={() => remove(p.id)}
-                    className="text-xs text-sale px-2 py-1"
+                    className="text-[11px] text-sale px-2"
                   >
                     إزالة
                   </button>
