@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+type ProfileSnippet = { full_name: string | null; phone: string | null };
+
 type AffRow = {
   user_id: string;
   status: string;
   marketing_channels: string[] | null;
   marketing_url: string | null;
   application_date: string | null;
-  profiles?: { full_name: string | null; phone: string | null } | null;
+  profiles: ProfileSnippet | null;
 };
 
 type SupRow = {
@@ -19,8 +21,23 @@ type SupRow = {
   business_type: string | null;
   governorate: string | null;
   application_date: string | null;
-  profiles?: { full_name: string | null; phone: string | null } | null;
+  profiles: ProfileSnippet | null;
 };
+
+function pickProfile(raw: unknown): ProfileSnippet | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    const first = raw[0] as ProfileSnippet | undefined;
+    return first
+      ? { full_name: first.full_name ?? null, phone: first.phone ?? null }
+      : null;
+  }
+  if (typeof raw === "object") {
+    const o = raw as ProfileSnippet;
+    return { full_name: o.full_name ?? null, phone: o.phone ?? null };
+  }
+  return null;
+}
 
 export default function AdminPartnershipsPage() {
   const [affiliates, setAffiliates] = useState<AffRow[]>([]);
@@ -35,17 +52,48 @@ export default function AdminPartnershipsPage() {
     const [a, s] = await Promise.all([
       supabase
         .from("affiliate_profiles")
-        .select("user_id, status, marketing_channels, marketing_url, application_date, profiles(full_name, phone)")
+        .select(
+          "user_id, status, marketing_channels, marketing_url, application_date, profiles(full_name, phone)"
+        )
         .order("application_date", { ascending: false }),
       supabase
         .from("supplier_profiles")
-        .select("user_id, status, business_name, business_type, governorate, application_date, profiles(full_name, phone)")
+        .select(
+          "user_id, status, business_name, business_type, governorate, application_date, profiles(full_name, phone)"
+        )
         .order("application_date", { ascending: false }),
     ]);
+
     if (a.error) setErr(a.error.message);
     if (s.error) setErr((e) => e || s.error!.message);
-    setAffiliates((a.data as AffRow[]) || []);
-    setSuppliers((s.data as SupRow[]) || []);
+
+    const affRows: AffRow[] = (a.data || []).map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        user_id: String(r.user_id),
+        status: String(r.status || "pending"),
+        marketing_channels: (r.marketing_channels as string[] | null) || null,
+        marketing_url: (r.marketing_url as string | null) || null,
+        application_date: (r.application_date as string | null) || null,
+        profiles: pickProfile(r.profiles),
+      };
+    });
+
+    const supRows: SupRow[] = (s.data || []).map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        user_id: String(r.user_id),
+        status: String(r.status || "pending"),
+        business_name: String(r.business_name || ""),
+        business_type: (r.business_type as string | null) || null,
+        governorate: (r.governorate as string | null) || null,
+        application_date: (r.application_date as string | null) || null,
+        profiles: pickProfile(r.profiles),
+      };
+    });
+
+    setAffiliates(affRows);
+    setSuppliers(supRows);
     setLoading(false);
   }
 
@@ -58,7 +106,10 @@ export default function AdminPartnershipsPage() {
     setErr("");
     const patch: Record<string, unknown> = { status };
     if (status === "approved") patch.approved_at = new Date().toISOString();
-    const { error } = await supabase.from("affiliate_profiles").update(patch).eq("user_id", userId);
+    const { error } = await supabase
+      .from("affiliate_profiles")
+      .update(patch)
+      .eq("user_id", userId);
     if (error) {
       setErr(error.message);
       return;
@@ -72,7 +123,10 @@ export default function AdminPartnershipsPage() {
     setErr("");
     const patch: Record<string, unknown> = { status };
     if (status === "approved") patch.approved_at = new Date().toISOString();
-    const { error } = await supabase.from("supplier_profiles").update(patch).eq("user_id", userId);
+    const { error } = await supabase
+      .from("supplier_profiles")
+      .update(patch)
+      .eq("user_id", userId);
     if (error) {
       setErr(error.message);
       return;
@@ -109,16 +163,32 @@ export default function AdminPartnershipsPage() {
                 <span className="font-semibold text-[#3157D5]">{row.status}</span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" className="rounded-lg bg-[#21865B] text-white px-3 py-1.5 text-xs font-semibold" onClick={() => setAffiliateStatus(row.user_id, "approved")}>
+                <button
+                  type="button"
+                  className="rounded-lg bg-[#21865B] text-white px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setAffiliateStatus(row.user_id, "approved")}
+                >
                   موافقة
                 </button>
-                <button type="button" className="rounded-lg bg-[#D64C4C] text-white px-3 py-1.5 text-xs font-semibold" onClick={() => setAffiliateStatus(row.user_id, "rejected")}>
+                <button
+                  type="button"
+                  className="rounded-lg bg-[#D64C4C] text-white px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setAffiliateStatus(row.user_id, "rejected")}
+                >
                   رفض
                 </button>
-                <button type="button" className="rounded-lg border border-[#E4E9F0] px-3 py-1.5 text-xs font-semibold" onClick={() => setAffiliateStatus(row.user_id, "needs_information")}>
+                <button
+                  type="button"
+                  className="rounded-lg border border-[#E4E9F0] px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setAffiliateStatus(row.user_id, "needs_information")}
+                >
                   طلب بيانات
                 </button>
-                <button type="button" className="rounded-lg border border-[#E4E9F0] px-3 py-1.5 text-xs font-semibold" onClick={() => setAffiliateStatus(row.user_id, "suspended")}>
+                <button
+                  type="button"
+                  className="rounded-lg border border-[#E4E9F0] px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setAffiliateStatus(row.user_id, "suspended")}
+                >
                   إيقاف
                 </button>
               </div>
@@ -139,22 +209,39 @@ export default function AdminPartnershipsPage() {
                 <div>
                   <p className="font-semibold">{row.business_name}</p>
                   <p className="text-[#718096]">
-                    {row.profiles?.full_name || "—"} · {row.business_type || "—"} · {row.governorate || "—"}
+                    {row.profiles?.full_name || "—"} · {row.business_type || "—"} ·{" "}
+                    {row.governorate || "—"}
                   </p>
                 </div>
                 <span className="font-semibold text-[#3157D5]">{row.status}</span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" className="rounded-lg bg-[#21865B] text-white px-3 py-1.5 text-xs font-semibold" onClick={() => setSupplierStatus(row.user_id, "approved")}>
+                <button
+                  type="button"
+                  className="rounded-lg bg-[#21865B] text-white px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setSupplierStatus(row.user_id, "approved")}
+                >
                   موافقة
                 </button>
-                <button type="button" className="rounded-lg bg-[#D64C4C] text-white px-3 py-1.5 text-xs font-semibold" onClick={() => setSupplierStatus(row.user_id, "rejected")}>
+                <button
+                  type="button"
+                  className="rounded-lg bg-[#D64C4C] text-white px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setSupplierStatus(row.user_id, "rejected")}
+                >
                   رفض
                 </button>
-                <button type="button" className="rounded-lg border border-[#E4E9F0] px-3 py-1.5 text-xs font-semibold" onClick={() => setSupplierStatus(row.user_id, "needs_information")}>
+                <button
+                  type="button"
+                  className="rounded-lg border border-[#E4E9F0] px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setSupplierStatus(row.user_id, "needs_information")}
+                >
                   طلب بيانات
                 </button>
-                <button type="button" className="rounded-lg border border-[#E4E9F0] px-3 py-1.5 text-xs font-semibold" onClick={() => setSupplierStatus(row.user_id, "suspended")}>
+                <button
+                  type="button"
+                  className="rounded-lg border border-[#E4E9F0] px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => setSupplierStatus(row.user_id, "suspended")}
+                >
                   إيقاف
                 </button>
               </div>
