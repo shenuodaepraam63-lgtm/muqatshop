@@ -266,24 +266,21 @@ export function CheckoutForm() {
     }
   };
 
-  const field =
-    "w-full rounded-xl border border-border bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ink/20";
-
   return (
     <form
       onSubmit={submit}
-      className="bg-card/60 border border-border rounded-2xl p-5 md:p-6 space-y-4"
+      className="bg-white border border-border rounded-card p-5 md:p-6 space-y-4 shadow-card"
     >
       <h2 className="text-lg font-bold text-ink mb-1">بيانات التوصيل</h2>
       <p className="text-xs text-muted mb-4">
         {selfMerchantId
-          ? "أدخل بيانات العميل — الطلب يُسجَّل على حسابك كتاجر"
+          ? "أدخل بيانات العميل — الطلب يُسجَّل على حسابك كمسوق"
           : "الحقول المعلّمة * مطلوبة"}
       </p>
 
       {!selfMerchantId && refMerchantId && (
-        <p className="text-xs bg-[#f0ebe3] rounded-lg px-3 py-2 text-muted">
-          طلب عبر رابط تاجر{refMerchantName ? ` (${refMerchantName})` : ""}
+        <p className="text-xs bg-surface-2 rounded-xl px-3 py-2 text-muted border border-border">
+          طلب عبر رابط مسوق{refMerchantName ? ` (${refMerchantName})` : ""}
         </p>
       )}
 
@@ -292,7 +289,7 @@ export function CheckoutForm() {
           {selfMerchantId ? "اسم العميل *" : "اسمك كامل *"}
         </label>
         <input
-          className={field}
+          className="input-field"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           placeholder="الاسم بالكامل"
@@ -304,7 +301,7 @@ export function CheckoutForm() {
         <div>
           <label className="block text-sm font-medium mb-1.5">المحافظة *</label>
           <select
-            className={field}
+            className="input-field"
             value={governorate}
             onChange={(e) => onGovChange(e.target.value)}
             required
@@ -320,7 +317,7 @@ export function CheckoutForm() {
         <div>
           <label className="block text-sm font-medium mb-1.5">المركز / القسم *</label>
           <select
-            className={field}
+            className="input-field"
             value={center}
             onChange={(e) => setCenter(e.target.value)}
             required
@@ -341,7 +338,7 @@ export function CheckoutForm() {
       <div>
         <label className="block text-sm font-medium mb-1.5">المنطقة</label>
         <input
-          className={field}
+          className="input-field"
           value={area}
           onChange={(e) => setArea(e.target.value)}
           placeholder="مثال: الحي السابع"
@@ -352,7 +349,7 @@ export function CheckoutForm() {
         <div>
           <label className="block text-sm font-medium mb-1.5">الشارع</label>
           <input
-            className={field}
+            className="input-field"
             value={street}
             onChange={(e) => setStreet(e.target.value)}
           />
@@ -360,7 +357,7 @@ export function CheckoutForm() {
         <div>
           <label className="block text-sm font-medium mb-1.5">الشقة / المبنى</label>
           <input
-            className={field}
+            className="input-field"
             value={apartment}
             onChange={(e) => setApartment(e.target.value)}
           />
@@ -371,7 +368,7 @@ export function CheckoutForm() {
         <div>
           <label className="block text-sm font-medium mb-1.5">رقم التليفون *</label>
           <input
-            className={field}
+            className="input-field"
             type="tel"
             inputMode="numeric"
             value={phone}
@@ -382,7 +379,7 @@ export function CheckoutForm() {
         <div>
           <label className="block text-sm font-medium mb-1.5">تليفون احتياطي</label>
           <input
-            className={field}
+            className="input-field"
             type="tel"
             inputMode="numeric"
             value={phoneAlt}
@@ -394,37 +391,29 @@ export function CheckoutForm() {
       <div>
         <label className="block text-sm font-medium mb-1.5">ملاحظات على الطلب</label>
         <textarea
-          className={`${field} min-h-[80px] resize-y`}
+          className="input-field min-h-[80px] resize-y"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />
       </div>
 
       {!selfMerchantId && (
-        <div className="border border-dashed border-[#d4cfc4] rounded-xl p-3 space-y-2">
+        <div className="border border-dashed border-border rounded-xl p-3 space-y-2 bg-surface-2/40">
           <label className="block text-sm font-medium">كود خصم</label>
           <div className="flex gap-2">
             <input
-              className={field}
+              className="input-field"
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
               placeholder="مثال: SALE10"
               disabled={!!appliedCode}
             />
             {appliedCode ? (
-              <button
-                type="button"
-                onClick={clearCoupon}
-                className="shrink-0 px-4 rounded-xl border text-sm"
-              >
+              <button type="button" onClick={clearCoupon} className="btn-secondary shrink-0">
                 إلغاء
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={applyCoupon}
-                className="shrink-0 px-4 rounded-xl bg-ink text-white text-sm"
-              >
+              <button type="button" onClick={applyCoupon} className="btn-primary shrink-0">
                 تطبيق
               </button>
             )}
@@ -439,13 +428,13 @@ export function CheckoutForm() {
           <span>{formatPrice(subtotal)}</span>
         </div>
         {selfMerchantId && markupProfit > 0 && (
-          <div className="flex justify-between text-green-700">
+          <div className="flex justify-between text-success">
             <span>ربحك (رفع سعر)</span>
             <span>{formatPrice(markupProfit)}</span>
           </div>
         )}
         {discount > 0 && (
-          <div className="flex justify-between text-green-700">
+          <div className="flex justify-between text-success">
             <span>خصم {appliedCode && `(${appliedCode})`}</span>
             <span>-{formatPrice(discount)}</span>
           </div>
@@ -475,18 +464,18 @@ export function CheckoutForm() {
       </div>
 
       {error && (
-        <p className="text-sm text-sale bg-sale/10 rounded-lg px-3 py-2">{error}</p>
+        <p className="text-sm text-sale bg-sale/10 rounded-xl px-3 py-2">{error}</p>
       )}
 
       <button
         type="submit"
         disabled={loading || items.length === 0}
-        className="w-full bg-ink text-page py-3.5 rounded-full text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
+        className="btn-primary w-full"
       >
         {loading
           ? "جاري إرسال الطلب..."
           : selfMerchantId
-            ? "إرسال طلب التاجر"
+            ? "إرسال طلب المسوق"
             : "إرسال الطلب"}
       </button>
     </form>

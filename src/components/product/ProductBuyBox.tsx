@@ -33,7 +33,12 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-export function ProductBuyBox({ product, colors = [], sizes = [], variants = [] }: Props) {
+export function ProductBuyBox({
+  product,
+  colors = [],
+  sizes = [],
+  variants = [],
+}: Props) {
   const addItem = useCartStore((s) => s.addItem);
   const [qty, setQty] = useState(1);
   const [size, setSize] = useState<string>(sizes[0] || "");
@@ -46,24 +51,38 @@ export function ProductBuyBox({ product, colors = [], sizes = [], variants = [] 
   const baseStock = product.stock ?? null;
 
   const stock = useMemo(() => {
-    if (hasMatrix) return variantStock({ stock: baseStock, variants }, size || null, colorName || null);
+    if (hasMatrix)
+      return variantStock(
+        { stock: baseStock, variants },
+        size || null,
+        colorName || null
+      );
     return Number(baseStock) || 0;
   }, [hasMatrix, variants, baseStock, size, colorName]);
 
   const unitPrice = useMemo(() => {
-    if (hasMatrix) return variantPrice({ price: product.price, variants }, size || null, colorName || null);
+    if (hasMatrix)
+      return variantPrice(
+        { price: product.price, variants },
+        size || null,
+        colorName || null
+      );
     return product.price;
   }, [hasMatrix, variants, product.price, size, colorName]);
 
   const isOut = stock <= 0;
   const sizeAvailable = (s: string) => {
     if (!hasMatrix) return true;
-    if (colors.length === 0) return (findVariant(variants, s, null)?.stock ?? 0) > 0;
-    return colors.some((c) => (findVariant(variants, s, c.name)?.stock ?? 0) > 0);
+    if (colors.length === 0)
+      return (findVariant(variants, s, null)?.stock ?? 0) > 0;
+    return colors.some(
+      (c) => (findVariant(variants, s, c.name)?.stock ?? 0) > 0
+    );
   };
   const colorAvailable = (cName: string) => {
     if (!hasMatrix) return true;
-    if (sizes.length === 0) return (findVariant(variants, null, cName)?.stock ?? 0) > 0;
+    if (sizes.length === 0)
+      return (findVariant(variants, null, cName)?.stock ?? 0) > 0;
     return (findVariant(variants, size || null, cName)?.stock ?? 0) > 0;
   };
 
@@ -81,7 +100,9 @@ export function ProductBuyBox({ product, colors = [], sizes = [], variants = [] 
     if (isOut) return;
     if (sizes.length && !size) return;
     if (!ensureCanPurchase()) {
-      redirectToCustomerAuth(product.slug ? `/products/${encodeURIComponent(product.slug)}` : "/shop");
+      redirectToCustomerAuth(
+        product.slug ? `/products/${encodeURIComponent(product.slug)}` : "/shop"
+      );
       return;
     }
     addItem({
@@ -102,15 +123,24 @@ export function ProductBuyBox({ product, colors = [], sizes = [], variants = [] 
       <div className="space-y-5 pb-24 md:pb-0">
         {sizes.length > 0 && (
           <div>
-            <p className="text-sm mb-2.5">المقاس{size ? ` : ${size}` : ""}</p>
+            <p className="text-sm mb-2.5 font-medium">المقاس{size ? ` : ${size}` : ""}</p>
             <div className="flex flex-wrap gap-2">
               {sizes.map((s) => {
                 const ok = sizeAvailable(s);
                 return (
-                  <button key={s} type="button" disabled={!ok} onClick={() => setSize(s)}
-                    className={`min-w-[3rem] px-3 py-2 rounded-lg border text-sm ${
-                      size === s ? "border-ink bg-ink text-white" : "border-border"
-                    } ${!ok ? "opacity-40 line-through" : ""}`}>{s}</button>
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={!ok}
+                    onClick={() => setSize(s)}
+                    className={`min-w-[3rem] px-3 py-2 rounded-btn border text-sm transition ${
+                      size === s
+                        ? "border-ink bg-ink text-white"
+                        : "border-border bg-white hover:border-ink/30"
+                    } ${!ok ? "opacity-40 line-through" : ""}`}
+                  >
+                    {s}
+                  </button>
                 );
               })}
             </div>
@@ -118,48 +148,102 @@ export function ProductBuyBox({ product, colors = [], sizes = [], variants = [] 
         )}
         {colors.length > 0 && (
           <div>
-            <p className="text-sm mb-2.5">اللون{colorName ? ` : ${colorName}` : ""}</p>
+            <p className="text-sm mb-2.5 font-medium">
+              اللون{colorName ? ` : ${colorName}` : ""}
+            </p>
             <div className="flex flex-wrap gap-2">
               {colors.map((c, i) => {
                 const ok = colorAvailable(c.name);
                 return (
-                  <button key={c.name + i} type="button" disabled={!ok} onClick={() => setColorIdx(i)} title={c.name}
-                    className={`w-9 h-9 rounded-full border-2 ${colorIdx === i ? "border-ink scale-110" : "border-transparent"} ${!ok ? "opacity-30" : ""}`}
-                    style={{ backgroundColor: c.hex }} />
+                  <button
+                    key={c.name + i}
+                    type="button"
+                    disabled={!ok}
+                    onClick={() => setColorIdx(i)}
+                    title={c.name}
+                    className={`w-9 h-9 rounded-full border-2 transition ${
+                      colorIdx === i ? "border-ink scale-110" : "border-transparent"
+                    } ${!ok ? "opacity-30" : ""}`}
+                    style={{ backgroundColor: c.hex }}
+                  />
                 );
               })}
             </div>
           </div>
         )}
         <div className="flex items-center gap-3">
-          <span className="text-sm">الكمية</span>
-          <div className="flex items-center gap-2 border border-border rounded-full px-2">
-            <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="p-2"><Minus className="w-4 h-4" /></button>
+          <span className="text-sm font-medium">الكمية</span>
+          <div className="flex items-center gap-2 border border-border rounded-btn px-2 bg-white">
+            <button
+              type="button"
+              onClick={() => setQty((q) => Math.max(1, q - 1))}
+              className="p-2"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
             <span className="w-8 text-center text-sm">{qty}</span>
-            <button type="button" onClick={() => setQty((q) => Math.min(stock || 99, q + 1))} className="p-2"><Plus className="w-4 h-4" /></button>
+            <button
+              type="button"
+              onClick={() => setQty((q) => Math.min(stock || 99, q + 1))}
+              className="p-2"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
           <span className="text-xs text-muted">متوفر: {stock}</span>
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-xl font-bold">{formatPrice(unitPrice)}</span>
           {product.compareAtPrice != null && product.compareAtPrice > unitPrice && (
-            <span className="text-sm text-muted line-through">{formatPrice(product.compareAtPrice)}</span>
+            <span className="text-sm text-muted line-through">
+              {formatPrice(product.compareAtPrice)}
+            </span>
           )}
         </div>
-        <button type="button" onClick={onAdd} disabled={isOut} className="w-full bg-ink text-page py-3.5 rounded-full text-sm font-semibold disabled:opacity-40">
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={isOut}
+          className="btn-primary w-full disabled:opacity-40"
+        >
           {isOut ? "غير متوفر" : done ? "تمت الإضافة ✓" : "أضف إلى السلة"}
         </button>
         <div className="flex gap-2">
-          <Link href="/cart" onClick={onAdd} className="hidden md:flex flex-1 items-center justify-center bg-[#1a2744] text-white py-3.5 rounded-full text-sm font-semibold">اشترِ الآن</Link>
-          <a href={waHref} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 border border-[#25D366] text-[#25D366] py-3.5 rounded-full text-sm font-semibold">
+          <Link
+            href="/cart"
+            onClick={onAdd}
+            className="hidden md:flex flex-1 items-center justify-center bg-brand-dark text-white py-3.5 rounded-btn text-sm font-semibold hover:bg-ink transition"
+          >
+            اشترِ الآن
+          </Link>
+          <a
+            href={waHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 border border-[#25D366] text-[#25D366] py-3.5 rounded-btn text-sm font-semibold hover:bg-emerald-50 transition"
+          >
             <WhatsAppIcon className="w-5 h-5" /> واتساب
           </a>
         </div>
       </div>
-      <div className="md:hidden fixed bottom-16 inset-x-0 z-40 bg-page/95 backdrop-blur border-t border-border px-4 py-2 flex items-center gap-2">
-        <div className="flex-1"><p className="text-sm font-bold">{formatPrice(unitPrice)}</p></div>
-        <a href={waHref} target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-full border border-[#25D366] text-[#25D366]"><WhatsAppIcon className="w-5 h-5" /></a>
-        <button type="button" onClick={onAdd} disabled={isOut} className="bg-[#1a2744] text-white text-xs font-semibold px-4 py-2.5 rounded-full disabled:opacity-40">
+      <div className="md:hidden fixed bottom-16 inset-x-0 z-40 bg-page/95 backdrop-blur-md border-t border-border px-4 py-2 flex items-center gap-2 shadow-[0_-4px_16px_rgba(12,10,9,0.06)]">
+        <div className="flex-1">
+          <p className="text-sm font-bold">{formatPrice(unitPrice)}</p>
+        </div>
+        <a
+          href={waHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-2.5 rounded-btn border border-[#25D366] text-[#25D366]"
+        >
+          <WhatsAppIcon className="w-5 h-5" />
+        </a>
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={isOut}
+          className="bg-ink text-white text-xs font-semibold px-4 py-2.5 rounded-btn disabled:opacity-40"
+        >
           {isOut ? "نفد" : done ? "✓" : "اشترِ الآن"}
         </button>
       </div>
