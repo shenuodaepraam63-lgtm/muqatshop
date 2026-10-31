@@ -3,43 +3,53 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 
 export function Footer() {
   return (
-    <footer className="bg-card border-t border-border mt-16">
-      <div className="max-w-page mx-auto px-4 md:px-8 py-12">
+    <footer className="bg-surface-2 border-t border-border mt-16">
+      <div className="max-w-page mx-auto px-4 md:px-8 py-12 md:py-14">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <div>
-            <Link href="/" aria-label="Muqatshop — الصفحة الرئيسية" className="inline-flex mb-4">
+            <Link
+              href="/"
+              aria-label="Muqatshop — الصفحة الرئيسية"
+              className="inline-flex mb-4"
+            >
               <BrandLogo size="md" />
             </Link>
-            <p className="text-sm text-muted leading-relaxed">
-              تصميمك، قصتك — توصيل لكل محافظات مصر
+            <p className="text-sm text-muted leading-relaxed max-w-xs">
+              تصميمك، قصتك — توصيل لكل محافظات مصر بجودة عالية وتجربة شراء سهلة.
             </p>
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">روابط سريعة</h4>
-            <ul className="space-y-2 text-sm text-muted">
+            <h4 className="font-semibold text-ink mb-4 text-sm">روابط سريعة</h4>
+            <ul className="space-y-2.5 text-sm text-muted">
               <li>
-                <Link href="/shop" className="hover:text-ink transition">
+                <Link href="/shop" className="hover:text-brand-dark transition">
                   جميع المنتجات
                 </Link>
               </li>
               <li>
-                <Link href="/categories" className="hover:text-ink transition">
+                <Link
+                  href="/categories"
+                  className="hover:text-brand-dark transition"
+                >
                   التصنيفات
                 </Link>
               </li>
               <li>
-                <Link href="/more" className="hover:text-ink transition">
+                <Link href="/more" className="hover:text-brand-dark transition">
                   المزيد
                 </Link>
               </li>
               <li>
-                <Link href="/track" className="hover:text-ink transition">
+                <Link href="/track" className="hover:text-brand-dark transition">
                   تتبع طلب
                 </Link>
               </li>
               <li>
-                <Link href="/merchant/register" className="hover:text-ink transition">
+                <Link
+                  href="/merchant/register"
+                  className="hover:text-brand-dark transition"
+                >
                   سجّل كمسوق
                 </Link>
               </li>
@@ -47,14 +57,17 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">خدمة العملاء</h4>
-            <ul className="space-y-2 text-sm text-muted">
+            <h4 className="font-semibold text-ink mb-4 text-sm">خدمة العملاء</h4>
+            <ul className="space-y-2.5 text-sm text-muted">
               <li>شحن لكل محافظات مصر</li>
               <li>توصيل مجاني للطلبات فوق 1000 ج.م</li>
               <li>الدفع عند الاستلام متاح</li>
               <li>تواصل عبر واتساب</li>
               <li>
-                <Link href="/merchant/login" className="hover:text-ink transition">
+                <Link
+                  href="/merchant/login"
+                  className="hover:text-brand-dark transition"
+                >
                   دخول المسوق
                 </Link>
               </li>

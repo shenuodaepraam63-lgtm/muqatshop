@@ -38,7 +38,11 @@ const NAV = [
   { href: "/merchant/profile", label: "حسابي", icon: User },
 ];
 
-export default function MerchantLayout({ children }: { children: React.ReactNode }) {
+export default function MerchantLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const isAuth =
@@ -76,7 +80,9 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
   if (isAuth) return <>{children}</>;
 
   const isActive = (href: string, exact?: boolean) =>
-    exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+    exact
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + "/");
 
   const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
     <nav className="flex flex-col gap-0.5 p-2">
@@ -90,8 +96,8 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
             onClick={onNavigate}
             className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition ${
               active
-                ? "bg-accent text-white font-medium shadow-sm"
-                : "text-ink hover:bg-[#f0ebe3]"
+                ? "bg-ink text-white font-medium shadow-soft"
+                : "text-ink-soft hover:bg-surface-2 hover:text-ink"
             }`}
           >
             <Icon className="w-4 h-4 shrink-0" strokeWidth={1.75} />
@@ -99,11 +105,11 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
           </Link>
         );
       })}
-      <div className="my-2 border-t border-[#e8e2d9]" />
+      <div className="my-2 border-t border-border" />
       <Link
         href="/"
         onClick={onNavigate}
-        className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-ink hover:bg-[#f0ebe3]"
+        className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-ink-soft hover:bg-surface-2 hover:text-ink"
       >
         <Store className="w-4 h-4 shrink-0" strokeWidth={1.75} />
         العودة للمتجر العام
@@ -124,36 +130,40 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="marketer-shell min-h-screen">
-      <header className="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-[#e8e2d9] shadow-header">
+      <header className="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-border shadow-header">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
-            <p className="text-[11px] text-accent font-semibold tracking-wide">
+            <p className="text-[11px] text-brand font-semibold tracking-wide">
               بوابة المسوق
             </p>
-            <p className="font-semibold text-sm text-ink truncate max-w-[200px]">{name}</p>
+            <p className="font-semibold text-sm text-ink truncate max-w-[200px]">
+              {name}
+            </p>
           </div>
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="w-10 h-10 rounded-xl border border-[#e8e2d9] flex items-center justify-center bg-page"
+            className="w-10 h-10 rounded-xl border border-border flex items-center justify-center bg-page hover:bg-surface-2 transition"
             aria-label="القائمة"
           >
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
         {open && (
-          <div className="border-t border-[#e8e2d9] bg-white max-h-[70vh] overflow-y-auto">
+          <div className="border-t border-border bg-white max-h-[70vh] overflow-y-auto">
             <NavLinks onNavigate={() => setOpen(false)} />
           </div>
         )}
       </header>
 
       <div className="lg:flex lg:min-h-screen">
-        <aside className="hidden lg:flex lg:flex-col w-64 shrink-0 border-l border-[#e8e2d9] bg-white sticky top-0 h-screen overflow-y-auto shadow-[ -4px_0_24px_rgba(13,13,18,0.03)]">
-          <div className="px-4 py-5 border-b border-[#e8e2d9]">
-            <p className="text-[11px] font-semibold text-accent tracking-wide">بوابة المسوق</p>
+        <aside className="hidden lg:flex lg:flex-col w-64 shrink-0 border-l border-border bg-white sticky top-0 h-screen overflow-y-auto shadow-soft">
+          <div className="px-4 py-5 border-b border-border">
+            <p className="text-[11px] font-semibold text-brand tracking-wide">
+              بوابة المسوق
+            </p>
             <p className="font-bold text-ink mt-0.5 truncate">{name}</p>
-            <span className="inline-flex mt-2 text-[10px] font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
+            <span className="inline-flex mt-2 text-[10px] font-medium bg-emerald-50 text-success px-2 py-0.5 rounded-full">
               مفعّل
             </span>
           </div>
@@ -161,7 +171,9 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
         </aside>
 
         <main className="flex-1 min-w-0">
-          <div className="max-w-5xl mx-auto px-4 py-6 md:px-8 md:py-8">{children}</div>
+          <div className="max-w-5xl mx-auto px-4 py-6 md:px-8 md:py-8">
+            {children}
+          </div>
         </main>
       </div>
     </div>

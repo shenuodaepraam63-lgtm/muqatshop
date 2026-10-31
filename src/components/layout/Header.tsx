@@ -52,7 +52,6 @@ export function Header() {
 
   let accountLinks: { href: string; label: string }[] = [];
   if (merchant) {
-    /* من المتجر العام: اختصار واحد لبوابة المسوق */
     accountLinks = [{ href: "/merchant", label: "بوابة المسوق" }];
   } else if (customer) {
     accountLinks = [{ href: "/account", label: "حسابي" }];
@@ -68,12 +67,12 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-page/95 backdrop-blur-sm shadow-header">
-      <div className="max-w-page mx-auto px-4 md:px-8 h-20 sm:h-24 flex items-center justify-between">
+    <header className="sticky top-0 z-40 bg-page/90 backdrop-blur-md shadow-header border-b border-border/70">
+      <div className="max-w-page mx-auto px-4 md:px-8 h-16 sm:h-20 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="md:hidden p-2 -mr-2"
+            className="md:hidden p-2 -mr-2 rounded-xl hover:bg-surface-2 transition"
             onClick={() => setOpen((v) => !v)}
             aria-label="القائمة"
           >
@@ -84,63 +83,75 @@ export function Header() {
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-5 text-sm font-medium">
+        <nav className="hidden md:flex items-center gap-1 text-sm font-medium">
           {mainLinks.map((l) => (
-            <Link key={l.href} href={l.href} className="hover:opacity-70 transition">
+            <Link
+              key={l.href}
+              href={l.href}
+              className="px-3 py-2 rounded-xl text-ink-soft hover:text-ink hover:bg-surface-2 transition"
+            >
               {l.label}
             </Link>
           ))}
-          <span className="w-px h-4 bg-border" />
+          <span className="w-px h-4 bg-border mx-1" />
           {accountLinks.map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className="hover:opacity-70 transition text-[#0f2744]"
+              className="px-3 py-2 rounded-xl text-brand-dark font-semibold hover:bg-surface-2 transition"
             >
               {l.label}
             </Link>
           ))}
           {(merchant || customer) && (
-            <button type="button" className="text-xs text-sale" onClick={logout}>
+            <button
+              type="button"
+              className="px-3 py-2 text-xs text-sale hover:bg-red-50 rounded-xl transition"
+              onClick={logout}
+            >
               خروج
             </button>
           )}
         </nav>
 
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-0.5 sm:gap-1">
           {(merchant || customer) && (
             <Link
               href={merchant ? "/merchant" : "/account"}
-              className="hidden sm:flex items-center gap-1 text-xs font-medium bg-[#0f2744] text-white px-2.5 py-1.5 rounded-full max-w-[140px] truncate"
+              className="hidden sm:flex items-center gap-1.5 text-xs font-medium bg-ink text-white px-3 py-1.5 rounded-full max-w-[140px] truncate shadow-soft"
               title={merchant?.name || customer?.name}
             >
               <User className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">{merchant?.name || customer?.name}</span>
             </Link>
           )}
-          <Link href="/search" className="p-2 hover:opacity-70 transition" aria-label="بحث">
-            <Search className="w-6 h-6" strokeWidth={1.5} />
+          <Link
+            href="/search"
+            className="p-2.5 rounded-xl hover:bg-surface-2 transition"
+            aria-label="بحث"
+          >
+            <Search className="w-5 h-5" strokeWidth={1.5} />
           </Link>
           <Link
             href="/wishlist"
-            className="relative p-2 hover:opacity-70 transition"
+            className="relative p-2.5 rounded-xl hover:bg-surface-2 transition"
             aria-label="الأمنيات"
           >
-            <Heart className="w-6 h-6" strokeWidth={1.5} />
+            <Heart className="w-5 h-5" strokeWidth={1.5} />
             {wishCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-sale text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center">
+              <span className="absolute top-1 right-1 bg-sale text-white text-[10px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-0.5">
                 {wishCount}
               </span>
             )}
           </Link>
           <Link
             href="/cart"
-            className="relative p-2 hover:opacity-70 transition"
+            className="relative p-2.5 rounded-xl hover:bg-surface-2 transition"
             aria-label="السلة"
           >
-            <ShoppingBag className="w-6 h-6" strokeWidth={1.5} />
+            <ShoppingBag className="w-5 h-5" strokeWidth={1.5} />
             {totalItems > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-accent text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center">
+              <span className="absolute top-1 right-1 bg-brand text-white text-[10px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-0.5">
                 {totalItems}
               </span>
             )}
@@ -149,25 +160,25 @@ export function Header() {
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-border bg-page px-4 pb-4">
-          <nav className="flex flex-col gap-1 pt-2 text-sm font-medium">
+        <div className="md:hidden border-t border-border bg-page/98 backdrop-blur-md px-4 pb-4">
+          <nav className="flex flex-col gap-0.5 pt-2 text-sm font-medium">
             {mainLinks.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="py-2.5 border-b border-[#f0ebe3]"
+                className="py-3 px-2 rounded-xl border-b border-border/80 hover:bg-surface-2"
               >
                 {l.label}
               </Link>
             ))}
-            <p className="text-[11px] text-muted pt-3 pb-1">الحساب</p>
+            <p className="text-[11px] text-muted pt-3 pb-1 px-2">الحساب</p>
             {accountLinks.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="py-2.5 border-b border-[#f0ebe3] text-[#0f2744]"
+                className="py-3 px-2 rounded-xl border-b border-border/80 text-brand-dark font-semibold"
               >
                 {l.label}
               </Link>
@@ -175,7 +186,7 @@ export function Header() {
             {(merchant || customer) && (
               <button
                 type="button"
-                className="py-2.5 text-right text-sale"
+                className="py-3 px-2 text-right text-sale rounded-xl"
                 onClick={() => {
                   setOpen(false);
                   logout();
