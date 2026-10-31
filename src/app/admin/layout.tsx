@@ -17,6 +17,7 @@ import {
   Megaphone,
   Images,
   TicketPercent,
+  PanelsTopLeft,
 } from "lucide-react";
 
 const ADMIN_EMAIL = "muqatshop@gmail.com";
@@ -126,6 +127,7 @@ export default function AdminLayout({
         {navLink("/admin", "المنتجات", <Package className="w-4 h-4" />, pathname === "/admin")}
         {navLink("/admin/categories", "التصنيفات", <Tags className="w-4 h-4" />, pathname?.includes("/categories"))}
         {navLink("/admin/announcement", "إعدادات المتجر", <Megaphone className="w-4 h-4" />, pathname?.includes("/announcement"))}
+        {navLink("/admin/homepage", "الصفحة الرئيسية", <PanelsTopLeft className="w-4 h-4" />, pathname?.includes("/homepage"))}
       </nav>
       <div className="p-3 border-t border-[#e8e2d9]">
         <button onClick={handleLogout} className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition">

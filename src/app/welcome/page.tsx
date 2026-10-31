@@ -19,7 +19,11 @@ function WelcomeInner() {
 
   const [tab, setTab] = useState<Tab>((sp.get("tab") as Tab) || "customer");
   const [custMode, setCustMode] = useState<CustMode>(
-    sp.get("mode") === "forgot" ? "forgot" : "login"
+    sp.get("mode") === "forgot"
+      ? "forgot"
+      : sp.get("mode") === "register"
+        ? "register"
+        : "login"
   );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

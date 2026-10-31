@@ -2,6 +2,7 @@ import { logoArtwork } from "./logoArtwork";
 
 type BrandLogoProps = {
   size?: "sm" | "md" | "lg";
+  tone?: "brand" | "navy";
   className?: string;
 };
 
@@ -11,7 +12,7 @@ const logoSizeClasses = {
   lg: "w-[min(82vw,520px)]",
 };
 
-export function BrandLogo({ size = "md", className = "" }: BrandLogoProps) {
+export function BrandLogo({ size = "md", tone = "brand", className = "" }: BrandLogoProps) {
   return (
     <svg
       role="img"
@@ -23,7 +24,7 @@ export function BrandLogo({ size = "md", className = "" }: BrandLogoProps) {
     >
       <title>Muqatshop — Your Style. Your Choice.</title>
       {logoArtwork.map(({ fill, d, transform }, index) => (
-        <path key={index} d={d} fill={fill} transform={transform} />
+        <path key={index} d={d} fill={tone === "navy" ? "#14243A" : fill} transform={transform} />
       ))}
     </svg>
   );

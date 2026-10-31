@@ -13,6 +13,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
  */
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "";
+  if (pathname === "/") return <>{children}</>;
   const bare =
     pathname === "/welcome" ||
     pathname.startsWith("/welcome/") ||

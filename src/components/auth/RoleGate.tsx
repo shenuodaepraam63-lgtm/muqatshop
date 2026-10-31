@@ -7,6 +7,17 @@ import { getCustomerSession } from "@/lib/customer";
 import { getMerchantSession } from "@/lib/merchant";
 
 const PUBLIC_PREFIXES = [
+  "/shop",
+  "/categories",
+  "/collections",
+  "/groups",
+  "/products",
+  "/product",
+  "/search",
+  "/cart",
+  "/track",
+  "/order-success",
+  "/try-mug",
   "/welcome",
   "/merchant/login",
   "/merchant/register",
@@ -35,7 +46,7 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const path = pathname || "/";
-    const isPublic = isUnder(path, PUBLIC_PREFIXES);
+    const isPublic = path === "/" || isUnder(path, PUBLIC_PREFIXES);
     const merchant = getMerchantSession();
     const customer = getCustomerSession();
 
