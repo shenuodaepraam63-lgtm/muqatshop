@@ -6,12 +6,22 @@ import { supabase, type Order } from "@/lib/supabase";
 import { formatPrice } from "@/lib/utils";
 
 const statusLabel: Record<string, string> = {
-  new: "جديد",
-  confirmed: "مؤكد",
+  new: "في انتظار تأكيد العميل",
+  confirmed: "العميل أكد / مؤكد",
   shipped: "تم الشحن",
   delivered: "تم التسليم",
   cancelled: "ملغي",
 };
+
+function orderStatusText(o: Order): string {
+  if (o.status === "cancelled" && o.cancel_source === "whatsapp") {
+    return "إلغاء بطلب العميل (واتساب)";
+  }
+  if (o.status === "confirmed" && o.customer_confirmed_at) {
+    return "العميل أكد الطلب";
+  }
+  return statusLabel[o.status] || o.status;
+}
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -49,14 +59,13 @@ export default function AdminOrdersPage() {
                 href={`/admin/orders/${o.id}`}
                 className="flex items-center gap-4 bg-white border border-[#e8e2d9] rounded-2xl px-5 py-4 hover:shadow-md hover:border-ink/20 transition group"
               >
-                {/* Envelope style */}
                 <div className="w-12 h-12 rounded-xl bg-[#f0ebe3] flex items-center justify-center text-xl shrink-0 group-hover:bg-ink group-hover:text-page transition">
                   ✉
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-ink truncate">{o.customer_name}</p>
                   <p className="text-xs text-muted mt-0.5">
-                    {o.order_number} · {" "}
+                    {o.order_number} ·{" "}
                     {new Date(o.created_at).toLocaleString("ar-EG", {
                       dateStyle: "medium",
                       timeStyle: "short",
@@ -65,9 +74,7 @@ export default function AdminOrdersPage() {
                 </div>
                 <div className="text-left shrink-0">
                   <p className="font-bold text-sm">{formatPrice(Number(o.total))}</p>
-                  <p className="text-[11px] text-muted">
-                    {statusLabel[o.status] || o.status}
-                  </p>
+                  <p className="text-[11px] text-muted">{orderStatusText(o)}</p>
                 </div>
               </Link>
             </li>

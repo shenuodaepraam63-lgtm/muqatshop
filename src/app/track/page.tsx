@@ -6,7 +6,7 @@ import { supabase, type Order } from "@/lib/supabase";
 import { formatPrice } from "@/lib/utils";
 
 const statusLabel: Record<string, string> = {
-  new: "قيد المراجعة",
+  new: "في انتظار تأكيدك",
   confirmed: "تم التأكيد",
   shipped: "تم الشحن",
   delivered: "تم التسليم",
@@ -51,7 +51,9 @@ function TrackInner() {
   return (
     <div className="max-w-lg mx-auto px-4 py-10">
       <h1 className="text-2xl font-bold mb-2">تتبع الطلب</h1>
-      <p className="text-sm text-muted mb-6">أدخل رقم الطلب (مثال MQ-XXXX) ورقم التليفون للتأكيد</p>
+      <p className="text-sm text-muted mb-6">
+        أدخل رقم الطلب (مثال MQ-XXXX) ورقم التليفون للتأكيد
+      </p>
 
       <form onSubmit={search} className="space-y-3 mb-8">
         <input

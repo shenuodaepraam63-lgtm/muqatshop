@@ -19,17 +19,11 @@ export const supabase: SupabaseClient = createClient(
 
 export type ProductColor = { name: string; hex: string };
 
-/** صف مواصفة مرن: اسم الحقل + القيمة (مثل أمازون) */
 export type DetailSpecRow = {
   label: string;
   value: string;
 };
 
-/**
- * قسم تفاصيل حر على المنتج.
- * - text: محتوى نصي حر
- * - specs: جدول اسم/قيمة بدون حقول ثابتة
- */
 export type DetailSection = {
   title: string;
   content?: string;
@@ -72,7 +66,6 @@ export type Product = {
   dimensions: string | null;
   origin_country: string | null;
   care_instructions: string | null;
-  /** أقسام تفاصيل مخصصة: عنوان + نص أو جدول مواصفات */
   detail_sections?: DetailSection[] | null;
   is_active: boolean;
   is_featured: boolean;
@@ -80,7 +73,6 @@ export type Product = {
   updated_at?: string;
 };
 
-/** مجموعة رئيسية مثل: إلكترونيات، إكسسوارات */
 export type CategoryGroup = {
   id: string;
   name: string;
@@ -90,13 +82,11 @@ export type CategoryGroup = {
   is_active?: boolean;
 };
 
-/** تصنيف داخل مجموعة — يدعم فروع متداخلة عبر parent_id */
 export type Category = {
   id: string;
   name: string;
   slug: string;
   group_id?: string | null;
-  /** تصنيف أب (فرع فرعي) — null = تصنيف مباشر تحت المجموعة */
   parent_id?: string | null;
   image?: string | null;
   sort_order?: number | null;
@@ -130,6 +120,13 @@ export type Order = {
   status: string;
   created_at: string;
   updated_at?: string;
+  /** WhatsApp tracking (optional columns) */
+  wa_received_message_id?: string | null;
+  wa_received_sent_at?: string | null;
+  wa_confirmed_sent_at?: string | null;
+  wa_cancelled_sent_at?: string | null;
+  customer_confirmed_at?: string | null;
+  cancel_source?: string | null;
 };
 
 export function productMainImage(product: {
@@ -178,7 +175,6 @@ export function variantPrice(
   return Number(product.price) || 0;
 }
 
-/** يجمع معرّفات التصنيف + كل الفروع تحته (لجلب المنتجات) */
 export function collectCategoryIdsWithDescendants(
   rootId: string,
   all: { id: string; parent_id?: string | null }[]
