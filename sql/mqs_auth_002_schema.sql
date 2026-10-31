@@ -1,27 +1,26 @@
 -- =============================================================================
--- MQS-AUTH-002 — Additive account schema (SAFE / NON-DESTRUCTIVE)
--- Document: Authentication & Account Experience
+-- MQS-AUTH-002 — Additive account schema v2 (SAFE / NON-DESTRUCTIVE)
+-- Compatible with existing customers / merchants / merchant_applications
 --
 -- WHAT THIS DOES
 --   • Creates: profiles, affiliate_profiles, supplier_profiles, account_activity
---   • Enables RLS + owner/admin policies on NEW tables only
---   • Optional soft-link columns on legacy customers / merchants (nullable)
---   • Optional backfill helpers (commented) — run only after review
+--   • RLS on NEW tables only (legacy open policies unchanged)
+--   • Soft-link columns on legacy tables (nullable)
+--   • P0/P1: admin can manage others; users cannot escalate role/status;
+--            maps role=merchant → affiliate; protects admin-only columns
 --
 -- WHAT THIS DOES NOT DO
---   • Does NOT drop customers, merchants, merchant_applications, or any data
---   • Does NOT change existing open RLS on legacy tables (separate phase)
---   • Does NOT delete sessions, passwords, or auth.users rows
---   • Does NOT replace OTP/email link flows
+--   • Does NOT drop or rewrite legacy tables/data
+--   • Does NOT tighten RLS on customers/merchants (later phase)
+--   • Does NOT delete sessions, passwords, or auth.users
 --
--- APPLY: review on Staging first, then run in a maintenance window if approved.
--- ROLLBACK: see bottom of this file.
+-- APPLY: Development Branch / Staging only until explicit Production approval.
 -- =============================================================================
 
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- 0) Shared helpers (idempotent)
+-- 0) Shared helpers
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.set_updated_at()
@@ -34,8 +33,6 @@ BEGIN
 END;
 $$;
 
--- Platform admin check (matches current admin email used in orders policies).
--- SECURITY DEFINER so policies can call it; narrow GRANT.
 CREATE OR REPLACE FUNCTION public.is_platform_admin()
 RETURNS boolean
 LANGUAGE sql
@@ -52,8 +49,27 @@ $$;
 REVOKE ALL ON FUNCTION public.is_platform_admin() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_platform_admin() TO authenticated;
 
+-- Normalize signup metadata → account_type (legacy uses role=merchant)
+CREATE OR REPLACE FUNCTION public.normalize_account_type(raw text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE lower(trim(COALESCE(raw, '')))
+    WHEN 'admin' THEN 'customer'  -- never self-assign admin
+    WHEN 'affiliate' THEN 'affiliate'
+    WHEN 'merchant' THEN 'affiliate'
+    WHEN 'marketer' THEN 'affiliate'
+    WHEN 'supplier' THEN 'supplier'
+    WHEN 'vendor' THEN 'supplier'
+    WHEN 'customer' THEN 'customer'
+    WHEN 'user' THEN 'customer'
+    ELSE 'customer'
+  END;
+$$;
+
 -- ---------------------------------------------------------------------------
--- 1) profiles — one row per auth.users (canonical identity for MQS-AUTH-002)
+-- 1) profiles
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -61,12 +77,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   full_name text,
   phone text,
   avatar_url text,
-  -- account_type is the ROLE; approval status lives on affiliate/supplier profiles
   account_type text NOT NULL DEFAULT 'customer'
     CHECK (account_type IN ('customer', 'affiliate', 'supplier', 'admin')),
-  -- general account flag (not the same as affiliate/supplier approval)
   is_active boolean NOT NULL DEFAULT true,
-  -- soft links to legacy rows (nullable; never required for new flow)
   legacy_customer_id uuid REFERENCES public.customers (id) ON DELETE SET NULL,
   legacy_merchant_id uuid REFERENCES public.merchants (id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -84,13 +97,40 @@ CREATE TRIGGER profiles_set_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+-- P0/P1: non-admin cannot change account_type or is_active
+CREATE OR REPLACE FUNCTION public.profiles_guard_role_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF public.is_platform_admin() THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.account_type IS DISTINCT FROM OLD.account_type THEN
+    RAISE EXCEPTION 'account_type can only be changed by platform admin';
+  END IF;
+  IF NEW.is_active IS DISTINCT FROM OLD.is_active THEN
+    RAISE EXCEPTION 'is_active can only be changed by platform admin';
+  END IF;
+  IF NEW.id IS DISTINCT FROM OLD.id THEN
+    RAISE EXCEPTION 'profile id is immutable';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_guard_role_change ON public.profiles;
+CREATE TRIGGER profiles_guard_role_change
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.profiles_guard_role_change();
+
 COMMENT ON TABLE public.profiles IS
-  'MQS-AUTH-002 canonical user profile. Role = account_type. Do not let clients change admin.';
-COMMENT ON COLUMN public.profiles.account_type IS
-  'customer | affiliate | supplier | admin — NOT the same as approval status';
+  'MQS-AUTH-002 canonical profile. account_type is role; approval is on affiliate/supplier.';
 
 -- ---------------------------------------------------------------------------
--- 2) affiliate_profiles — marketers (Pending until admin approves)
+-- 2) affiliate_profiles
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.affiliate_profiles (
@@ -117,11 +157,38 @@ CREATE TRIGGER affiliate_profiles_set_updated_at
   BEFORE UPDATE ON public.affiliate_profiles
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
-COMMENT ON TABLE public.affiliate_profiles IS
-  'Affiliate application + marketing meta. status gates marketing permissions.';
+-- P1: protect admin columns + status escalation for non-admin
+CREATE OR REPLACE FUNCTION public.affiliate_guard_admin_fields()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF public.is_platform_admin() THEN
+    RETURN NEW;
+  END IF;
+  NEW.admin_note := OLD.admin_note;
+  NEW.approved_at := OLD.approved_at;
+  NEW.reviewed_at := OLD.reviewed_at;
+  IF NEW.status IS DISTINCT FROM OLD.status
+     AND NEW.status NOT IN ('pending', 'needs_information') THEN
+    RAISE EXCEPTION 'affiliates cannot set status to %', NEW.status;
+  END IF;
+  IF OLD.status NOT IN ('pending', 'needs_information') THEN
+    RAISE EXCEPTION 'affiliate application is locked for non-admin edits';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS affiliate_guard_admin_fields ON public.affiliate_profiles;
+CREATE TRIGGER affiliate_guard_admin_fields
+  BEFORE UPDATE ON public.affiliate_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.affiliate_guard_admin_fields();
 
 -- ---------------------------------------------------------------------------
--- 3) supplier_profiles — merchants/vendors (Pending until admin approves)
+-- 3) supplier_profiles
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.supplier_profiles (
@@ -154,11 +221,37 @@ CREATE TRIGGER supplier_profiles_set_updated_at
   BEFORE UPDATE ON public.supplier_profiles
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
-COMMENT ON TABLE public.supplier_profiles IS
-  'Supplier/vendor application. Products only after status = approved (enforced in app/API).';
+CREATE OR REPLACE FUNCTION public.supplier_guard_admin_fields()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF public.is_platform_admin() THEN
+    RETURN NEW;
+  END IF;
+  NEW.admin_note := OLD.admin_note;
+  NEW.approved_at := OLD.approved_at;
+  NEW.reviewed_at := OLD.reviewed_at;
+  IF NEW.status IS DISTINCT FROM OLD.status
+     AND NEW.status NOT IN ('pending', 'needs_information') THEN
+    RAISE EXCEPTION 'suppliers cannot set status to %', NEW.status;
+  END IF;
+  IF OLD.status NOT IN ('pending', 'needs_information') THEN
+    RAISE EXCEPTION 'supplier application is locked for non-admin edits';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS supplier_guard_admin_fields ON public.supplier_profiles;
+CREATE TRIGGER supplier_guard_admin_fields
+  BEFORE UPDATE ON public.supplier_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.supplier_guard_admin_fields();
 
 -- ---------------------------------------------------------------------------
--- 4) account_activity — audit trail (append-oriented)
+-- 4) account_activity
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.account_activity (
@@ -174,22 +267,17 @@ CREATE INDEX IF NOT EXISTS account_activity_user_idx
 CREATE INDEX IF NOT EXISTS account_activity_type_idx
   ON public.account_activity (event_type);
 
-COMMENT ON TABLE public.account_activity IS
-  'Account events for support/audit. Clients may INSERT own events; cannot UPDATE/DELETE.';
-
 -- ---------------------------------------------------------------------------
--- 5) Soft-link columns on LEGACY tables (nullable only — no data loss)
+-- 5) Soft links on legacy tables (no data loss)
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE public.customers
   ADD COLUMN IF NOT EXISTS auth_user_id uuid;
 
--- FK only if not already present (ignore error if constraint exists with different name)
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'customers_auth_user_id_fkey'
+    SELECT 1 FROM pg_constraint WHERE conname = 'customers_auth_user_id_fkey'
   ) THEN
     ALTER TABLE public.customers
       ADD CONSTRAINT customers_auth_user_id_fkey
@@ -203,15 +291,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS customers_auth_user_id_uidx
   ON public.customers (auth_user_id)
   WHERE auth_user_id IS NOT NULL;
 
--- Merchants: optional link to auth.users for unified login later
 ALTER TABLE public.merchants
   ADD COLUMN IF NOT EXISTS auth_user_id uuid;
 
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'merchants_auth_user_id_fkey'
+    SELECT 1 FROM pg_constraint WHERE conname = 'merchants_auth_user_id_fkey'
   ) THEN
     ALTER TABLE public.merchants
       ADD CONSTRAINT merchants_auth_user_id_fkey
@@ -226,7 +312,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS merchants_auth_user_id_uidx
   WHERE auth_user_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
--- 6) Auto-create profile on new auth user (does not touch legacy rows)
+-- 6) Auto profile on auth signup (maps merchant → affiliate)
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
@@ -239,14 +325,13 @@ DECLARE
   v_type text;
   v_name text;
 BEGIN
-  v_type := COALESCE(NEW.raw_user_meta_data ->> 'account_type', NEW.raw_user_meta_data ->> 'role', 'customer');
-  IF v_type NOT IN ('customer', 'affiliate', 'supplier', 'admin') THEN
-    v_type := 'customer';
-  END IF;
-  -- Never allow self-signup as admin via metadata
-  IF v_type = 'admin' THEN
-    v_type := 'customer';
-  END IF;
+  v_type := public.normalize_account_type(
+    COALESCE(
+      NEW.raw_user_meta_data ->> 'account_type',
+      NEW.raw_user_meta_data ->> 'role',
+      'customer'
+    )
+  );
 
   v_name := COALESCE(
     NEW.raw_user_meta_data ->> 'full_name',
@@ -273,7 +358,7 @@ CREATE TRIGGER on_auth_user_created_profile
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
 
 -- ---------------------------------------------------------------------------
--- 7) RLS on NEW tables only (legacy policies unchanged)
+-- 7) RLS — new tables only
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -285,6 +370,8 @@ ALTER TABLE public.account_activity ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS profiles_select_own ON public.profiles;
 DROP POLICY IF EXISTS profiles_insert_self ON public.profiles;
 DROP POLICY IF EXISTS profiles_update_own ON public.profiles;
+DROP POLICY IF EXISTS profiles_update_self ON public.profiles;
+DROP POLICY IF EXISTS profiles_update_admin ON public.profiles;
 DROP POLICY IF EXISTS profiles_delete_admin ON public.profiles;
 
 CREATE POLICY profiles_select_own ON public.profiles
@@ -298,23 +385,25 @@ CREATE POLICY profiles_insert_self ON public.profiles
     AND account_type IN ('customer', 'affiliate', 'supplier')
   );
 
-CREATE POLICY profiles_update_own ON public.profiles
+-- P0: split self vs admin update (admin can update other users)
+CREATE POLICY profiles_update_self ON public.profiles
   FOR UPDATE TO authenticated
-  USING (id = auth.uid() OR public.is_platform_admin())
+  USING (id = auth.uid())
   WITH CHECK (
-    -- non-admin cannot escalate to admin or change id
     id = auth.uid()
-    AND (
-      public.is_platform_admin()
-      OR account_type IN ('customer', 'affiliate', 'supplier')
-    )
+    AND account_type IN ('customer', 'affiliate', 'supplier')
   );
+
+CREATE POLICY profiles_update_admin ON public.profiles
+  FOR UPDATE TO authenticated
+  USING (public.is_platform_admin())
+  WITH CHECK (public.is_platform_admin());
 
 CREATE POLICY profiles_delete_admin ON public.profiles
   FOR DELETE TO authenticated
   USING (public.is_platform_admin());
 
--- affiliate_profiles
+-- affiliate
 DROP POLICY IF EXISTS affiliate_select_own ON public.affiliate_profiles;
 DROP POLICY IF EXISTS affiliate_insert_self ON public.affiliate_profiles;
 DROP POLICY IF EXISTS affiliate_update_own_limited ON public.affiliate_profiles;
@@ -326,13 +415,8 @@ CREATE POLICY affiliate_select_own ON public.affiliate_profiles
 
 CREATE POLICY affiliate_insert_self ON public.affiliate_profiles
   FOR INSERT TO authenticated
-  WITH CHECK (
-    user_id = auth.uid()
-    AND status = 'pending'
-  );
+  WITH CHECK (user_id = auth.uid() AND status = 'pending');
 
--- User may update marketing fields only while pending/needs_information;
--- cannot set approved/suspended themselves.
 CREATE POLICY affiliate_update_own_limited ON public.affiliate_profiles
   FOR UPDATE TO authenticated
   USING (
@@ -349,7 +433,7 @@ CREATE POLICY affiliate_update_admin ON public.affiliate_profiles
   USING (public.is_platform_admin())
   WITH CHECK (public.is_platform_admin());
 
--- supplier_profiles (same pattern)
+-- supplier
 DROP POLICY IF EXISTS supplier_select_own ON public.supplier_profiles;
 DROP POLICY IF EXISTS supplier_insert_self ON public.supplier_profiles;
 DROP POLICY IF EXISTS supplier_update_own_limited ON public.supplier_profiles;
@@ -361,10 +445,7 @@ CREATE POLICY supplier_select_own ON public.supplier_profiles
 
 CREATE POLICY supplier_insert_self ON public.supplier_profiles
   FOR INSERT TO authenticated
-  WITH CHECK (
-    user_id = auth.uid()
-    AND status = 'pending'
-  );
+  WITH CHECK (user_id = auth.uid() AND status = 'pending');
 
 CREATE POLICY supplier_update_own_limited ON public.supplier_profiles
   FOR UPDATE TO authenticated
@@ -382,7 +463,7 @@ CREATE POLICY supplier_update_admin ON public.supplier_profiles
   USING (public.is_platform_admin())
   WITH CHECK (public.is_platform_admin());
 
--- account_activity
+-- activity
 DROP POLICY IF EXISTS activity_select_own ON public.account_activity;
 DROP POLICY IF EXISTS activity_insert_self ON public.account_activity;
 
@@ -394,83 +475,38 @@ CREATE POLICY activity_insert_self ON public.account_activity
   FOR INSERT TO authenticated
   WITH CHECK (user_id = auth.uid() OR public.is_platform_admin());
 
--- No UPDATE/DELETE policies for activity → append-only for clients
-
 COMMIT;
 
 -- =============================================================================
--- OPTIONAL BACKFILL (run separately after reviewing SELECT results)
--- Does not delete; only fills null links and creates missing profiles.
+-- OPTIONAL BACKFILL (commented — read-only preview first; never auto-run)
 -- =============================================================================
-
 /*
--- Preview matches by email (read-only):
-SELECT c.id AS customer_id, c.email, u.id AS auth_user_id
+SELECT c.id, c.email, u.id AS auth_user_id
 FROM public.customers c
 JOIN auth.users u ON lower(u.email) = lower(c.email)
 WHERE c.auth_user_id IS NULL;
 
-SELECT m.id AS merchant_id, m.email, u.id AS auth_user_id
+SELECT m.id, m.email, u.id AS auth_user_id
 FROM public.merchants m
 JOIN auth.users u ON lower(u.email) = lower(m.email)
 WHERE m.auth_user_id IS NULL;
-
--- Backfill auth_user_id on customers:
-UPDATE public.customers c
-SET auth_user_id = u.id
-FROM auth.users u
-WHERE c.auth_user_id IS NULL
-  AND lower(c.email) = lower(u.email);
-
--- Backfill auth_user_id on merchants:
-UPDATE public.merchants m
-SET auth_user_id = u.id
-FROM auth.users u
-WHERE m.auth_user_id IS NULL
-  AND lower(m.email) = lower(u.email);
-
--- Create profiles for existing auth users (skip if already present):
-INSERT INTO public.profiles (id, full_name, phone, account_type, legacy_customer_id, legacy_merchant_id)
-SELECT
-  u.id,
-  COALESCE(u.raw_user_meta_data ->> 'name', split_part(u.email, '@', 1)),
-  NULLIF(u.raw_user_meta_data ->> 'phone', ''),
-  CASE
-    WHEN lower(COALESCE(u.raw_user_meta_data ->> 'role', '')) = 'merchant' THEN 'affiliate'
-    ELSE 'customer'
-  END,
-  c.id,
-  m.id
-FROM auth.users u
-LEFT JOIN public.customers c ON c.auth_user_id = u.id OR lower(c.email) = lower(u.email)
-LEFT JOIN public.merchants m ON m.auth_user_id = u.id OR lower(m.email) = lower(u.email)
-ON CONFLICT (id) DO NOTHING;
 */
 
 -- =============================================================================
--- ROLLBACK (new objects only — does not touch legacy data)
+-- ROLLBACK (new objects only)
 -- =============================================================================
-
 /*
 BEGIN;
-
 DROP TRIGGER IF EXISTS on_auth_user_created_profile ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_auth_user();
-
 DROP TABLE IF EXISTS public.account_activity CASCADE;
 DROP TABLE IF EXISTS public.supplier_profiles CASCADE;
 DROP TABLE IF EXISTS public.affiliate_profiles CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
-
--- Optional: remove soft-link columns (only if you are sure nothing uses them)
--- ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_auth_user_id_fkey;
--- ALTER TABLE public.customers DROP COLUMN IF EXISTS auth_user_id;
--- ALTER TABLE public.merchants DROP CONSTRAINT IF EXISTS merchants_auth_user_id_fkey;
--- ALTER TABLE public.merchants DROP COLUMN IF EXISTS auth_user_id;
-
--- Keep is_platform_admin / set_updated_at if other objects use them; else:
+DROP FUNCTION IF EXISTS public.profiles_guard_role_change();
+DROP FUNCTION IF EXISTS public.affiliate_guard_admin_fields();
+DROP FUNCTION IF EXISTS public.supplier_guard_admin_fields();
+DROP FUNCTION IF EXISTS public.normalize_account_type(text);
 -- DROP FUNCTION IF EXISTS public.is_platform_admin();
--- DROP FUNCTION IF EXISTS public.set_updated_at();
-
 COMMIT;
 */
