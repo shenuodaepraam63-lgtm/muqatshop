@@ -17,7 +17,7 @@ export function authRedirectTo(path: string) {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-/** بعد جلسة Auth ناجحة: مزامنة صف customers + جلسة الواجهة */
+/** بعد جلسة Auth ناجحة: مزامنة صف customers + auth_user_id + جلسة الواجهة */
 export async function syncCustomerFromAuthUser(opts?: {
   name?: string;
 }): Promise<{ ok: true; session: CustomerSession } | { ok: false; error: string }> {
@@ -53,6 +53,7 @@ export async function syncCustomerFromAuthUser(opts?: {
         password_hash: `auth:${user.id}`,
         email_verified: true,
         is_active: true,
+        auth_user_id: user.id,
       })
       .select("id, name, phone, email")
       .maybeSingle();
@@ -66,6 +67,7 @@ export async function syncCustomerFromAuthUser(opts?: {
       .update({
         email_verified: true,
         name: opts?.name || existing.name || metaName,
+        auth_user_id: user.id,
       })
       .eq("id", existing.id);
     row = {
@@ -87,7 +89,7 @@ export async function syncCustomerFromAuthUser(opts?: {
   return { ok: true, session };
 }
 
-/** بعد تأكيد بريد التاجر: مزامنة merchants + محفظة + جلسة */
+/** بعد تأكيد بريد التاجر: مزامنة merchants + auth_user_id + محفظة + جلسة */
 export async function syncMerchantFromAuthUser(opts?: {
   name?: string;
   phone?: string | null;
@@ -135,6 +137,7 @@ export async function syncMerchantFromAuthUser(opts?: {
         password_hash: `auth:${user.id}`,
         is_active: true,
         email_verified: true,
+        auth_user_id: user.id,
       })
       .select("id, name, phone, email, code, is_active")
       .maybeSingle();
@@ -171,6 +174,7 @@ export async function syncMerchantFromAuthUser(opts?: {
         phone: metaPhone !== null && metaPhone !== undefined ? metaPhone : existing.phone,
         code,
         password_hash: `auth:${user.id}`,
+        auth_user_id: user.id,
       })
       .eq("id", existing.id);
 
