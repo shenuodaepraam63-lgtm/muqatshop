@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { AuthShell } from "@/components/auth/AuthShell";
 
 type AccountChoice = "customer" | "affiliate" | "supplier";
@@ -13,34 +13,43 @@ const CHOICES: {
   title: string;
   description: string;
   icon: string;
+  href: string;
 }[] = [
   {
     id: "customer",
     title: "عميل",
     description: "أرغب في تصفح المنتجات وشراء ما يناسبني.",
     icon: "🛍",
+    href: "/register/customer",
   },
   {
     id: "affiliate",
     title: "مسوق",
     description: "أرغب في تسويق المنتجات والحصول على عمولات مقابل المبيعات الناجحة.",
     icon: "📈",
+    href: "/register/affiliate",
   },
   {
     id: "supplier",
     title: "تاجر",
     description: "أمتلك منتجات وأرغب في عرضها والتعاون مع Muqatshop.",
     icon: "🏪",
+    href: "/register/supplier",
   },
 ];
 
 function RegisterChooser() {
   const router = useRouter();
   const sp = useSearchParams();
-  const initial = (sp.get("type") as AccountChoice) || null;
-  const [selected, setSelected] = useState<AccountChoice | null>(
-    initial && ["customer", "affiliate", "supplier"].includes(initial) ? initial : null
-  );
+  const typeParam = sp.get("type") as AccountChoice | null;
+
+  useEffect(() => {
+    if (typeParam === "customer") router.replace("/register/customer");
+    if (typeParam === "affiliate") router.replace("/register/affiliate");
+    if (typeParam === "supplier") router.replace("/register/supplier");
+  }, [typeParam, router]);
+
+  const [selected, setSelected] = useState<AccountChoice | null>(null);
 
   const hint = useMemo(
     () =>
@@ -49,18 +58,8 @@ function RegisterChooser() {
   );
 
   function continueNext() {
-    if (!selected) return;
-    // Gradual: reuse existing flows until full forms ship
-    if (selected === "customer") {
-      router.push("/welcome?tab=customer&mode=register");
-      return;
-    }
-    if (selected === "affiliate") {
-      router.push("/welcome?tab=merchant&mode=register");
-      return;
-    }
-    // supplier — pending dedicated form; route to pending info for now via merchant path
-    router.push("/welcome?tab=merchant&mode=register&as=supplier");
+    const choice = CHOICES.find((c) => c.id === selected);
+    if (choice) router.push(choice.href);
   }
 
   return (
@@ -79,7 +78,7 @@ function RegisterChooser() {
     >
       <p className="text-xs text-[#718096] mb-4 leading-relaxed">{hint}</p>
 
-      <div className="grid gap-3 sm:grid-cols-1">
+      <div className="grid gap-3">
         {CHOICES.map((c) => {
           const active = selected === c.id;
           return (
@@ -87,7 +86,7 @@ function RegisterChooser() {
               key={c.id}
               type="button"
               onClick={() => setSelected(c.id)}
-              className={`text-start rounded-xl border px-4 py-4 transition-all duration-160 ${
+              className={`text-start rounded-xl border px-4 py-4 transition-all ${
                 active
                   ? "border-[#3157D5] bg-[#3157D5]/5 ring-1 ring-[#3157D5]"
                   : "border-[#E4E9F0] bg-white hover:border-[#3157D5]/40"
@@ -100,9 +99,7 @@ function RegisterChooser() {
                 <div className="flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[17px] font-semibold text-[#202B3C]">{c.title}</span>
-                    {active ? (
-                      <span className="text-xs font-bold text-[#3157D5]">✓ محدد</span>
-                    ) : null}
+                    {active ? <span className="text-xs font-bold text-[#3157D5]">✓ محدد</span> : null}
                   </div>
                   <p className="mt-1 text-sm text-[#718096] leading-relaxed">{c.description}</p>
                 </div>
