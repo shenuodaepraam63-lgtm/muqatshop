@@ -1,0 +1,3 @@
+-- Applied on production via migration: mq_customer_phase_a_orders_addresses
+-- Additive only: customer_id / customer_email on orders + customer_addresses + RLS
+-- See Supabase migration history for exact SQL.
