@@ -101,7 +101,7 @@ export default async function HomePage() {
     whyUs: <WhyUsSection />,
     join: <JoinSection />,
     faq: <FaqSection config={config} />,
-    finalCta: <FinalCtaSection config={config} />,
+    finalCta: <FinalCtaSection />,
   };
 
   const announcementVisible = isAnnouncementActive(config);
