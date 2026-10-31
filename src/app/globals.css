@@ -3,18 +3,26 @@
 @tailwind utilities;
 
 :root {
-  --page-bg: #fffcee;
-  --card-bg: #ede9d9;
-  --text: #101010;
-  --text-muted: #666666;
-  --sale: #f2627b;
-  --accent: #0042eb;
-  --border: #e8e2d9;
+  --page-bg: #faf7f2;
+  --card-bg: #ffffff;
+  --surface-2: #f3eee6;
+  --text: #0c0a09;
+  --text-soft: #44403c;
+  --text-muted: #78716c;
+  --sale: #e11d48;
+  --accent: #1c1917;
+  --brand: #8b5e34;
+  --brand-dark: #6b4423;
+  --gold: #c4a574;
+  --success: #059669;
+  --border: #e7e0d6;
   --radius-media: 16px;
-  --radius-btn: 40px;
+  --radius-btn: 12px;
+  --radius-card: 18px;
   --header-h: 73px;
   --announce-h: 37px;
   --bottom-nav-h: 64px;
+  --shadow-card: 0 1px 2px rgba(12, 10, 9, 0.04), 0 8px 24px rgba(12, 10, 9, 0.06);
 }
 
 html {
@@ -26,6 +34,12 @@ body {
   color: var(--text);
   font-family: var(--font-changa), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(139, 94, 52, 0.18);
+  color: var(--text);
 }
 
 body.admin-mode .announcement-bar,
@@ -50,13 +64,13 @@ body.admin-mode > main {
 }
 
 .animate-marquee {
-  animation: marquee 25s linear infinite;
+  animation: marquee 28s linear infinite;
 }
 
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -65,7 +79,7 @@ body.admin-mode > main {
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out forwards;
+  animation: fadeInUp 0.5s ease-out forwards;
 }
 
 @keyframes storyProgress {
@@ -103,7 +117,38 @@ body.admin-mode > main {
   }
 }
 
-/* —— بوابة المسوق / عرض تفاصيل المنتج —— */
+/* —— أزرار موحّدة —— */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-ink text-white font-semibold
+      rounded-btn px-5 py-3 text-sm transition hover:bg-brand-dark
+      disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-white text-ink font-semibold
+      border border-border rounded-btn px-5 py-3 text-sm transition
+      hover:border-ink/30 hover:bg-surface-2
+      disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 text-ink-soft font-medium
+      rounded-btn px-4 py-2 text-sm transition hover:bg-surface-2 hover:text-ink;
+  }
+
+  .input-field {
+    @apply w-full border border-border rounded-xl bg-white px-4 py-3 text-sm text-ink
+      outline-none transition placeholder:text-muted
+      focus:border-brand/40 focus:ring-2 focus:ring-brand/15;
+  }
+
+  .ui-card {
+    @apply bg-white border border-border rounded-card shadow-soft;
+  }
+}
+
+/* —— بوابة المسوق —— */
 .marketer-shell {
   background-color: var(--page-bg);
   color: var(--text);
@@ -112,7 +157,8 @@ body.admin-mode > main {
 .marketer-card {
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 .marketer-prose {
@@ -137,7 +183,7 @@ body.admin-mode > main {
   grid-template-columns: minmax(7rem, 38%) 1fr;
   gap: 0.75rem 1rem;
   padding: 0.65rem 0;
-  border-bottom: 1px solid #f0ebe3;
+  border-bottom: 1px solid var(--border);
   font-size: 0.8125rem;
   line-height: 1.55;
   align-items: start;
@@ -193,7 +239,7 @@ body.admin-mode > main {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: #ebe6dc;
+  background: var(--surface-2);
   border-radius: 1rem;
   color: var(--text-muted);
   font-size: 0.875rem;
