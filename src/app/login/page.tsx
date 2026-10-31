@@ -1,9 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { AuthShell } from "@/components/auth/AuthShell";
 import {
@@ -59,7 +58,6 @@ function LoginForm() {
         return;
       }
 
-      // Ensure legacy rows stay linked (gradual migration)
       const identityRes = await loadAccountIdentity();
       if (!identityRes.ok) {
         setError(identityRes.error);
@@ -73,7 +71,6 @@ function LoginForm() {
         return;
       }
 
-      // Bridge old UI sessions
       if (identity.accountType === "affiliate" || identity.accountType === "supplier") {
         await syncMerchantFromAuthUser().catch(() => null);
       } else if (identity.accountType === "customer") {
@@ -81,10 +78,7 @@ function LoginForm() {
       }
 
       mirrorLegacySession(identity);
-
-      if (!remember) {
-        // Session still managed by Supabase; UI preference only for now
-      }
+      void remember;
 
       router.replace(resolvePostLoginPath(identity));
     } catch {
@@ -116,9 +110,7 @@ function LoginForm() {
 
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <div>
-          <label className="block text-sm font-semibold text-[#202B3C] mb-1.5">
-            البريد الإلكتروني
-          </label>
+          <label className="block text-sm font-semibold text-[#202B3C] mb-1.5">البريد الإلكتروني</label>
           <input
             type="email"
             inputMode="email"
@@ -134,10 +126,7 @@ function LoginForm() {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="block text-sm font-semibold text-[#202B3C]">كلمة المرور</label>
-            <Link
-              href="/forgot-password"
-              className="text-xs font-semibold text-[#3157D5] hover:underline"
-            >
+            <Link href="/forgot-password" className="text-xs font-semibold text-[#3157D5] hover:underline">
               نسيت كلمة المرور؟
             </Link>
           </div>
@@ -172,7 +161,7 @@ function LoginForm() {
         </label>
 
         {error ? (
-          <p className="text-sm text-[#D64C4C] animate-[fadeIn_180ms_ease-out]" role="alert">
+          <p className="text-sm text-[#D64C4C]" role="alert">
             {error}
           </p>
         ) : null}
@@ -185,14 +174,6 @@ function LoginForm() {
           {loading ? "جارٍ تسجيل الدخول..." : "تسجيل الدخول"}
         </button>
       </form>
-
-      <p className="mt-4 text-center text-xs text-[#718096]">
-        أو استخدم{" "}
-        <Link href="/welcome" className="underline hover:text-[#3157D5]">
-          صفحة الدخول الحالية
-        </Link>{" "}
-        مؤقتًا أثناء الانتقال.
-      </p>
     </AuthShell>
   );
 }
@@ -201,9 +182,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-sm text-[#718096]">
-          جاري التحميل...
-        </div>
+        <div className="min-h-screen flex items-center justify-center text-sm text-[#718096]">جاري التحميل...</div>
       }
     >
       <LoginForm />
