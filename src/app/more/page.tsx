@@ -46,7 +46,9 @@ const sections: MoreSection[] = [
     title: "الطلبات والحساب",
     items: [
       { href: "/track", label: "تتبع طلب", desc: "حالة شحنتك", icon: PackageSearch },
-      { href: "/welcome", label: "دخول / حساب", desc: "عميل أو مسوق", icon: User },
+      { href: "/login", label: "دخول / حساب", desc: "تسجيل الدخول الموحد", icon: User },
+      { href: "/register", label: "إنشاء حساب", desc: "عميل · مسوق · تاجر", icon: User },
+      { href: "/account/profile", label: "الملف الشخصي", desc: "بيانات الحساب", icon: User },
     ],
   },
   {
@@ -78,16 +80,12 @@ export default function MorePage() {
 
       <div className="max-w-page mx-auto px-4 md:px-8 py-8">
         <h1 className="text-2xl md:text-3xl font-bold mb-2 text-ink">المزيد</h1>
-        <p className="text-sm text-muted mb-8">
-          روابط إضافية وأقسام في مكان واحد
-        </p>
+        <p className="text-sm text-muted mb-8">روابط إضافية وأقسام في مكان واحد</p>
 
         <div className="space-y-8">
           {sections.map((sec) => (
             <section key={sec.title}>
-              <h2 className="text-xs font-semibold text-muted tracking-wide mb-3">
-                {sec.title}
-              </h2>
+              <h2 className="text-xs font-semibold text-muted tracking-wide mb-3">{sec.title}</h2>
               <ul className="rounded-card border border-border bg-white overflow-hidden divide-y divide-border shadow-soft">
                 {sec.items.map((item) => {
                   const Icon = item.icon;
@@ -100,9 +98,7 @@ export default function MorePage() {
                         <p className="font-medium text-sm text-ink">{item.label}</p>
                         <p className="text-xs text-muted truncate">{item.desc}</p>
                       </div>
-                      {!item.disabled && (
-                        <ChevronLeft className="w-4 h-4 text-muted shrink-0" />
-                      )}
+                      {!item.disabled && <ChevronLeft className="w-4 h-4 text-muted shrink-0" />}
                     </div>
                   );
                   if (item.disabled) {
