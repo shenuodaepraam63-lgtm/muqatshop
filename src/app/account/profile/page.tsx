@@ -3,11 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AuthShell } from "@/components/auth/AuthShell";
 import {
   loadAccountIdentity,
   type AccountIdentity,
 } from "@/lib/account-identity";
+import { resolveCustomerId } from "@/lib/customer-account";
 import { supabase } from "@/lib/supabase";
 import { signOutEverywhere } from "@/lib/auth-session";
 
@@ -20,7 +20,6 @@ export default function AccountProfilePage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [confirmOut, setConfirmOut] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -42,111 +41,83 @@ export default function AccountProfilePage() {
     setSaving(true);
     setErr(null);
     setMsg(null);
-    const { error } = await supabase
+    const name = fullName.trim();
+    const { error: pErr } = await supabase
       .from("profiles")
-      .update({
-        full_name: fullName.trim(),
-        phone: phone.trim() || null,
-      })
+      .update({ full_name: name || null, phone: phone.trim() || null })
       .eq("id", identity.userId);
-    setSaving(false);
-    if (error) {
-      setErr(error.message);
+    if (pErr) {
+      setSaving(false);
+      setErr(pErr.message);
       return;
     }
-    setMsg("تم تحديث الملف الشخصي.");
+    const customerId = await resolveCustomerId(identity);
+    if (customerId) {
+      await supabase
+        .from("customers")
+        .update({ name: name || identity.email.split("@")[0], phone: phone.trim() || null })
+        .eq("id", customerId);
+    }
+    setSaving(false);
+    setMsg("تم حفظ بياناتك");
   }
 
-  async function logout() {
-    await signOutEverywhere();
-    router.replace("/");
+  if (loading || !identity) {
+    return <p className="text-sm text-[#718096]">جاري التحميل...</p>;
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-[#718096]">
-        جاري التحميل...
-      </div>
-    );
-  }
-
-  if (!identity) return null;
-
-  const typeLabel =
-    identity.accountType === "admin"
-      ? "إدارة"
-      : identity.accountType === "affiliate"
-        ? "مسوق"
-        : identity.accountType === "supplier"
-          ? "تاجر"
-          : "عميل";
-
-  const statusLabel =
-    identity.affiliateStatus || identity.supplierStatus || (identity.isActive ? "نشط" : "موقوف");
-
-  const field =
-    "w-full h-[50px] rounded-[10px] border border-[#E4E9F0] px-3 text-[15px] outline-none focus:border-[#3157D5]";
+  const field = "w-full rounded-xl border border-[#E4E9F0] bg-white px-3 py-2.5 text-sm";
 
   return (
-    <AuthShell
-      title="الملف الشخصي"
-      description="إدارة بيانات حسابك على Muqatshop."
-      footer={
-        <div className="space-y-2 text-center text-sm">
-          <Link href="/forgot-password" className="block text-[#3157D5] font-semibold">
-            تغيير كلمة المرور
-          </Link>
-          {!confirmOut ? (
-            <button type="button" className="text-[#718096]" onClick={() => setConfirmOut(true)}>
-              تسجيل الخروج
-            </button>
-          ) : (
-            <div className="flex gap-2 justify-center">
-              <button type="button" className="font-semibold text-[#D64C4C]" onClick={logout}>
-                تأكيد الخروج
-              </button>
-              <button type="button" className="text-[#718096]" onClick={() => setConfirmOut(false)}>
-                إلغاء
-              </button>
-            </div>
-          )}
-        </div>
-      }
-    >
-      <div className="rounded-xl border border-[#E4E9F0] bg-[#F6F8FB] p-4 mb-4 text-sm space-y-2">
-        <div className="flex justify-between gap-2">
-          <span className="text-[#718096]">البريد</span>
-          <span className="font-semibold dir-ltr">{identity.email}</span>
-        </div>
-        <div className="flex justify-between gap-2">
-          <span className="text-[#718096]">نوع الحساب</span>
-          <span className="font-semibold">{typeLabel}</span>
-        </div>
-        <div className="flex justify-between gap-2">
-          <span className="text-[#718096]">الحالة</span>
-          <span className="font-semibold">{statusLabel}</span>
-        </div>
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-lg font-bold text-[#14243A]">بياناتي الشخصية</h2>
+        <p className="mt-1 text-sm text-[#718096]">تحديث الاسم ورقم الهاتف المرتبطين بالحساب.</p>
       </div>
 
-      <form onSubmit={save} className="space-y-3">
+      <form onSubmit={save} className="space-y-3 rounded-2xl border border-[#E4E9F0] bg-white p-5 shadow-sm">
         <div>
-          <label className="block text-sm font-semibold mb-1">الاسم</label>
+          <label className="mb-1 block text-xs font-semibold text-[#718096]">البريد (لا يتغير)</label>
+          <input className={field} value={identity.email} disabled dir="ltr" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-[#718096]">الاسم</label>
           <input className={field} value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </div>
         <div>
-          <label className="block text-sm font-semibold mb-1">رقم الهاتف</label>
-          <input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01XXXXXXXXX" />
+          <label className="mb-1 block text-xs font-semibold text-[#718096]">الهاتف</label>
+          <input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" />
         </div>
-        {err ? <p className="text-sm text-[#D64C4C]">{err}</p> : null}
-        {msg ? <p className="text-sm text-[#21865B]">{msg}</p> : null}
-        <button type="submit" disabled={saving} className="w-full h-[50px] rounded-[10px] bg-[#3157D5] text-white font-semibold disabled:opacity-60">
-          {saving ? "جاري الحفظ..." : "حفظ التغييرات"}
+        {err && <p className="text-sm text-[#D64C4C]">{err}</p>}
+        {msg && <p className="text-sm text-[#21865B]">{msg}</p>}
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-xl bg-[#14243A] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {saving ? "..." : "حفظ"}
         </button>
       </form>
 
-      <Link href="/account" className="mt-4 block text-center text-xs text-[#718096] hover:text-[#3157D5]">
-        عنوان الشحن والطلبات (الحساب الحالي)
-      </Link>
-    </AuthShell>
+      <div id="settings" className="space-y-3 rounded-2xl border border-[#E4E9F0] bg-white p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-[#14243A]">إعدادات الحساب</h3>
+        <Link href="/forgot-password" className="block text-sm font-semibold text-[#3157D5]">
+          تغيير / استعادة كلمة المرور
+        </Link>
+        <Link href="/register/supplier" className="block text-sm font-semibold text-[#3157D5]">
+          التعاون كتاجر — إنشاء حساب تاجر
+        </Link>
+        <button
+          type="button"
+          onClick={async () => {
+            await signOutEverywhere();
+            router.replace("/login");
+          }}
+          className="text-sm font-semibold text-[#D64C4C]"
+        >
+          تسجيل الخروج
+        </button>
+      </div>
+    </div>
   );
 }
