@@ -68,7 +68,7 @@ export default function MerchantCatalogPage() {
         </div>
         <Link
           href="/merchant/favorites"
-          className="text-xs text-accent hover:underline flex items-center gap-1 font-medium"
+          className="text-xs text-brand-dark hover:underline flex items-center gap-1 font-medium"
         >
           <Heart className="w-3.5 h-3.5" /> المفضلة ({favs.length})
         </Link>
@@ -86,7 +86,7 @@ export default function MerchantCatalogPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="بحث عن منتج..."
-          className="w-full border border-[#e8e2d9] rounded-xl pr-10 pl-4 py-2.5 text-sm bg-white"
+          className="input-field pr-10"
         />
       </div>
 
@@ -102,16 +102,15 @@ export default function MerchantCatalogPage() {
             const img = productMainImage(p) || "";
             const base = Number(p.price) || 0;
             const liked = favs.includes(p.id);
-            /** مسار المسوق فقط — مش /products */
             const href = `/merchant/catalog/${p.id}`;
 
             return (
               <article
                 key={p.id}
-                className="group rounded-2xl overflow-hidden bg-[#f5f1e8] hover:shadow-md transition flex flex-col"
+                className="group rounded-card overflow-hidden bg-white border border-border shadow-soft hover:shadow-card hover:border-brand/20 transition flex flex-col"
               >
                 <Link href={href} className="block">
-                  <div className="relative aspect-square bg-[#ebe6dc] overflow-hidden">
+                  <div className="relative aspect-square bg-surface-2 overflow-hidden">
                     {img ? (
                       <Image
                         src={img}
@@ -129,7 +128,7 @@ export default function MerchantCatalogPage() {
                     <button
                       type="button"
                       onClick={(e) => onFav(e, p.id)}
-                      className="absolute bottom-2 left-2 z-10 w-9 h-9 rounded-full bg-white/95 shadow flex items-center justify-center"
+                      className="absolute bottom-2 left-2 z-10 w-9 h-9 rounded-full bg-white/95 shadow-soft flex items-center justify-center"
                     >
                       <Heart
                         className={`w-4 h-4 ${
@@ -151,13 +150,13 @@ export default function MerchantCatalogPage() {
                 <div className="px-3 pb-3 pt-2 flex gap-1.5 mt-auto">
                   <Link
                     href={href}
-                    className="flex-1 text-center text-[11px] border border-ink rounded-full py-2 font-semibold"
+                    className="flex-1 text-center text-[11px] border border-border rounded-btn py-2 font-semibold hover:border-ink/30"
                   >
                     التفاصيل
                   </Link>
                   <Link
                     href={`/merchant/new-order?product=${p.id}`}
-                    className="flex-1 text-center text-[11px] bg-accent text-white rounded-full py-2 font-semibold inline-flex items-center justify-center gap-0.5"
+                    className="flex-1 text-center text-[11px] bg-ink text-white rounded-btn py-2 font-semibold inline-flex items-center justify-center gap-0.5 hover:bg-brand-dark"
                   >
                     <PlusCircle className="w-3 h-3" /> أوردر
                   </Link>

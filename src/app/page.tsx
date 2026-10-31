@@ -43,8 +43,8 @@ export default async function HomePage() {
       {groups.length > 0 && (
         <section className="max-w-page mx-auto px-4 md:px-8 mt-10">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl md:text-2xl font-bold">تسوق حسب المجموعة</h2>
-            <Link href="/categories" className="text-sm text-muted underline">
+            <h2 className="text-xl md:text-2xl font-bold text-ink">تسوق حسب المجموعة</h2>
+            <Link href="/categories" className="text-sm text-brand-dark font-medium hover:underline">
               كل التصنيفات
             </Link>
           </div>
@@ -53,14 +53,14 @@ export default async function HomePage() {
               <Link
                 key={g.id}
                 href={`/groups/${encodeURIComponent(g.slug)}`}
-                className="rounded-2xl bg-[#f5f1e8] border border-[#e8e2d9] px-4 py-6 text-center hover:shadow-md transition"
+                className="rounded-card bg-white border border-border px-4 py-6 text-center shadow-soft hover:shadow-card hover:border-brand/25 transition"
               >
                 <span className="font-semibold text-ink">{g.name}</span>
               </Link>
             ))}
             <Link
               href="/shop"
-              className="rounded-2xl bg-ink text-page px-4 py-6 text-center hover:opacity-90 transition"
+              className="rounded-card bg-ink text-white px-4 py-6 text-center shadow-soft hover:bg-brand-dark transition"
             >
               <span className="font-semibold">كل المتجر</span>
             </Link>
@@ -70,14 +70,14 @@ export default async function HomePage() {
 
       <section id="products" className="max-w-page mx-auto px-4 md:px-8 mt-10 md:mt-14 mb-16 scroll-mt-24">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl md:text-2xl font-bold">أحدث المنتجات</h2>
-          <Link href="/shop" className="text-sm text-muted underline">
+          <h2 className="text-xl md:text-2xl font-bold text-ink">أحدث المنتجات</h2>
+          <Link href="/shop" className="text-sm text-brand-dark font-medium hover:underline">
             عرض الكل
           </Link>
         </div>
 
         {products.length === 0 ? (
-          <div className="rounded-media bg-card py-16 px-6 text-center">
+          <div className="rounded-card bg-white border border-border py-16 px-6 text-center shadow-soft">
             <h2 className="text-xl md:text-2xl font-bold mb-3">قريباً</h2>
             <p className="text-muted max-w-md mx-auto text-sm">
               جاري تجهيز المنتجات من لوحة التحكم
