@@ -71,7 +71,7 @@ export default function AccountPage() {
   useEffect(() => {
     const s = getCustomerSession();
     if (!s) {
-      router.replace("/welcome?tab=customer&next=/account");
+      router.replace("/login?next=/account");
       return;
     }
     setCustomerId(s.id);
@@ -142,14 +142,13 @@ export default function AccountPage() {
     await supabase.auth.signOut();
     clearCustomerSession();
     clearSiteRole();
-    router.replace("/welcome");
+    router.replace("/login");
   };
 
   const requestDeleteCode = async () => {
     setDeleteErr("");
     setDeleteMsg("");
-    if (!confirm("سيتم إرسال رمز تحقق رقمي من Supabase إلى بريدك لتأكيد حذف الحساب. متابعة؟"))
-      return;
+    if (!confirm("سيتم إرسال رمز تحقق رقمي من Supabase إلى بريدك لتأكيد حذف الحساب. متابعة؟")) return;
 
     setDeleteLoading(true);
     const em = email.trim().toLowerCase();
@@ -166,8 +165,7 @@ export default function AccountPage() {
       setDeleteLoading(false);
       if (otpErr) {
         setDeleteErr(
-          "لازم تسجّل دخول بحساب مؤكد (من رابط البريد) أولًا، ثم تحذف الحساب.\n" +
-            otpErr.message
+          "لازم تسجّل دخول بحساب مؤكد (من رابط البريد) أولًا، ثم تحذف الحساب.\n" + otpErr.message
         );
         return;
       }
@@ -235,7 +233,7 @@ export default function AccountPage() {
     clearCustomerSession();
     clearSiteRole();
     setDeleteLoading(false);
-    router.replace("/welcome?tab=customer");
+    router.replace("/login");
   };
 
   const applyMerchant = async () => {
@@ -268,14 +266,12 @@ export default function AccountPage() {
       return;
     }
     setAppStatus("pending");
-    setMsg("تم إرسال طلب التاجر — بانتظار موافقة الإدارة");
+    setMsg("تم إرسال الطلب — بانتظار موافقة الإدارة. للتجار الجدد يُفضّل /register/supplier");
   };
 
   if (!ready) {
     return (
-      <div className="max-w-page mx-auto px-4 py-16 text-center text-muted text-sm">
-        جاري التحميل...
-      </div>
+      <div className="max-w-page mx-auto px-4 py-16 text-center text-muted text-sm">جاري التحميل...</div>
     );
   }
 
@@ -378,17 +374,22 @@ export default function AccountPage() {
       </form>
 
       <div className="bg-white border border-border rounded-2xl p-5 space-y-3">
-        <h2 className="font-semibold">طلب حساب تاجر</h2>
+        <h2 className="font-semibold">التعاون كتاجر</h2>
+        <p className="text-sm text-muted">
+          لإنشاء حساب تاجر وتقديم طلب التعاون استخدم{" "}
+          <Link href="/register/supplier" className="text-[#3157D5] font-semibold underline">
+            صفحة تسجيل التاجر
+          </Link>
+          .
+        </p>
         {appStatus === "pending" && (
-          <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-            طلبك قيد المراجعة من الإدارة
-          </p>
+          <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">طلبك قيد المراجعة من الإدارة</p>
         )}
         {appStatus === "approved" && (
-          <p className="text-sm text-green-700">تمت الموافقة — سجّل دخول التاجر من /merchant/login</p>
+          <p className="text-sm text-green-700">تمت الموافقة — سجّل الدخول من /login</p>
         )}
         {appStatus === "rejected" && (
-          <p className="text-sm text-sale">تم رفض الطلب السابق — يمكنك التقديم مرة أخرى</p>
+          <p className="text-sm text-sale">تم رفض الطلب السابق — يمكنك التقديم عبر /register/supplier</p>
         )}
         {appStatus !== "pending" && appStatus !== "approved" && (
           <>
@@ -404,21 +405,16 @@ export default function AccountPage() {
               onClick={applyMerchant}
               className="w-full border border-ink py-3 rounded-full text-sm font-semibold disabled:opacity-50"
             >
-              {appLoading ? "..." : "تقديم طلب لأن أصبح تاجرًا"}
+              {appLoading ? "..." : "تقديم طلب سريع (قديم)"}
             </button>
           </>
         )}
       </div>
 
-      {/* —— حذف الحساب: واضح في صفحة حسابي —— */}
-      <div
-        id="delete-account"
-        className="bg-red-50 border-2 border-sale rounded-2xl p-5 space-y-3"
-      >
+      <div id="delete-account" className="bg-red-50 border-2 border-sale rounded-2xl p-5 space-y-3">
         <h2 className="font-bold text-sale text-base">حذف الحساب</h2>
         <p className="text-xs text-muted leading-relaxed">
-          هذا الزر في صفحة <strong>حسابي</strong>. بعد الضغط يوصلك رمز رقمي من Supabase على الإيميل،
-          وبعد كتابة الرمز يُحذف الحساب نهائيًا.
+          بعد الضغط يوصلك رمز رقمي من Supabase على الإيميل، وبعد كتابته يُحذف الحساب نهائيًا.
         </p>
 
         {deleteStep === "idle" && (
@@ -467,14 +463,6 @@ export default function AccountPage() {
             >
               إلغاء
             </button>
-            <button
-              type="button"
-              className="w-full text-xs underline text-muted"
-              disabled={deleteLoading}
-              onClick={requestDeleteCode}
-            >
-              إعادة إرسال الرمز
-            </button>
           </form>
         )}
 
@@ -485,7 +473,7 @@ export default function AccountPage() {
 
       <div className="space-y-2">
         <Link
-          href="/welcome?tab=customer&mode=forgot"
+          href="/forgot-password"
           className="block w-full text-center border border-border py-3 rounded-full text-sm"
         >
           نسيت / تغيير كلمة المرور
