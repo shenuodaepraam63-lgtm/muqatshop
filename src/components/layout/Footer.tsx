@@ -7,11 +7,7 @@ export function Footer() {
       <div className="max-w-page mx-auto px-4 md:px-8 py-12 md:py-14">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <div>
-            <Link
-              href="/"
-              aria-label="Muqatshop — الصفحة الرئيسية"
-              className="inline-flex mb-4"
-            >
+            <Link href="/" aria-label="Muqatshop — الصفحة الرئيسية" className="inline-flex mb-4">
               <BrandLogo size="md" />
             </Link>
             <p className="text-sm text-muted leading-relaxed max-w-xs">
@@ -28,10 +24,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/categories"
-                  className="hover:text-brand-dark transition"
-                >
+                <Link href="/categories" className="hover:text-brand-dark transition">
                   التصنيفات
                 </Link>
               </li>
@@ -46,11 +39,13 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/merchant/register"
-                  className="hover:text-brand-dark transition"
-                >
+                <Link href="/register/affiliate" className="hover:text-brand-dark transition">
                   سجّل كمسوق
+                </Link>
+              </li>
+              <li>
+                <Link href="/register/supplier" className="hover:text-brand-dark transition">
+                  سجّل كتاجر
                 </Link>
               </li>
             </ul>
@@ -64,11 +59,8 @@ export function Footer() {
               <li>الدفع عند الاستلام متاح</li>
               <li>تواصل عبر واتساب</li>
               <li>
-                <Link
-                  href="/merchant/login"
-                  className="hover:text-brand-dark transition"
-                >
-                  دخول المسوق
+                <Link href="/login" className="hover:text-brand-dark transition">
+                  تسجيل الدخول
                 </Link>
               </li>
             </ul>
