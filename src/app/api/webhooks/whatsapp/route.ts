@@ -1,18 +1,17 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { getWhatsAppConfig } from "@/lib/whatsapp/config";
+import { handleInboundWhatsAppMessages } from "@/lib/whatsapp/handle-inbound";
 
 export const runtime = "nodejs";
 
-/**
- * Meta calls GET when you subscribe the WhatsApp webhook.
- * The verify token must exactly match WHATSAPP_VERIFY_TOKEN in Vercel.
- */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
-  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  const cfg = getWhatsAppConfig();
+  const verifyToken = cfg?.verifyToken || process.env.WHATSAPP_VERIFY_TOKEN;
 
   if (!verifyToken) {
     return new NextResponse("Webhook verification is not configured", {
@@ -30,15 +29,13 @@ export async function GET(req: NextRequest) {
   return new NextResponse("Forbidden", { status: 403 });
 }
 
-/**
- * Meta sends WhatsApp webhook notifications here.
- * Verify the signature against the raw request body before parsing it.
- */
 export async function POST(req: NextRequest) {
-  const appSecret = process.env.META_APP_SECRET;
+  const appSecret =
+    process.env.META_APP_SECRET?.trim() || getWhatsAppConfig()?.appSecret;
+
   if (!appSecret) {
     return NextResponse.json(
-      { ok: false, error: "META_APP_SECRET is not configured" },
+      { ok: false, error: "not_configured" },
       { status: 500 }
     );
   }
@@ -48,42 +45,56 @@ export async function POST(req: NextRequest) {
   const expectedSignature =
     "sha256=" + createHmac("sha256", appSecret).update(rawBody).digest("hex");
 
-  const supplied = Buffer.from(signature);
-  const expected = Buffer.from(expectedSignature);
-
-  if (
-    supplied.length !== expected.length ||
-    !timingSafeEqual(supplied, expected)
-  ) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid webhook signature" },
-      { status: 401 }
-    );
+  try {
+    const supplied = Buffer.from(signature);
+    const expected = Buffer.from(expectedSignature);
+    if (
+      supplied.length !== expected.length ||
+      !timingSafeEqual(supplied, expected)
+    ) {
+      return NextResponse.json({ ok: false }, { status: 401 });
+    }
+  } catch {
+    return NextResponse.json({ ok: false }, { status: 401 });
   }
 
   try {
     const payload = JSON.parse(rawBody) as {
       object?: string;
-      entry?: Array<{ changes?: Array<{ field?: string }> }>;
+      entry?: Array<{
+        changes?: Array<{
+          field?: string;
+          value?: {
+            messages?: unknown[];
+            statuses?: unknown[];
+          };
+        }>;
+      }>;
     };
 
-    // Acknowledge valid WhatsApp notifications. Message/order processing can
-    // be added separately without exposing customer data in application logs.
-    const changeCount = (payload.entry || []).reduce(
-      (total, entry) => total + (entry.changes || []).length,
-      0
-    );
+    if (payload.object !== "whatsapp_business_account") {
+      return NextResponse.json({ ok: true });
+    }
 
-    return NextResponse.json({
-      ok: true,
-      received: true,
-      object: payload.object || null,
-      changes: changeCount,
-    });
+    const messages: unknown[] = [];
+    for (const entry of payload.entry || []) {
+      for (const change of entry.changes || []) {
+        if (change.field !== "messages") continue;
+        const batch = change.value?.messages;
+        if (Array.isArray(batch)) messages.push(...batch);
+      }
+    }
+
+    // Acknowledge quickly; process after response is not possible in serverless
+    // without background — keep processing short and safe.
+    if (messages.length) {
+      await handleInboundWhatsAppMessages(
+        messages as Parameters<typeof handleInboundWhatsAppMessages>[0]
+      );
+    }
+
+    return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "Invalid JSON payload" },
-      { status: 400 }
-    );
+    return NextResponse.json({ ok: false }, { status: 400 });
   }
 }
