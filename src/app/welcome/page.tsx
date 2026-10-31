@@ -29,7 +29,6 @@ function WelcomeInner() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // مسوق مسجّل → بوابة المسوق فقط (مش المتجر كعميل)
     if (getMerchantSession()) {
       setSiteRole("merchant");
       router.replace("/merchant");
@@ -164,17 +163,16 @@ function WelcomeInner() {
     );
   };
 
-  const field =
-    "w-full border border-[#e8e2d9] rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ink/20 bg-white";
-
   return (
-    <div className="min-h-screen bg-page flex flex-col items-center justify-center px-4 py-10">
-      <div className="mb-8">
+    <div className="min-h-screen bg-page flex flex-col items-center justify-center px-4 py-10 relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(196,165,116,0.18),_transparent_55%)]" />
+
+      <div className="relative z-10 mb-8">
         <BrandLogo size="md" />
       </div>
 
-      <div className="w-full max-w-md bg-white border border-[#e8e2d9] rounded-3xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-3 border-b border-[#e8e2d9]">
+      <div className="relative z-10 w-full max-w-md bg-white border border-border rounded-card shadow-card overflow-hidden">
+        <div className="grid grid-cols-3 border-b border-border">
           {(
             [
               { id: "guest" as Tab, label: "زائر" },
@@ -193,7 +191,7 @@ function WelcomeInner() {
               className={`py-3.5 text-sm font-semibold transition ${
                 tab === t.id
                   ? "bg-ink text-white"
-                  : "bg-[#faf8f5] text-muted hover:text-ink"
+                  : "bg-surface-2/80 text-muted hover:text-ink"
               }`}
             >
               {t.label}
@@ -204,15 +202,11 @@ function WelcomeInner() {
         <div className="p-6 space-y-4">
           {tab === "guest" && (
             <>
-              <h1 className="text-lg font-bold text-center">تصفح كزائر</h1>
+              <h1 className="text-lg font-bold text-center text-ink">تصفح كزائر</h1>
               <p className="text-sm text-muted text-center leading-relaxed">
                 تشوف المنتجات والأسعار عادي. للشراء أو السلة هتحتاج تسجّل كعميل.
               </p>
-              <button
-                type="button"
-                onClick={goGuest}
-                className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold"
-              >
+              <button type="button" onClick={goGuest} className="btn-primary w-full">
                 دخول كزائر
               </button>
             </>
@@ -220,7 +214,7 @@ function WelcomeInner() {
 
           {tab === "customer" && (
             <>
-              <h1 className="text-lg font-bold text-center">
+              <h1 className="text-lg font-bold text-center text-ink">
                 {custMode === "forgot"
                   ? "استعادة كلمة المرور"
                   : custMode === "register"
@@ -229,13 +223,13 @@ function WelcomeInner() {
               </h1>
 
               {custMode !== "forgot" && (
-                <div className="flex rounded-full bg-[#f0ebe3] p-1 text-sm">
+                <div className="flex rounded-xl bg-surface-2 p-1 text-sm">
                   <button
                     type="button"
-                    className={`flex-1 py-2 rounded-full ${
+                    className={`flex-1 py-2 rounded-lg transition ${
                       custMode === "login"
-                        ? "bg-white font-semibold shadow-sm"
-                        : ""
+                        ? "bg-white font-semibold shadow-soft text-ink"
+                        : "text-muted"
                     }`}
                     onClick={() => setCustMode("login")}
                   >
@@ -243,10 +237,10 @@ function WelcomeInner() {
                   </button>
                   <button
                     type="button"
-                    className={`flex-1 py-2 rounded-full ${
+                    className={`flex-1 py-2 rounded-lg transition ${
                       custMode === "register"
-                        ? "bg-white font-semibold shadow-sm"
-                        : ""
+                        ? "bg-white font-semibold shadow-soft text-ink"
+                        : "text-muted"
                     }`}
                     onClick={() => setCustMode("register")}
                   >
@@ -263,7 +257,7 @@ function WelcomeInner() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="البريد الإلكتروني"
-                    className={field}
+                    className="input-field"
                   />
                   <input
                     type="password"
@@ -271,20 +265,20 @@ function WelcomeInner() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="كلمة المرور"
-                    className={field}
+                    className="input-field"
                   />
                   {error && <p className="text-sm text-sale">{error}</p>}
                   {info && <p className="text-sm text-muted">{info}</p>}
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold disabled:opacity-50"
+                    className="btn-primary w-full"
                   >
                     {loading ? "..." : "دخول كعميل"}
                   </button>
                   <button
                     type="button"
-                    className="w-full text-xs text-muted underline"
+                    className="w-full text-xs text-muted underline hover:text-ink"
                     onClick={() => {
                       setCustMode("forgot");
                       setError("");
@@ -303,7 +297,7 @@ function WelcomeInner() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="الاسم الكامل"
-                    className={field}
+                    className="input-field"
                   />
                   <input
                     type="email"
@@ -311,7 +305,7 @@ function WelcomeInner() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="البريد الإلكتروني"
-                    className={field}
+                    className="input-field"
                   />
                   <input
                     type="password"
@@ -319,7 +313,7 @@ function WelcomeInner() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="كلمة المرور (6+ أحرف)"
-                    className={field}
+                    className="input-field"
                   />
                   {error && <p className="text-sm text-sale">{error}</p>}
                   {info && (
@@ -328,7 +322,7 @@ function WelcomeInner() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold disabled:opacity-50"
+                    className="btn-primary w-full"
                   >
                     {loading ? "..." : "إنشاء حساب وإرسال رابط التأكيد"}
                   </button>
@@ -346,7 +340,7 @@ function WelcomeInner() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="البريد الإلكتروني"
-                    className={field}
+                    className="input-field"
                   />
                   {error && <p className="text-sm text-sale">{error}</p>}
                   {info && (
@@ -355,13 +349,13 @@ function WelcomeInner() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-ink text-white py-3.5 rounded-full text-sm font-semibold disabled:opacity-50"
+                    className="btn-primary w-full"
                   >
                     {loading ? "..." : "إرسال رابط الاستعادة"}
                   </button>
                   <button
                     type="button"
-                    className="w-full text-xs text-muted"
+                    className="w-full text-xs text-muted hover:text-ink"
                     onClick={() => setCustMode("login")}
                   >
                     العودة لتسجيل الدخول
@@ -373,20 +367,16 @@ function WelcomeInner() {
 
           {tab === "merchant" && (
             <>
-              <h1 className="text-lg font-bold text-center">بوابة المسوق</h1>
+              <h1 className="text-lg font-bold text-center text-ink">
+                بوابة المسوق
+              </h1>
               <p className="text-sm text-muted text-center leading-relaxed">
                 حساب منفصل عن العميل — كتالوج، أوردرات، وأرباح جوه البوابة فقط.
               </p>
-              <a
-                href="/merchant/login"
-                className="block w-full text-center bg-ink text-white py-3.5 rounded-full text-sm font-semibold"
-              >
+              <a href="/merchant/login" className="btn-primary w-full">
                 دخول مسوق
               </a>
-              <a
-                href="/merchant/register"
-                className="block w-full text-center border border-ink py-3 rounded-full text-sm font-semibold"
-              >
+              <a href="/merchant/register" className="btn-secondary w-full">
                 إنشاء حساب مسوق
               </a>
             </>
@@ -401,7 +391,7 @@ export default function WelcomePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-muted text-sm">
+        <div className="min-h-screen flex items-center justify-center text-muted text-sm bg-page">
           ...
         </div>
       }
