@@ -20,6 +20,7 @@ import { getMerchantSession, getMerchantSettings } from "@/lib/merchant";
 import { getMerchantRef, clearMerchantRef } from "@/lib/merchant-ref";
 import { notifyOrderWhatsApp } from "@/lib/whatsapp/client-notify";
 
+/** Checkout + delivery form for cart (export required for Next typecheck). */
 export function CheckoutForm() {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
