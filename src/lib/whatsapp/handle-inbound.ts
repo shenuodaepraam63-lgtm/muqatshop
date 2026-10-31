@@ -48,7 +48,6 @@ async function markProcessed(
     action,
     order_id: orderId || null,
   });
-  // unique violation => already processed
   if (error) return false;
   return true;
 }
@@ -107,7 +106,6 @@ export async function handleInboundWhatsAppMessages(
       order = data;
     }
 
-    // Fallback: latest open order for this phone (still requires phone match)
     if (!order) {
       const { data: list } = await admin
         .from("orders")
@@ -123,10 +121,7 @@ export async function handleInboundWhatsAppMessages(
     }
 
     if (!order) continue;
-
-    if (!phonesMatch(order.phone, msg.from)) {
-      continue;
-    }
+    if (!phonesMatch(order.phone, msg.from)) continue;
 
     const now = new Date().toISOString();
     const totalStr =
@@ -180,9 +175,7 @@ export async function handleInboundWhatsAppMessages(
     }
 
     if (action === "cancel") {
-      if (order.status === "shipped" || order.status === "delivered") {
-        continue;
-      }
+      if (order.status === "shipped" || order.status === "delivered") continue;
       if (order.status === "cancelled") continue;
 
       await admin
@@ -193,7 +186,7 @@ export async function handleInboundWhatsAppMessages(
           updated_at: now,
         })
         .eq("id", order.id)
-        .not("status", "in", "(shipped,delivered,cancelled)");
+        .in("status", ["new", "confirmed"]);
 
       if (!order.wa_cancelled_sent_at) {
         const sent = await sendWhatsAppTemplate({
