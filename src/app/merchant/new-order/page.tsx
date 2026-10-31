@@ -16,6 +16,7 @@ import {
   loadMarketerPages,
   type MarketerPage,
 } from "@/lib/marketer-local";
+import { notifyOrderWhatsApp } from "@/lib/whatsapp/client-notify";
 
 type Line = {
   product: Product;
@@ -172,6 +173,7 @@ function NewOrderInner() {
 
       const { error: err } = await supabase.from("orders").insert(payload);
       if (err) throw err;
+      notifyOrderWhatsApp(orderNumber);
       router.push("/merchant/orders");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "فشل إنشاء الطلب");
