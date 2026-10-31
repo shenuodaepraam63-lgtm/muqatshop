@@ -105,8 +105,8 @@ export function HomeHeader({ categories }: { categories: Category[] }) {
                 <Link href="/categories" role="menuitem" onClick={closeMenus} className="rounded-lg px-3 py-2 text-sm font-bold text-[#3157D5] hover:bg-[#F6F8FB]">جميع التصنيفات</Link>
               </div>}
             </div>
-            <a href="mailto:muqatshop@gmail.com?subject=%D8%AA%D8%B9%D8%A7%D9%88%D9%86%20%D8%AA%D8%AC%D8%A7%D8%B1%D9%8A" className="transition hover:text-[#3157D5]">انضم كتاجر</a>
-            <Link href="/merchant/register" className="transition hover:text-[#3157D5]">انضم كمسوق</Link>
+            <Link href="/register/supplier" className="transition hover:text-[#3157D5]">انضم كتاجر</Link>
+            <Link href="/register/affiliate" className="transition hover:text-[#3157D5]">انضم كمسوق</Link>
             <Link href="/#why-muqatshop" className="transition hover:text-[#3157D5]">عن المنصة</Link>
           </nav>
 
@@ -116,8 +116,8 @@ export function HomeHeader({ categories }: { categories: Category[] }) {
               <ShoppingBag className="h-5 w-5" />
               {itemCount > 0 && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#3157D5] px-1 text-center text-[10px] font-bold leading-5 text-white">{itemCount}</span>}
             </button>
-            <Link href="/welcome?tab=customer" className="hidden min-h-10 items-center gap-2 rounded-lg border border-[#D6DDEA] px-3 text-sm font-semibold text-[#14243A] transition hover:bg-[#F6F8FB] sm:inline-flex"><UserRound className="h-4 w-4" /><span>تسجيل الدخول</span></Link>
-            <Link href="/welcome?tab=customer&mode=register" className="hidden min-h-10 items-center rounded-lg bg-[#3157D5] px-3 text-sm font-semibold text-white transition hover:bg-[#2447B8] sm:inline-flex">إنشاء حساب</Link>
+            <Link href="/login" className="hidden min-h-10 items-center gap-2 rounded-lg border border-[#D6DDEA] px-3 text-sm font-semibold text-[#14243A] transition hover:bg-[#F6F8FB] sm:inline-flex"><UserRound className="h-4 w-4" /><span>تسجيل الدخول</span></Link>
+            <Link href="/register" className="hidden min-h-10 items-center rounded-lg bg-[#3157D5] px-3 text-sm font-semibold text-white transition hover:bg-[#2447B8] sm:inline-flex">إنشاء حساب</Link>
           </div>
         </div>
         {mobileOpen && <div className="border-t border-[#E4E9F0] bg-white px-4 pb-5 pt-3 md:hidden">
@@ -126,10 +126,10 @@ export function HomeHeader({ categories }: { categories: Category[] }) {
             <Link onClick={closeMenus} className="rounded-lg px-3 py-3 text-sm font-semibold hover:bg-[#F6F8FB]" href="/shop">المنتجات</Link>
             <button type="button" onClick={() => setCategoryOpen((value) => !value)} aria-expanded={categoryOpen} className="flex items-center justify-between rounded-lg px-3 py-3 text-sm font-semibold hover:bg-[#F6F8FB]">التصنيفات <ChevronDown className="h-4 w-4" /></button>
             {categoryOpen && <div className="mr-3 border-r border-[#E4E9F0] pr-2">{categories.slice(0, 8).map((category) => <Link key={category.id} href={`/categories/${encodeURIComponent(category.slug)}`} onClick={closeMenus} className="block rounded-lg px-3 py-2.5 text-sm text-[#526174] hover:bg-[#F6F8FB]">{category.name}</Link>)}<Link href="/categories" onClick={closeMenus} className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-[#3157D5]">كل التصنيفات</Link></div>}
-            <a onClick={closeMenus} className="rounded-lg px-3 py-3 text-sm font-semibold hover:bg-[#F6F8FB]" href="mailto:muqatshop@gmail.com?subject=%D8%AA%D8%B9%D8%A7%D9%88%D9%86%20%D8%AA%D8%AC%D8%A7%D8%B1%D9%8A">انضم كتاجر</a>
-            <Link onClick={closeMenus} className="rounded-lg px-3 py-3 text-sm font-semibold hover:bg-[#F6F8FB]" href="/merchant/register">انضم كمسوق</Link>
+            <Link onClick={closeMenus} className="rounded-lg px-3 py-3 text-sm font-semibold hover:bg-[#F6F8FB]" href="/register/supplier">انضم كتاجر</Link>
+            <Link onClick={closeMenus} className="rounded-lg px-3 py-3 text-sm font-semibold hover:bg-[#F6F8FB]" href="/register/affiliate">انضم كمسوق</Link>
             <Link onClick={closeMenus} className="rounded-lg px-3 py-3 text-sm font-semibold hover:bg-[#F6F8FB]" href="/#why-muqatshop">عن المنصة</Link>
-            <div className="mt-2 grid grid-cols-2 gap-2"><Link onClick={closeMenus} href="/welcome?tab=customer" className="rounded-lg border border-[#D6DDEA] px-3 py-3 text-center text-sm font-semibold">تسجيل الدخول</Link><Link onClick={closeMenus} href="/welcome?tab=customer&mode=register" className="rounded-lg bg-[#3157D5] px-3 py-3 text-center text-sm font-semibold text-white">إنشاء حساب</Link></div>
+            <div className="mt-2 grid grid-cols-2 gap-2"><Link onClick={closeMenus} href="/login" className="rounded-lg border border-[#D6DDEA] px-3 py-3 text-center text-sm font-semibold">تسجيل الدخول</Link><Link onClick={closeMenus} href="/register" className="rounded-lg bg-[#3157D5] px-3 py-3 text-center text-sm font-semibold text-white">إنشاء حساب</Link></div>
           </nav>
         </div>}
       </header>
