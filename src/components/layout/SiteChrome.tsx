@@ -6,18 +6,27 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { BottomNav } from "@/components/layout/BottomNav";
 
-/**
- * يخفي هيدر/فوتر/تنقل المتجر العام في:
- * - صفحة الترحيب
- * - كل مسارات بوابة المسوق (/merchant/*) — ليها layout خاص زي تارجت
- */
+const AUTH_BARE = [
+  "/welcome",
+  "/login",
+  "/register",
+  "/verify-email",
+  "/forgot-password",
+  "/reset-password",
+  "/account/pending",
+  "/account/profile",
+  "/affiliate/pending",
+  "/supplier/pending",
+];
+
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "";
   if (pathname === "/") return <>{children}</>;
+
   const bare =
-    pathname === "/welcome" ||
-    pathname.startsWith("/welcome/") ||
-    pathname.startsWith("/merchant");
+    AUTH_BARE.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
+    pathname.startsWith("/merchant") ||
+    pathname.startsWith("/auth");
 
   if (bare) {
     return <main className="min-h-screen">{children}</main>;

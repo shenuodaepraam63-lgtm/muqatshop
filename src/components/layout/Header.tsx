@@ -8,17 +8,15 @@ import { useWishlistStore } from "@/lib/wishlist";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import {
   getMerchantSession,
-  clearMerchantSession,
   MERCHANT_SESSION_EVENT,
   type MerchantSession,
 } from "@/lib/merchant";
 import {
   getCustomerSession,
-  clearCustomerSession,
   CUSTOMER_SESSION_EVENT,
   type CustomerSession,
 } from "@/lib/customer";
-import { clearSiteRole } from "@/lib/role";
+import { signOutEverywhere } from "@/lib/auth-session";
 
 export function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
@@ -52,18 +50,25 @@ export function Header() {
 
   let accountLinks: { href: string; label: string }[] = [];
   if (merchant) {
-    accountLinks = [{ href: "/merchant", label: "بوابة المسوق" }];
+    accountLinks = [
+      { href: "/merchant", label: "بوابة المسوق" },
+      { href: "/account/profile", label: "الملف الشخصي" },
+    ];
   } else if (customer) {
-    accountLinks = [{ href: "/account", label: "حسابي" }];
+    accountLinks = [
+      { href: "/account", label: "حسابي" },
+      { href: "/account/profile", label: "الملف الشخصي" },
+    ];
   } else {
-    accountLinks = [{ href: "/welcome", label: "دخول" }];
+    accountLinks = [
+      { href: "/login", label: "دخول" },
+      { href: "/register", label: "إنشاء حساب" },
+    ];
   }
 
-  const logout = () => {
-    if (merchant) clearMerchantSession();
-    if (customer) clearCustomerSession();
-    clearSiteRole();
-    window.location.href = "/welcome";
+  const logout = async () => {
+    await signOutEverywhere();
+    window.location.href = "/";
   };
 
   return (
@@ -125,18 +130,10 @@ export function Header() {
               <span className="truncate">{merchant?.name || customer?.name}</span>
             </Link>
           )}
-          <Link
-            href="/search"
-            className="p-2.5 rounded-xl hover:bg-surface-2 transition"
-            aria-label="بحث"
-          >
+          <Link href="/search" className="p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="بحث">
             <Search className="w-5 h-5" strokeWidth={1.5} />
           </Link>
-          <Link
-            href="/wishlist"
-            className="relative p-2.5 rounded-xl hover:bg-surface-2 transition"
-            aria-label="الأمنيات"
-          >
+          <Link href="/wishlist" className="relative p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="الأمنيات">
             <Heart className="w-5 h-5" strokeWidth={1.5} />
             {wishCount > 0 && (
               <span className="absolute top-1 right-1 bg-sale text-white text-[10px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-0.5">
@@ -144,11 +141,7 @@ export function Header() {
               </span>
             )}
           </Link>
-          <Link
-            href="/cart"
-            className="relative p-2.5 rounded-xl hover:bg-surface-2 transition"
-            aria-label="السلة"
-          >
+          <Link href="/cart" className="relative p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="السلة">
             <ShoppingBag className="w-5 h-5" strokeWidth={1.5} />
             {totalItems > 0 && (
               <span className="absolute top-1 right-1 bg-brand text-white text-[10px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-0.5">

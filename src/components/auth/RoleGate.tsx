@@ -19,14 +19,21 @@ const PUBLIC_PREFIXES = [
   "/order-success",
   "/try-mug",
   "/welcome",
+  "/login",
+  "/register",
+  "/verify-email",
+  "/forgot-password",
+  "/reset-password",
   "/merchant/login",
   "/merchant/register",
   "/admin",
   "/adminm",
   "/auth",
+  "/account/pending",
+  "/affiliate",
+  "/supplier",
 ];
 
-/** مسارات خاصة بالعميل فقط — المسوق ما يدخلهاش */
 const CUSTOMER_ONLY = [
   "/account",
   "/cart",
@@ -50,23 +57,16 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
     const merchant = getMerchantSession();
     const customer = getCustomerSession();
 
-    // —— مسوق مسجّل: دور المسوق فقط، ومنتجاته جوه /merchant ——
     if (merchant) {
       setSiteRole("merchant");
-
-      // يمنع تجربة العميل (سلة / حساب عميل / أمنيات)
-      if (isUnder(path, CUSTOMER_ONLY)) {
+      if (isUnder(path, CUSTOMER_ONLY) && !path.startsWith("/account/pending") && !path.startsWith("/account/profile")) {
         router.replace("/merchant");
         return;
       }
-
-      // صفحة منتج المتجر العام → صفحة المنتج داخل بوابة المسوق لو فيه id في query لاحقًا
-      // المنتجات تُعرض من /merchant/catalog/[id] فقط
       setReady(true);
       return;
     }
 
-    // —— عميل مسجّل: ممنوع بوابة المسوق (ما عدا login/register) ——
     if (customer) {
       setSiteRole("customer");
       if (
@@ -83,20 +83,18 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // —— زائر / بدون جلسة ——
     const role = getSiteRole();
     if (!role && !isPublic) {
-      router.replace("/welcome");
+      router.replace("/login");
       return;
     }
 
-    // زائر يحاول يدخل بوابة المسوق الداخلية
     if (
       path.startsWith("/merchant") &&
       path !== "/merchant/login" &&
       path !== "/merchant/register"
     ) {
-      router.replace("/merchant/login");
+      router.replace("/login");
       return;
     }
 
