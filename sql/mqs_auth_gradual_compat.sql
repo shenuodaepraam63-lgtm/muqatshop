@@ -1,0 +1,4 @@
+-- Applied on production as migration: mqs_auth_gradual_compat_layer
+-- Purpose: gradual replace — same identity data, new shape, no drops.
+-- See: v_account_identity, trg_sync_customer_to_profile, trg_sync_merchant_to_profile,
+--      trg_sync_profile_to_customer
