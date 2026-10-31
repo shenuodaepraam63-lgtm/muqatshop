@@ -22,13 +22,16 @@ export function AuthShell({
   footer,
 }: AuthShellProps) {
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-[#F6F8FB] text-[#202B3C]">
-      {/* Branding panel — desktop */}
+    <div
+      className="min-h-screen flex flex-col lg:flex-row bg-[#F6F8FB] text-[#202B3C]"
+      style={{ fontFamily: "var(--font-cairo), var(--font-inter), system-ui, sans-serif" }}
+    >
+      {/* Branding panel — desktop 42% */}
       <aside className="hidden lg:flex lg:w-[42%] bg-[#14243A] text-white flex-col justify-between p-10 xl:p-14 relative overflow-hidden">
         <div className="relative z-10">
           <BrandLogo size="lg" className="brightness-0 invert" />
-          <p className="mt-10 text-2xl font-bold leading-relaxed">تجارتك تبدأ بخطوة.</p>
-          <p className="mt-4 text-sm text-white/70 leading-relaxed max-w-sm">{brandingMessage}</p>
+          <p className="mt-10 text-[28px] font-bold leading-relaxed">تجارتك تبدأ بخطوة.</p>
+          <p className="mt-4 text-[15px] text-white/70 leading-relaxed max-w-sm">{brandingMessage}</p>
         </div>
         <div className="relative z-10 grid grid-cols-2 gap-3 max-w-xs">
           {["عميل", "مسوق", "تاجر", "منصة"].map((label) => (
@@ -50,14 +53,14 @@ export function AuthShell({
         />
       </aside>
 
-      {/* Form panel */}
+      {/* Form panel — 58% */}
       <main className="flex-1 flex flex-col items-center justify-center px-5 py-10 sm:px-8">
         <div className="w-full max-w-[460px]">
           <div className="lg:hidden mb-8 flex justify-center">
             <BrandLogo size="md" />
           </div>
 
-          <div className="bg-white border border-[#E4E9F0] rounded-2xl shadow-sm p-6 sm:p-8 animate-[fadeSlide_250ms_ease-out]">
+          <div className="bg-white border border-[#E4E9F0] rounded-2xl shadow-sm p-6 sm:p-8 motion-safe:animate-[fadeSlide_250ms_ease-out]">
             <h1 className="text-[28px] font-bold leading-tight text-[#202B3C]">{title}</h1>
             {description ? (
               <p className="mt-2 text-[15px] text-[#718096] leading-relaxed">{description}</p>
@@ -88,7 +91,7 @@ export function AuthShell({
           }
         }
         @media (prefers-reduced-motion: reduce) {
-          .animate-\\[fadeSlide_250ms_ease-out\\] {
+          .motion-safe\\:animate-\\[fadeSlide_250ms_ease-out\\] {
             animation: none !important;
           }
         }
