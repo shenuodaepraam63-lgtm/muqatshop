@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Heart, Minus, Plus, ShoppingBag, Check } from "lucide-react";
 import { useCartStore } from "@/lib/store";
+import { useWishlistStore } from "@/lib/wishlist";
 import type { ProductColor, ProductVariant } from "@/lib/supabase";
 import { findVariant, variantPrice, variantStock } from "@/lib/supabase";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, isSaleActive, salePercent } from "@/lib/utils";
 import { whatsappProductUrl } from "@/lib/whatsapp";
-import { Minus, Plus } from "lucide-react";
 import { ensureCanPurchase, redirectToCustomerAuth } from "@/lib/purchase-guard";
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
     name: string;
     price: number;
     compareAtPrice?: number | null;
+    saleEndsAt?: string | null;
     image: string;
     slug?: string;
     stock?: number | null;
@@ -25,14 +27,6 @@ type Props = {
   variants?: ProductVariant[];
 };
 
-function WhatsAppIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-    </svg>
-  );
-}
-
 export function ProductBuyBox({
   product,
   colors = [],
@@ -40,12 +34,18 @@ export function ProductBuyBox({
   variants = [],
 }: Props) {
   const addItem = useCartStore((s) => s.addItem);
+  const toggleWish = useWishlistStore((s) => s.toggle);
+  const wished = useWishlistStore((s) => s.has(product.id));
   const [qty, setQty] = useState(1);
-  const [size, setSize] = useState<string>(sizes[0] || "");
-  const [colorIdx, setColorIdx] = useState(0);
+  // لا اختيار تلقائي — العميل يختار
+  const [size, setSize] = useState<string>("");
+  const [colorIdx, setColorIdx] = useState<number | null>(null);
   const [done, setDone] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showSticky, setShowSticky] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  const selectedColor = colors[colorIdx];
+  const selectedColor = colorIdx != null ? colors[colorIdx] : undefined;
   const colorName = selectedColor?.name || "";
   const hasMatrix = variants.length > 0;
   const baseStock = product.stock ?? null;
@@ -70,21 +70,40 @@ export function ProductBuyBox({
     return product.price;
   }, [hasMatrix, variants, product.price, size, colorName]);
 
+  const saleOn = isSaleActive(unitPrice, product.compareAtPrice, product.saleEndsAt);
+  const pct =
+    saleOn && product.compareAtPrice != null
+      ? salePercent(unitPrice, Number(product.compareAtPrice))
+      : 0;
+
+  const needsSize = sizes.length > 0;
+  const needsColor = colors.length > 0;
+  const optionsComplete =
+    (!needsSize || Boolean(size)) && (!needsColor || colorIdx != null);
   const isOut = stock <= 0;
+  const canAdd = !isOut && optionsComplete && !loading;
+
   const sizeAvailable = (s: string) => {
     if (!hasMatrix) return true;
-    if (colors.length === 0)
-      return (findVariant(variants, s, null)?.stock ?? 0) > 0;
-    return colors.some(
-      (c) => (findVariant(variants, s, c.name)?.stock ?? 0) > 0
-    );
+    if (colors.length === 0) return (findVariant(variants, s, null)?.stock ?? 0) > 0;
+    return colors.some((c) => (findVariant(variants, s, c.name)?.stock ?? 0) > 0);
   };
   const colorAvailable = (cName: string) => {
     if (!hasMatrix) return true;
-    if (sizes.length === 0)
-      return (findVariant(variants, null, cName)?.stock ?? 0) > 0;
+    if (sizes.length === 0) return (findVariant(variants, null, cName)?.stock ?? 0) > 0;
     return (findVariant(variants, size || null, cName)?.stock ?? 0) > 0;
   };
+
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setShowSticky(!entry.isIntersecting),
+      { threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const pageUrl =
     typeof window !== "undefined" && product.slug
@@ -96,34 +115,77 @@ export function ProductBuyBox({
     pageUrl
   );
 
-  const onAdd = () => {
-    if (isOut) return;
-    if (sizes.length && !size) return;
+  const onAdd = async () => {
+    if (!canAdd) return;
     if (!ensureCanPurchase()) {
       redirectToCustomerAuth(
         product.slug ? `/products/${encodeURIComponent(product.slug)}` : "/shop"
       );
       return;
     }
-    addItem({
+    setLoading(true);
+    try {
+      addItem({
+        productId: product.id,
+        name: variantLabel ? `${product.name} — ${variantLabel}` : product.name,
+        price: unitPrice,
+        basePrice: unitPrice,
+        image: product.image,
+        quantity: Math.min(qty, Math.max(1, stock)),
+        variant: variantLabel || undefined,
+      });
+      setDone(true);
+      window.setTimeout(() => setDone(false), 2800);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onWish = () => {
+    toggleWish({
       productId: product.id,
-      name: variantLabel ? `${product.name} — ${variantLabel}` : product.name,
-      price: unitPrice,
-      basePrice: unitPrice,
+      name: product.name,
+      slug: product.slug || product.id,
+      price: product.price,
       image: product.image,
-      quantity: Math.min(qty, Math.max(1, stock)),
-      variant: variantLabel || undefined,
     });
-    setDone(true);
-    setTimeout(() => setDone(false), 2200);
   };
 
   return (
     <>
-      <div className="space-y-5 pb-24 md:pb-0">
+      <div ref={panelRef} className="space-y-5">
+        {/* السعر */}
+        <div>
+          <div className="flex flex-wrap items-baseline gap-3">
+            <span className="text-[25px] font-bold text-[#14243A] sm:text-[30px]">
+              {formatPrice(unitPrice)}
+            </span>
+            {saleOn && product.compareAtPrice != null && (
+              <span className="text-sm text-[#667085] line-through sm:text-base">
+                {formatPrice(Number(product.compareAtPrice))}
+              </span>
+            )}
+            {pct > 0 && (
+              <span className="rounded-md bg-[#DC3545] px-2 py-0.5 text-xs font-bold text-white">
+                خصم {pct}%
+              </span>
+            )}
+          </div>
+          <p
+            className={`mt-2 text-sm font-semibold ${
+              isOut ? "text-[#DC3545]" : "text-[#16A36A]"
+            }`}
+          >
+            {isOut ? "غير متوفر حاليًا" : "متوفر"}
+          </p>
+        </div>
+
+        {/* المقاسات */}
         {sizes.length > 0 && (
           <div>
-            <p className="text-sm mb-2.5 font-medium">المقاس{size ? ` : ${size}` : ""}</p>
+            <p className="mb-2.5 text-sm font-medium text-[#14243A]">
+              المقاس{size ? ` : ${size}` : " — اختر المقاس"}
+            </p>
             <div className="flex flex-wrap gap-2">
               {sizes.map((s) => {
                 const ok = sizeAvailable(s);
@@ -133,11 +195,11 @@ export function ProductBuyBox({
                     type="button"
                     disabled={!ok}
                     onClick={() => setSize(s)}
-                    className={`min-w-[3rem] px-3 py-2 rounded-btn border text-sm transition ${
+                    className={`min-w-[3rem] rounded-lg border px-3 py-2 text-sm font-semibold transition ${
                       size === s
-                        ? "border-ink bg-ink text-white"
-                        : "border-border bg-white hover:border-ink/30"
-                    } ${!ok ? "opacity-40 line-through" : ""}`}
+                        ? "border-[#3157D5] bg-[#3157D5] text-white"
+                        : "border-[#E5EAF1] bg-white text-[#14243A] hover:border-[#3157D5]"
+                    } ${!ok ? "cursor-not-allowed opacity-40 line-through" : ""}`}
                   >
                     {s}
                   </button>
@@ -146,10 +208,12 @@ export function ProductBuyBox({
             </div>
           </div>
         )}
+
+        {/* الألوان */}
         {colors.length > 0 && (
           <div>
-            <p className="text-sm mb-2.5 font-medium">
-              اللون{colorName ? ` : ${colorName}` : ""}
+            <p className="mb-2.5 text-sm font-medium text-[#14243A]">
+              اللون{colorName ? ` : ${colorName}` : " — اختر اللون"}
             </p>
             <div className="flex flex-wrap gap-2">
               {colors.map((c, i) => {
@@ -161,8 +225,8 @@ export function ProductBuyBox({
                     disabled={!ok}
                     onClick={() => setColorIdx(i)}
                     title={c.name}
-                    className={`w-9 h-9 rounded-full border-2 transition ${
-                      colorIdx === i ? "border-ink scale-110" : "border-transparent"
+                    className={`h-9 w-9 rounded-full border-2 transition ${
+                      colorIdx === i ? "border-[#3157D5] scale-110" : "border-[#E5EAF1]"
                     } ${!ok ? "opacity-30" : ""}`}
                     style={{ backgroundColor: c.hex }}
                   />
@@ -171,82 +235,125 @@ export function ProductBuyBox({
             </div>
           </div>
         )}
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium">الكمية</span>
-          <div className="flex items-center gap-2 border border-border rounded-btn px-2 bg-white">
+
+        {/* الكمية */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-[#14243A]">الكمية</span>
+          <div className="flex h-[42px] items-center overflow-hidden rounded-lg border border-[#E5EAF1] bg-white">
             <button
               type="button"
+              disabled={qty <= 1}
               onClick={() => setQty((q) => Math.max(1, q - 1))}
-              className="p-2"
+              className="grid h-full w-10 place-items-center disabled:opacity-40"
+              aria-label="تقليل"
             >
-              <Minus className="w-4 h-4" />
+              <Minus className="h-4 w-4" />
             </button>
-            <span className="w-8 text-center text-sm">{qty}</span>
+            <span className="w-10 text-center text-sm font-semibold">{qty}</span>
             <button
               type="button"
-              onClick={() => setQty((q) => Math.min(stock || 99, q + 1))}
-              className="p-2"
+              disabled={qty >= Math.max(1, stock)}
+              onClick={() => setQty((q) => Math.min(Math.max(1, stock), q + 1))}
+              className="grid h-full w-10 place-items-center disabled:opacity-40"
+              aria-label="زيادة"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="h-4 w-4" />
             </button>
           </div>
-          <span className="text-xs text-muted">متوفر: {stock}</span>
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-xl font-bold">{formatPrice(unitPrice)}</span>
-          {product.compareAtPrice != null && product.compareAtPrice > unitPrice && (
-            <span className="text-sm text-muted line-through">
-              {formatPrice(product.compareAtPrice)}
-            </span>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={onAdd}
-          disabled={isOut}
-          className="btn-primary w-full disabled:opacity-40"
-        >
-          {isOut ? "غير متوفر" : done ? "تمت الإضافة ✓" : "أضف إلى السلة"}
-        </button>
+
+        {/* ملخص الاختيار */}
+        {(size || colorName) && (
+          <p className="text-xs text-[#667085]">
+            الاختيار: {[size, colorName].filter(Boolean).join(" · ")}
+          </p>
+        )}
+
         <div className="flex gap-2">
-          <Link
-            href="/cart"
-            onClick={onAdd}
-            className="hidden md:flex flex-1 items-center justify-center bg-brand-dark text-white py-3.5 rounded-btn text-sm font-semibold hover:bg-ink transition"
+          <button
+            type="button"
+            onClick={() => void onAdd()}
+            disabled={!canAdd}
+            className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-[10px] bg-[#3157D5] text-[15px] font-bold text-white transition hover:bg-[#2447B8] disabled:cursor-not-allowed disabled:bg-[#C8D0DC] max-md:h-[46px] max-md:text-sm"
           >
-            اشترِ الآن
-          </Link>
-          <a
-            href={waHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 border border-[#25D366] text-[#25D366] py-3.5 rounded-btn text-sm font-semibold hover:bg-emerald-50 transition"
+            {loading ? (
+              "جاري الإضافة..."
+            ) : done ? (
+              <>
+                <Check className="h-4 w-4" /> تمت الإضافة
+              </>
+            ) : isOut ? (
+              "غير متوفر"
+            ) : !optionsComplete ? (
+              "اختر الخيارات"
+            ) : (
+              <>
+                <ShoppingBag className="h-4 w-4" /> أضف إلى السلة
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={onWish}
+            className="grid h-[50px] w-[50px] place-items-center rounded-[10px] border border-[#E5EAF1] bg-white max-md:h-[46px] max-md:w-[46px]"
+            aria-label={wished ? "إزالة من المفضلة" : "إضافة للمفضلة"}
           >
-            <WhatsAppIcon className="w-5 h-5" /> واتساب
-          </a>
+            <Heart
+              className={`h-5 w-5 ${wished ? "fill-[#DC3545] text-[#DC3545]" : "text-[#14243A]"}`}
+            />
+          </button>
         </div>
-      </div>
-      <div className="md:hidden fixed bottom-16 inset-x-0 z-40 bg-page/95 backdrop-blur-md border-t border-border px-4 py-2 flex items-center gap-2 shadow-[0_-4px_16px_rgba(12,10,9,0.06)]">
-        <div className="flex-1">
-          <p className="text-sm font-bold">{formatPrice(unitPrice)}</p>
-        </div>
+
+        {done && (
+          <div className="rounded-xl border border-[#C8E6D5] bg-[#F0FAF5] px-3 py-3 text-sm text-[#14243A]">
+            <p className="font-semibold">تمت الإضافة إلى السلة</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Link
+                href="/cart"
+                className="rounded-lg bg-[#3157D5] px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                عرض السلة
+              </Link>
+              <span className="rounded-lg border border-[#E5EAF1] bg-white px-3 py-1.5 text-xs font-semibold text-[#526174]">
+                متابعة التسوق
+              </span>
+            </div>
+          </div>
+        )}
+
         <a
           href={waHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-2.5 rounded-btn border border-[#25D366] text-[#25D366]"
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-[#25D366] text-sm font-semibold text-[#25D366] hover:bg-emerald-50"
         >
-          <WhatsAppIcon className="w-5 h-5" />
+          استفسار واتساب
         </a>
-        <button
-          type="button"
-          onClick={onAdd}
-          disabled={isOut}
-          className="bg-ink text-white text-xs font-semibold px-4 py-2.5 rounded-btn disabled:opacity-40"
-        >
-          {isOut ? "نفد" : done ? "✓" : "اشترِ الآن"}
-        </button>
       </div>
+
+      {/* Sticky mobile bar */}
+      {showSticky && (
+        <div className="fixed inset-x-0 bottom-[56px] z-40 border-t border-[#E5EAF1] bg-white/95 px-3 py-2 shadow-[0_-4px_16px_rgba(20,36,58,0.08)] backdrop-blur md:hidden safe-area-pb">
+          <div className="mx-auto flex h-[56px] max-w-[1440px] items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-[#14243A]">
+                {formatPrice(unitPrice)}
+              </p>
+              {!optionsComplete && !isOut && (
+                <p className="text-[11px] text-[#667085]">اختر الخيارات أولًا</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => void onAdd()}
+              disabled={!canAdd}
+              className="h-11 shrink-0 rounded-[10px] bg-[#3157D5] px-4 text-sm font-bold text-white disabled:bg-[#C8D0DC]"
+            >
+              {isOut ? "غير متوفر" : done ? "تمت ✓" : "أضف إلى السلة"}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

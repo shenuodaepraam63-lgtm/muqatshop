@@ -2,14 +2,15 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 type Props = {
   images: string[];
   name: string;
+  badges?: { label: string; tone?: "sale" | "new" | "out" }[];
 };
 
-export function ProductGallery({ images, name }: Props) {
+export function ProductGallery({ images, name, badges = [] }: Props) {
   const list = images.length ? images : [];
   const [active, setActive] = useState(0);
   const [lightbox, setLightbox] = useState(false);
@@ -32,7 +33,6 @@ export function ProductGallery({ images, name }: Props) {
   const onTouchEnd = (e: React.TouchEvent) => {
     if (touchX.current == null) return;
     const dx = e.changedTouches[0].clientX - touchX.current;
-    // RTL: swipe left (negative) → next, swipe right → prev
     if (Math.abs(dx) > 45) {
       if (dx < 0) next();
       else prev();
@@ -55,106 +55,115 @@ export function ProductGallery({ images, name }: Props) {
     };
   }, [lightbox, next, prev]);
 
+  const visibleBadges = badges.slice(0, 2);
+
   return (
     <div className="min-w-0 w-full">
-      {/* Main image */}
-      <div
-        className="relative aspect-square md:aspect-[4/5] rounded-2xl overflow-hidden bg-[#ebe6dc] mb-3 select-none"
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        {current ? (
-          <Image
-            src={current}
-            alt={name}
-            fill
-            className="object-cover pointer-events-none"
-            sizes="(max-width: 768px) 100vw, 50vw"
-            priority
-            draggable={false}
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-muted">
-            لا صورة
-          </div>
-        )}
-
-        {/* Zoom */}
-        {current && (
-          <button
-            type="button"
-            onClick={() => setLightbox(true)}
-            className="absolute top-3 left-3 w-10 h-10 rounded-full bg-white/90 shadow flex items-center justify-center z-10"
-            aria-label="تكبير"
-          >
-            <Search className="w-4 h-4" />
-          </button>
-        )}
-
-        {list.length > 1 && (
-          <>
+      <div className="flex flex-col gap-3 lg:flex-row-reverse lg:gap-2.5">
+        {/* Main */}
+        <div
+          className="relative aspect-square w-full flex-1 overflow-hidden rounded-[12px] border border-[#E5EAF1] bg-white sm:rounded-[16px]"
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          {current ? (
             <button
               type="button"
-              onClick={prev}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/95 shadow-md flex items-center justify-center z-10 active:scale-95 transition"
-              aria-label="السابق"
+              className="absolute inset-0 z-[1]"
+              onClick={() => setLightbox(true)}
+              aria-label="عرض الصورة بحجم كامل"
             >
-              <ChevronRight className="w-5 h-5" />
+              <Image
+                src={current}
+                alt={name}
+                fill
+                className="object-contain p-3 pointer-events-none"
+                sizes="(max-width: 768px) 94vw, 42vw"
+                priority
+                draggable={false}
+              />
             </button>
-            <button
-              type="button"
-              onClick={next}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/95 shadow-md flex items-center justify-center z-10 active:scale-95 transition"
-              aria-label="التالي"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
+          ) : (
+            <div className="absolute inset-0 grid place-items-center text-sm text-[#718096]">
+              لا صورة
+            </div>
+          )}
 
-            <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5 z-10 pointer-events-none">
-              {list.map((_, i) => (
+          {visibleBadges.length > 0 && (
+            <div className="absolute right-2 top-2 z-[2] flex flex-col gap-1">
+              {visibleBadges.map((b) => (
                 <span
-                  key={i}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === active ? "w-5 bg-ink" : "w-1.5 bg-ink/35"
+                  key={b.label}
+                  className={`rounded-md px-2 py-0.5 text-[11px] font-bold text-white ${
+                    b.tone === "out"
+                      ? "bg-[#14243A]/85"
+                      : b.tone === "sale"
+                        ? "bg-[#DC3545]"
+                        : "bg-[#3157D5]"
                   }`}
-                />
+                >
+                  {b.label}
+                </span>
               ))}
             </div>
-          </>
+          )}
+
+          {list.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={prev}
+                className="absolute right-2 top-1/2 z-[2] hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-[#E5EAF1] bg-white/95 shadow sm:grid"
+                aria-label="السابق"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={next}
+                className="absolute left-2 top-1/2 z-[2] hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-[#E5EAF1] bg-white/95 shadow sm:grid"
+                aria-label="التالي"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <p className="absolute bottom-2 left-1/2 z-[2] -translate-x-1/2 rounded-full bg-[#14243A]/75 px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                {active + 1} / {list.length}
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Thumbs — vertical on desktop, horizontal on mobile */}
+        {list.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar lg:max-h-[520px] lg:w-[76px] lg:flex-col lg:overflow-y-auto lg:overflow-x-hidden lg:pb-0">
+            {list.map((url, i) => (
+              <button
+                key={url + i}
+                type="button"
+                onClick={() => setActive(i)}
+                className={`relative h-[58px] w-[58px] shrink-0 overflow-hidden rounded-[10px] border-2 bg-[#F6F8FB] sm:h-[76px] sm:w-[76px] ${
+                  active === i ? "border-[#3157D5]" : "border-[#E5EAF1]"
+                }`}
+              >
+                <Image src={url} alt="" fill className="object-contain p-1" sizes="76px" />
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Thumbnails */}
-      {list.length > 1 && (
-        <div className="flex min-w-0 w-full max-w-full gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {list.map((url, i) => (
-            <button
-              key={url + i}
-              type="button"
-              onClick={() => setActive(i)}
-              className={`relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl overflow-hidden bg-[#ebe6dc] ring-2 transition ${
-                active === i ? "ring-ink" : "ring-transparent opacity-75"
-              }`}
-            >
-              <Image src={url} alt="" fill className="object-cover" sizes="80px" />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Fullscreen lightbox */}
       {lightbox && current && (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col">
+        <div className="fixed inset-0 z-[100] flex flex-col bg-black/90">
           <div className="flex items-center justify-between px-4 py-3 text-white">
-            <span className="text-sm font-medium truncate">
+            <span className="truncate text-sm font-medium">
               {active + 1} / {list.length} — {name}
             </span>
             <button type="button" onClick={() => setLightbox(false)} aria-label="إغلاق">
-              <X className="w-7 h-7" />
+              <X className="h-7 w-7" />
             </button>
           </div>
           <div
-            className="relative flex-1 flex items-center justify-center"
+            className="relative flex flex-1 items-center justify-center"
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
           >
@@ -163,16 +172,18 @@ export function ProductGallery({ images, name }: Props) {
                 <button
                   type="button"
                   onClick={prev}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/15 text-white flex items-center justify-center z-10"
+                  className="absolute right-3 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/15 text-white"
+                  aria-label="السابق"
                 >
-                  <ChevronRight className="w-6 h-6" />
+                  <ChevronRight className="h-6 w-6" />
                 </button>
                 <button
                   type="button"
                   onClick={next}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/15 text-white flex items-center justify-center z-10"
+                  className="absolute left-3 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/15 text-white"
+                  aria-label="التالي"
                 >
-                  <ChevronLeft className="w-6 h-6" />
+                  <ChevronLeft className="h-6 w-6" />
                 </button>
               </>
             )}
@@ -184,20 +195,6 @@ export function ProductGallery({ images, name }: Props) {
               draggable={false}
             />
           </div>
-          {list.length > 1 && (
-            <div className="flex justify-center gap-1.5 pb-6">
-              {list.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setActive(i)}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === active ? "w-6 bg-white" : "w-1.5 bg-white/40"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>
