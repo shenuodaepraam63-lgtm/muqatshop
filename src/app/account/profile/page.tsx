@@ -9,7 +9,7 @@ import {
 } from "@/lib/account-identity";
 import { resolveCustomerId } from "@/lib/customer-account";
 import { supabase } from "@/lib/supabase";
-import { signOutEverywhere } from "@/lib/auth-session";
+import { signOutToHome } from "@/lib/auth-session";
 
 export default function AccountProfilePage() {
   const router = useRouter();
@@ -109,13 +109,12 @@ export default function AccountProfilePage() {
         </Link>
         <button
           type="button"
-          onClick={async () => {
-            await signOutEverywhere();
-            router.replace("/login");
+          onClick={() => {
+            void signOutToHome();
           }}
           className="text-sm font-semibold text-[#D64C4C]"
         >
-          تسجيل الخروج
+          تسجيل الخروج إلى الرئيسية
         </button>
       </div>
     </div>
