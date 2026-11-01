@@ -42,7 +42,7 @@ export default async function ShopPage({
 
   const { data: catRows } = await supabase
     .from("categories")
-    .select("id, name, slug, parent_id")
+    .select("id, name, slug, parent_id, image, description")
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
@@ -51,25 +51,41 @@ export default async function ShopPage({
     name: c.name as string,
     slug: c.slug as string,
     parent_id: (c.parent_id as string | null) || null,
+    image: (c.image as string | null) || null,
+    description: (c.description as string | null) || null,
   }));
 
   let categoryId: string | null = null;
   let title = "المتجر";
   let subtitle = "اكتشف المنتجات والتصنيفات والعروض في مكان واحد.";
+  let resolvedCategorySlug = categorySlug;
 
+  // Validate subcategory belongs to parent
   if (subcategorySlug) {
     const sub = categories.find((c) => c.slug === subcategorySlug);
     if (sub) {
-      categoryId = sub.id;
-      title = sub.name;
-      subtitle = "منتجات التصنيف الفرعي";
+      const parent = categories.find((c) => c.id === sub.parent_id);
+      if (parent) {
+        resolvedCategorySlug = parent.slug;
+        categoryId = sub.id;
+        title = sub.name;
+        subtitle = parent.name;
+      } else {
+        // orphan subcategory — treat as main
+        categoryId = sub.id;
+        resolvedCategorySlug = sub.slug;
+        title = sub.name;
+      }
     }
   } else if (categorySlug) {
-    const cat = categories.find((c) => c.slug === categorySlug);
+    const cat = categories.find((c) => c.slug === categorySlug && !c.parent_id);
     if (cat) {
       categoryId = cat.id;
       title = cat.name;
-      subtitle = "منتجات التصنيف";
+      subtitle = cat.description || "منتجات التصنيف";
+    } else {
+      // invalid / inactive category slug → ignore, show all
+      resolvedCategorySlug = "";
     }
   }
 
@@ -78,7 +94,7 @@ export default async function ShopPage({
     subtitle = "منتجات بخصم ساري فقط";
   }
   if (q) {
-    title = `نتائج البحث`;
+    title = "نتائج البحث";
     subtitle = `عن: ${q}`;
   }
 
@@ -110,7 +126,7 @@ export default async function ShopPage({
         page={catalog.page}
         totalPages={catalog.totalPages}
         categories={categories}
-        activeCategorySlug={categorySlug}
+        activeCategorySlug={resolvedCategorySlug}
         title={title}
         subtitle={subtitle}
       />

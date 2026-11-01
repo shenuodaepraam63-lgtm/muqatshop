@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MarketplaceProductCard } from "@/components/home/MarketplaceProductCard";
 import {
+  ActiveCategoryHeader,
   ShopCategoryBar,
   ShopSubcategoryBar,
   type ShopCategory,
@@ -32,18 +33,24 @@ export function ShopView({
   subtitle?: string;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const hasActiveCategory = Boolean(activeCategorySlug);
 
   return (
-    <div className="bg-[#F6F8FB] min-h-screen pb-20 md:pb-8">
+    <div className="min-h-screen bg-[#F6F8FB] pb-20 md:pb-8">
       <div className="home-container py-6 sm:py-8">
-        <header className="mb-5">
-          <h1 className="text-2xl font-bold text-[#14243A] sm:text-3xl">{title}</h1>
-          {subtitle ? (
-            <p className="mt-1 text-sm text-[#718096]">{subtitle}</p>
-          ) : null}
-        </header>
+        {!hasActiveCategory && (
+          <header className="mb-5">
+            <h1 className="text-2xl font-bold text-[#14243A] sm:text-3xl">{title}</h1>
+            {subtitle ? <p className="mt-1 text-sm text-[#718096]">{subtitle}</p> : null}
+          </header>
+        )}
 
         <ShopCategoryBar categories={categories} />
+
+        {hasActiveCategory && (
+          <ActiveCategoryHeader categories={categories} productCount={total} />
+        )}
+
         {activeCategorySlug ? (
           <ShopSubcategoryBar categories={categories} parentSlug={activeCategorySlug} />
         ) : null}
@@ -60,7 +67,7 @@ export function ShopView({
               <div className="rounded-2xl border border-dashed border-[#D6DDEA] bg-white px-4 py-16 text-center">
                 <p className="font-semibold text-[#14243A]">لا توجد منتجات مطابقة</p>
                 <p className="mt-2 text-sm text-[#718096]">
-                  جرّب تعديل البحث أو مسح الفلاتر.
+                  جرّب تصنيفًا آخر أو امسح الفلاتر.
                 </p>
               </div>
             ) : (
