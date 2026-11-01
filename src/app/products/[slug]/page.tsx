@@ -19,6 +19,13 @@ import { SizeGuide } from "@/components/product/SizeGuide";
 
 export const dynamic = "force-dynamic";
 
+type CategoryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  parent_id: string | null;
+};
+
 async function getProduct(rawSlug: string): Promise<Product | null> {
   const slug = decodeURIComponent(rawSlug).trim();
   let { data } = await supabase
@@ -40,20 +47,27 @@ async function getProduct(rawSlug: string): Promise<Product | null> {
   return data as Product | null;
 }
 
-async function getCategoryChain(categoryId: string | null | undefined) {
-  if (!categoryId) return [] as { name: string; slug: string }[];
+async function getCategoryChain(
+  categoryId: string | null | undefined
+): Promise<{ name: string; slug: string }[]> {
+  if (!categoryId) return [];
   const chain: { name: string; slug: string }[] = [];
   let currentId: string | null = categoryId;
+
   for (let i = 0; i < 4 && currentId; i++) {
-    const { data } = await supabase
+    const result = await supabase
       .from("categories")
       .select("id, name, slug, parent_id")
       .eq("id", currentId)
       .maybeSingle();
-    if (!data) break;
-    chain.unshift({ name: data.name as string, slug: data.slug as string });
-    currentId = (data.parent_id as string | null) || null;
+
+    const row = result.data as CategoryRow | null;
+    if (!row) break;
+
+    chain.unshift({ name: row.name, slug: row.slug });
+    currentId = row.parent_id;
   }
+
   return chain;
 }
 
@@ -154,7 +168,6 @@ export default async function ProductPage({
   if (!available) badges.push({ label: "غير متوفر", tone: "out" });
   else if (percent > 0) badges.push({ label: `خصم ${percent}%`, tone: "sale" });
 
-  // مواصفات من حقول المنتج فقط
   const specs: { label: string; value: string }[] = [];
   if (product.brand?.trim()) specs.push({ label: "العلامة التجارية", value: product.brand.trim() });
   if (product.material?.trim()) specs.push({ label: "الخامة", value: product.material.trim() });
@@ -191,7 +204,6 @@ export default async function ProductPage({
         stock={product.stock}
       />
 
-      {/* Breadcrumb */}
       <nav
         className="border-b border-[#E5EAF1] bg-white text-[11px] text-[#667085] sm:text-[13px]"
         aria-label="مسار التنقل"
@@ -205,7 +217,7 @@ export default async function ProductPage({
             المتجر
           </Link>
           {categoryChain.map((c, idx) => (
-            <span key={c.slug} className="contents">
+            <span key={`${c.slug}-${idx}`} className="contents">
               <span aria-hidden>/</span>
               <Link
                 href={
@@ -227,14 +239,11 @@ export default async function ProductPage({
       </nav>
 
       <div className="home-container py-5 sm:py-8">
-        {/* Main section: gallery | info | buy — stacks on mobile */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,42%)_minmax(0,34%)_minmax(0,24%)] lg:gap-5">
-          {/* Gallery */}
           <div className="min-w-0">
             <ProductGallery images={images} name={product.name} badges={badges} />
           </div>
 
-          {/* Info */}
           <div className="min-w-0 space-y-4">
             {product.brand?.trim() && (
               <p className="text-xs font-semibold uppercase tracking-wide text-[#667085]">
@@ -246,7 +255,7 @@ export default async function ProductPage({
             </h1>
 
             {shortDesc && (
-              <p className="text-[13px] leading-7 text-[#667085] sm:text-[15px] line-clamp-5">
+              <p className="line-clamp-5 text-[13px] leading-7 text-[#667085] sm:text-[15px]">
                 {shortDesc}
               </p>
             )}
@@ -262,7 +271,6 @@ export default async function ProductPage({
               </ul>
             )}
 
-            {/* Mobile buy box under info */}
             <div className="lg:hidden">
               <div className="rounded-[12px] border border-[#E5EAF1] bg-white p-4">
                 <ProductBuyBox
@@ -284,7 +292,6 @@ export default async function ProductPage({
             </div>
           </div>
 
-          {/* Purchase panel desktop */}
           <aside className="hidden min-w-0 lg:block">
             <div className="rounded-[16px] border border-[#E5EAF1] bg-white p-5">
               <ProductBuyBox
@@ -306,7 +313,6 @@ export default async function ProductPage({
           </aside>
         </div>
 
-        {/* Description */}
         {shortDesc && (
           <section className="mt-8 rounded-[12px] border border-[#E5EAF1] bg-white p-3.5 sm:rounded-[14px] sm:p-6">
             <h2 className="mb-3 text-lg font-bold text-[#14243A] sm:text-[22px]">وصف المنتج</h2>
@@ -316,7 +322,6 @@ export default async function ProductPage({
           </section>
         )}
 
-        {/* Specs */}
         {specs.length > 0 && (
           <section className="mt-5 rounded-[12px] border border-[#E5EAF1] bg-white p-3.5 sm:rounded-[14px] sm:p-6">
             <h2 className="mb-3 text-lg font-bold text-[#14243A] sm:text-[22px]">المواصفات</h2>
@@ -343,7 +348,6 @@ export default async function ProductPage({
           </section>
         )}
 
-        {/* Delivery — general only, no invented fees */}
         <section className="mt-5 rounded-[12px] border border-[#E5EAF1] bg-white p-3.5 sm:p-6">
           <h2 className="mb-2 text-lg font-bold text-[#14243A]">التوصيل</h2>
           <p className="text-sm leading-7 text-[#667085]">
@@ -354,7 +358,6 @@ export default async function ProductPage({
 
         <SizeGuide productType={product.product_type} customText={sizeGuideText} />
 
-        {/* Reviews */}
         <div className="mt-8 max-w-3xl">
           <ProductReviews productId={product.id} />
         </div>
