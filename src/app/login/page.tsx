@@ -12,6 +12,13 @@ import {
 } from "@/lib/account-identity";
 import { syncCustomerFromAuthUser, syncMerchantFromAuthUser } from "@/lib/auth-customer";
 
+function safeNextPath(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  if (raw.startsWith("/login") || raw.startsWith("/welcome")) return null;
+  return raw;
+}
+
 function LoginForm() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -23,6 +30,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
 
   const suspended = sp.get("suspended") === "1";
+  const nextPath = safeNextPath(sp.get("next"));
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -80,7 +88,12 @@ function LoginForm() {
       mirrorLegacySession(identity);
       void remember;
 
-      router.replace(resolvePostLoginPath(identity));
+      // Return to cart/checkout when requested; otherwise role home.
+      if (nextPath) {
+        router.replace(nextPath);
+      } else {
+        router.replace(resolvePostLoginPath(identity));
+      }
     } catch {
       setError("تعذر الاتصال بالخادم، حاول مرة أخرى.");
     } finally {
@@ -106,6 +119,12 @@ function LoginForm() {
         <div className="mb-4 rounded-xl border border-[#D64C4C]/30 bg-[#D64C4C]/5 px-3 py-2 text-sm text-[#D64C4C]">
           تعذر الدخول إلى الحساب، يرجى التواصل مع الدعم.
         </div>
+      ) : null}
+
+      {nextPath === "/cart" ? (
+        <p className="mb-4 rounded-xl border border-[#D9E4FF] bg-[#EEF3FF] px-3 py-2 text-sm text-[#3157D5]">
+          سجّل الدخول لإتمام طلبك — سلة التسوق محفوظة على هذا الجهاز.
+        </p>
       ) : null}
 
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
