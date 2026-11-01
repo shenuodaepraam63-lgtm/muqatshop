@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**" },
     ],
   },
+  async redirects() {
+    return [
+      { source: "/welcome", destination: "/login", permanent: true },
+      { source: "/welcome/:path*", destination: "/login", permanent: true },
+      { source: "/merchant/login", destination: "/login", permanent: true },
+      { source: "/merchant/register", destination: "/register/affiliate", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;
