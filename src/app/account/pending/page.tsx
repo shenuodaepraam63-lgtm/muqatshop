@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Clock } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { loadAccountIdentity } from "@/lib/account-identity";
 
@@ -20,6 +21,7 @@ function PendingInner() {
   const [typeLabel, setTypeLabel] = useState(typeQ === "supplier" ? "تاجر" : "مسوق");
   const [status, setStatus] = useState("pending");
   const [loaded, setLoaded] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -28,10 +30,9 @@ function PendingInner() {
         if (res.identity.accountType === "supplier") setTypeLabel("تاجر");
         else if (res.identity.accountType === "affiliate") setTypeLabel("مسوق");
         const st =
-          res.identity.supplierStatus ||
-          res.identity.affiliateStatus ||
-          "pending";
+          res.identity.supplierStatus || res.identity.affiliateStatus || "pending";
         setStatus(st);
+        setEmail(res.identity.email);
       }
       setLoaded(true);
     })();
@@ -41,8 +42,21 @@ function PendingInner() {
     <AuthShell
       title="طلبك قيد المراجعة"
       description="استلمنا بياناتك بنجاح. يقوم فريق Muqatshop بمراجعة طلب الانضمام، وسنخبرك عند تحديث حالته."
+      brandingMessage="نوع الحساب منفصل عن حالة الاعتماد — الصلاحيات تُفعَّل بعد موافقة الإدارة فقط."
     >
+      <div className="mb-5 flex justify-center">
+        <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF3FF] text-[#3157D5]">
+          <Clock className="h-7 w-7" strokeWidth={1.75} />
+        </span>
+      </div>
+
       <div className="rounded-xl border border-[#E4E9F0] bg-[#F6F8FB] p-4 space-y-2 text-sm">
+        {email ? (
+          <div className="flex justify-between gap-2">
+            <span className="text-[#718096]">البريد</span>
+            <span className="font-semibold truncate">{email}</span>
+          </div>
+        ) : null}
         <div className="flex justify-between">
           <span className="text-[#718096]">نوع الحساب</span>
           <span className="font-semibold">{typeLabel}</span>
@@ -81,7 +95,13 @@ function PendingInner() {
 
 export default function AccountPendingPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-sm text-[#718096]">
+          جاري التحميل...
+        </div>
+      }
+    >
       <PendingInner />
     </Suspense>
   );

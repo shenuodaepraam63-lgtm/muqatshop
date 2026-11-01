@@ -7,10 +7,12 @@ type AuthShellProps = {
   title: string;
   description?: string;
   brandingMessage?: string;
+  brandingTagline?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
 };
 
+const DEFAULT_TAGLINE = "تجارتك تبدأ بخطوة.";
 const DEFAULT_BRANDING =
   "منصة تجمع بين التسوق والتجار والمسوقين، وتمنح كل طرف تجربة منظمة في عالم التجارة الإلكترونية.";
 
@@ -18,6 +20,7 @@ export function AuthShell({
   title,
   description,
   brandingMessage = DEFAULT_BRANDING,
+  brandingTagline = DEFAULT_TAGLINE,
   children,
   footer,
 }: AuthShellProps) {
@@ -26,11 +29,11 @@ export function AuthShell({
       className="min-h-screen flex flex-col lg:flex-row bg-[#F6F8FB] text-[#202B3C]"
       style={{ fontFamily: "var(--font-cairo), var(--font-inter), system-ui, sans-serif" }}
     >
-      {/* Branding panel — desktop 42% */}
+      {/* Branding panel — desktop ~42% (MQS-AUTH-002) */}
       <aside className="hidden lg:flex lg:w-[42%] bg-[#14243A] text-white flex-col justify-between p-10 xl:p-14 relative overflow-hidden">
         <div className="relative z-10">
           <BrandLogo size="lg" className="brightness-0 invert" />
-          <p className="mt-10 text-[28px] font-bold leading-relaxed">تجارتك تبدأ بخطوة.</p>
+          <p className="mt-10 text-[28px] font-bold leading-relaxed">{brandingTagline}</p>
           <p className="mt-4 text-[15px] text-white/70 leading-relaxed max-w-sm">{brandingMessage}</p>
         </div>
         <div className="relative z-10 grid grid-cols-2 gap-3 max-w-xs">
@@ -53,7 +56,7 @@ export function AuthShell({
         />
       </aside>
 
-      {/* Form panel — 58% */}
+      {/* Form panel — ~58% */}
       <main className="flex-1 flex flex-col items-center justify-center px-5 py-10 sm:px-8">
         <div className="w-full max-w-[460px]">
           <div className="lg:hidden mb-8 flex justify-center">

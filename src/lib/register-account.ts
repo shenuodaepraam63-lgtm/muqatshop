@@ -30,7 +30,11 @@ function normalizePhone(phone: string) {
   return phone.replace(/\s+/g, "").trim();
 }
 
-export function validateRegisterBase(input: RegisterBaseInput, passwordConfirm: string): string | null {
+/** MQS-AUTH-002: min 8 enforced; 12+ recommended. */
+export function validateRegisterBase(
+  input: RegisterBaseInput,
+  passwordConfirm: string
+): string | null {
   if (!input.fullName.trim() || input.fullName.trim().length < 2) {
     return "يرجى إدخال الاسم الكامل.";
   }
@@ -43,7 +47,7 @@ export function validateRegisterBase(input: RegisterBaseInput, passwordConfirm: 
     return "رقم الهاتف يجب أن يبدأ بـ 01 ويتكون من 11 رقمًا.";
   }
   if (input.password.length < 8) {
-    return "كلمة المرور يجب ألا تقل عن 8 أحرف.";
+    return "كلمة المرور يجب ألا تقل عن 8 أحرف (يُفضّل 12 حرفًا أو أكثر).";
   }
   if (input.password !== passwordConfirm) {
     return "كلمتا المرور غير متطابقتين.";
@@ -51,7 +55,7 @@ export function validateRegisterBase(input: RegisterBaseInput, passwordConfirm: 
   return null;
 }
 
-/** Create Supabase Auth user; profile row is created by DB trigger. */
+/** Create Supabase Auth user; profile row is created by DB trigger. Email link confirm — no OTP UI. */
 export async function registerWithSupabaseAuth(
   input: RegisterBaseInput,
   extras?: {
@@ -68,7 +72,6 @@ export async function registerWithSupabaseAuth(
     name: fullName,
     phone,
     account_type: input.accountType,
-    // legacy compatibility for existing sync paths
     role:
       input.accountType === "affiliate"
         ? "merchant"
@@ -99,7 +102,9 @@ export async function registerWithSupabaseAuth(
       data: metadata,
       emailRedirectTo: authRedirectTo(
         `/auth/callback?next=${encodeURIComponent(
-          input.accountType === "customer" ? "/account" : `/account/pending?type=${input.accountType}`
+          input.accountType === "customer"
+            ? "/account"
+            : `/account/pending?type=${input.accountType}`
         )}`
       ),
     },
@@ -117,7 +122,6 @@ export async function registerWithSupabaseAuth(
   const session = data.session;
   const needsEmailConfirm = !session;
 
-  // If session exists immediately, attach partnership rows (RLS allows own pending insert)
   if (session && user) {
     await ensurePartnershipRows(user.id, input.accountType, extras);
   }
