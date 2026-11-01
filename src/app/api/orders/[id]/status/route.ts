@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
+import { track, trackOrderError } from "@/lib/monitor";
+import {
+  IMPORTANT_STATUS_NOTIFY,
+  notificationCopy,
+} from "@/lib/order-status-labels";
 
-/**
- * Update order status with:
- * - version check (optimistic concurrency)
- * - append-only status event
- * - sync primary shipment status
- *
- * Used by admin. Customer cannot call this to change status.
- */
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const started = Date.now();
   try {
     const { id: orderId } = await ctx.params;
     if (!orderId) {
@@ -31,7 +29,10 @@ export async function POST(
     try {
       admin = getSupabaseServiceClient();
     } catch {
-      return NextResponse.json({ ok: false, error: "إعدادات الخادم غير مكتملة" }, { status: 503 });
+      return NextResponse.json(
+        { ok: false, error: "إعدادات الخادم غير مكتملة" },
+        { status: 503 }
+      );
     }
 
     const {
@@ -42,7 +43,6 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "جلسة غير صالحة" }, { status: 401 });
     }
 
-    // Admin gate: profile role or legacy admin email list can be expanded later
     const { data: profile } = await admin
       .from("profiles")
       .select("role")
@@ -51,15 +51,12 @@ export async function POST(
 
     const role = profile?.role ? String(profile.role) : "";
     const isAdmin =
-      role === "admin" ||
-      role === "super_admin" ||
-      role === "staff";
+      role === "admin" || role === "super_admin" || role === "staff";
 
-    // Fallback: allow if user can already read order in admin context
-    // (keeps compatibility if profiles.role not set — tighten later)
+    // Soft gate remains for legacy admin sessions without profiles.role
+    // Log when role missing so it can be tightened in production ops
     if (!isAdmin) {
-      // Still require authenticated; admin UI uses same auth — soft gate
-      // For stricter lock, return 403 when role missing in production.
+      track("order.status.soft_admin", { userId: user.id, orderId }, "warn");
     }
 
     let body: { status?: string; note?: string; expectedVersion?: number };
@@ -76,7 +73,9 @@ export async function POST(
 
     const { data: current, error: fetchErr } = await admin
       .from("orders")
-      .select("id, status, version")
+      .select(
+        "id, status, version, order_number, customer_id, customer_email"
+      )
       .eq("id", orderId)
       .maybeSingle();
 
@@ -136,7 +135,6 @@ export async function POST(
       );
     }
 
-    // Append event (best-effort if table missing — migration required)
     await admin.from("order_status_events").insert({
       order_id: orderId,
       from_status: fromStatus,
@@ -146,7 +144,6 @@ export async function POST(
       note: body.note?.trim() || null,
     });
 
-    // Sync primary shipment (sort_order 0) status
     const { data: primary } = await admin
       .from("order_shipments")
       .select("id")
@@ -163,12 +160,9 @@ export async function POST(
       if (nextStatus === "shipped" || nextStatus === "out_for_delivery") {
         shipPatch.shipped_at = now;
       }
-      if (nextStatus === "delivered") {
-        shipPatch.delivered_at = now;
-      }
+      if (nextStatus === "delivered") shipPatch.delivered_at = now;
       await admin.from("order_shipments").update(shipPatch).eq("id", primary.id);
     } else {
-      // Ensure foundation row exists
       await admin.from("order_shipments").insert({
         order_id: orderId,
         label: "الشحنة الرئيسية",
@@ -178,6 +172,33 @@ export async function POST(
       });
     }
 
+    // Customer notification for important events (never fails the order update)
+    if (IMPORTANT_STATUS_NOTIFY.has(nextStatus)) {
+      try {
+        const copy = notificationCopy(
+          nextStatus,
+          String(current.order_number || orderId)
+        );
+        await admin.from("customer_notifications").insert({
+          customer_id: current.customer_id || null,
+          customer_email: current.customer_email || null,
+          order_id: orderId,
+          type: "order_status",
+          title: copy.title,
+          body: copy.body,
+        });
+      } catch (e) {
+        trackOrderError("notify", orderId, e);
+      }
+    }
+
+    track("order.status.updated", {
+      orderId,
+      fromStatus,
+      toStatus: nextStatus,
+      ms: Date.now() - started,
+    });
+
     return NextResponse.json({
       ok: true,
       status: updated.status,
@@ -185,8 +206,8 @@ export async function POST(
       updatedAt: updated.updated_at,
     });
   } catch (e: unknown) {
+    trackOrderError("status", undefined, e);
     const msg = e instanceof Error ? e.message : "خطأ غير متوقع";
-    console.error("status update error", e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
