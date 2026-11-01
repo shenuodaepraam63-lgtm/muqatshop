@@ -9,7 +9,6 @@ import {
 } from "@/lib/account-identity";
 import { resolveCustomerId } from "@/lib/customer-account";
 import { supabase } from "@/lib/supabase";
-import { signOutToHome } from "@/lib/auth-session";
 
 export default function AccountProfilePage() {
   const router = useRouter();
@@ -55,7 +54,10 @@ export default function AccountProfilePage() {
     if (customerId) {
       await supabase
         .from("customers")
-        .update({ name: name || identity.email.split("@")[0], phone: phone.trim() || null })
+        .update({
+          name: name || identity.email.split("@")[0],
+          phone: phone.trim() || null,
+        })
         .eq("id", customerId);
     }
     setSaving(false);
@@ -75,7 +77,10 @@ export default function AccountProfilePage() {
         <p className="mt-1 text-sm text-[#718096]">تحديث الاسم ورقم الهاتف المرتبطين بالحساب.</p>
       </div>
 
-      <form onSubmit={save} className="space-y-3 rounded-2xl border border-[#E4E9F0] bg-white p-5 shadow-sm">
+      <form
+        onSubmit={save}
+        className="space-y-3 rounded-2xl border border-[#E4E9F0] bg-white p-5 shadow-sm"
+      >
         <div>
           <label className="mb-1 block text-xs font-semibold text-[#718096]">البريد (لا يتغير)</label>
           <input className={field} value={identity.email} disabled dir="ltr" />
@@ -86,7 +91,12 @@ export default function AccountProfilePage() {
         </div>
         <div>
           <label className="mb-1 block text-xs font-semibold text-[#718096]">الهاتف</label>
-          <input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" />
+          <input
+            className={field}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            dir="ltr"
+          />
         </div>
         {err && <p className="text-sm text-[#D64C4C]">{err}</p>}
         {msg && <p className="text-sm text-[#21865B]">{msg}</p>}
@@ -99,24 +109,13 @@ export default function AccountProfilePage() {
         </button>
       </form>
 
-      <div id="settings" className="space-y-3 rounded-2xl border border-[#E4E9F0] bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-[#14243A]">إعدادات الحساب</h3>
-        <Link href="/forgot-password" className="block text-sm font-semibold text-[#3157D5]">
-          تغيير / استعادة كلمة المرور
+      <p className="text-sm text-[#718096]">
+        للأمان وكلمة المرور وتسجيل الخروج انتقل إلى{" "}
+        <Link href="/account/settings" className="font-semibold text-[#3157D5]">
+          إعدادات الحساب
         </Link>
-        <Link href="/register/supplier" className="block text-sm font-semibold text-[#3157D5]">
-          التعاون كتاجر — إنشاء حساب تاجر
-        </Link>
-        <button
-          type="button"
-          onClick={() => {
-            void signOutToHome();
-          }}
-          className="text-sm font-semibold text-[#D64C4C]"
-        >
-          تسجيل الخروج إلى الرئيسية
-        </button>
-      </div>
+        .
+      </p>
     </div>
   );
 }

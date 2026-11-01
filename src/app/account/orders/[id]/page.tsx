@@ -6,7 +6,12 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { loadAccountIdentity } from "@/lib/account-identity";
 import { fetchCustomerOrder, resolveCustomerId, type CustomerOrder } from "@/lib/customer-account";
-import { orderStatusLabel, orderStatusTone, ORDER_TIMELINE, timelineIndex } from "@/lib/order-status";
+import {
+  orderStatusLabel,
+  orderStatusTone,
+  ORDER_TIMELINE,
+  timelineIndex,
+} from "@/lib/order-status";
 import { formatPrice } from "@/lib/utils";
 
 type Item = {
@@ -64,9 +69,17 @@ export default function AccountOrderDetailPage() {
 
   return (
     <div className="space-y-4">
-      <Link href="/account/orders" className="text-sm font-semibold text-[#3157D5]">
-        ← طلباتي
-      </Link>
+      <div className="flex flex-wrap items-center gap-3">
+        <Link href="/account/orders" className="text-sm font-semibold text-[#3157D5]">
+          ← طلباتي
+        </Link>
+        <Link
+          href={`/account/orders/${order.id}/tracking`}
+          className="text-sm font-semibold text-[#18A999]"
+        >
+          تتبع الشحنة
+        </Link>
+      </div>
 
       <div className="rounded-2xl border border-[#E4E9F0] bg-white p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -74,10 +87,15 @@ export default function AccountOrderDetailPage() {
             <p className="text-xs text-[#718096]">رقم الطلب</p>
             <p className="font-mono text-lg font-bold text-[#14243A]">{order.order_number}</p>
             <p className="mt-1 text-xs text-[#718096]">
-              {new Date(order.created_at).toLocaleString("ar-EG", { dateStyle: "full", timeStyle: "short" })}
+              {new Date(order.created_at).toLocaleString("ar-EG", {
+                dateStyle: "full",
+                timeStyle: "short",
+              })}
             </p>
           </div>
-          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${orderStatusTone(order.status)}`}>
+          <span
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${orderStatusTone(order.status)}`}
+          >
             {orderStatusLabel(order.status)}
           </span>
         </div>
@@ -95,7 +113,9 @@ export default function AccountOrderDetailPage() {
                   >
                     {i + 1}
                   </span>
-                  <span className={done ? "font-semibold text-[#14243A]" : "text-[#718096]"}>{t.label}</span>
+                  <span className={done ? "font-semibold text-[#14243A]" : "text-[#718096]"}>
+                    {t.label}
+                  </span>
                 </li>
               );
             })}
