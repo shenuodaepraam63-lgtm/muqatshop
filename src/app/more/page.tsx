@@ -8,6 +8,7 @@ import {
   Store,
   HelpCircle,
   ChevronLeft,
+  Package,
 } from "lucide-react";
 
 export const metadata = {
@@ -39,28 +40,23 @@ const sections: MoreSection[] = [
         icon: PackageSearch,
       },
       { href: "/search", label: "بحث", desc: "ابحث عن منتج", icon: Search },
-      { href: "/wishlist", label: "المفضلة", desc: "قائمة الأمنيات", icon: Heart },
+      {
+        href: "/wishlist",
+        label: "المفضلة",
+        desc: "تُفتح داخل الحساب",
+        icon: Heart,
+      },
     ],
   },
   {
     title: "الطلبات والحساب",
     items: [
-      { href: "/track", label: "تتبع طلب", desc: "حالة شحنتك", icon: PackageSearch },
-      { href: "/login", label: "دخول / حساب", desc: "تسجيل الدخول الموحد", icon: User },
+      { href: "/account", label: "حسابي", desc: "نظرة عامة على الحساب", icon: User },
+      { href: "/account/orders", label: "طلباتي", desc: "قائمة الطلبات", icon: Package },
+      { href: "/account/profile", label: "بياناتي", desc: "الاسم والهاتف", icon: User },
+      { href: "/account/support", label: "الدعم", desc: "المساعدة والتواصل", icon: HelpCircle },
+      { href: "/login", label: "دخول", desc: "تسجيل الدخول الموحد", icon: User },
       { href: "/register", label: "إنشاء حساب", desc: "عميل · مسوق · تاجر", icon: User },
-      { href: "/account/profile", label: "الملف الشخصي", desc: "بيانات الحساب", icon: User },
-    ],
-  },
-  {
-    title: "قريباً",
-    items: [
-      {
-        href: "#",
-        label: "المساعدة والدعم",
-        desc: "سيُضاف هنا لاحقاً",
-        icon: HelpCircle,
-        disabled: true,
-      },
     ],
   },
 ];
