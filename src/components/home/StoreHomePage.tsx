@@ -70,7 +70,10 @@ async function loadHomeData() {
   const categories = (categoriesResult.data as Category[]) || [];
   const featured = ((featuredResult.data as Product[]) || []).filter(available);
   const offers = ((offersResult.data as Product[]) || [])
-    .filter((p) => available(p) && isSaleActive(p.compare_at_price, p.sale_ends_at))
+    .filter(
+      (p) =>
+        available(p) && isSaleActive(p.price, p.compare_at_price, p.sale_ends_at)
+    )
     .slice(0, 12);
   const active = ((activeResult.data as Product[]) || []).filter(available);
 
