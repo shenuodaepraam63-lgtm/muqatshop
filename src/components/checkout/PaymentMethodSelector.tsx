@@ -1,0 +1,30 @@
+"use client";
+
+/**
+ * Phase 2 decision: Cash on Delivery only.
+ * Structure ready to add more methods later without redesign.
+ */
+export function PaymentMethodSelector() {
+  return (
+    <section className="rounded-[14px] border border-[#E5EAF1] bg-white p-4 sm:p-5">
+      <h2 className="mb-1 text-lg font-bold text-[#14243A]">طريقة الدفع</h2>
+      <p className="mb-4 text-xs text-[#667085]">
+        الطرق المفعّلة حاليًا في المتجر
+      </p>
+
+      <div className="rounded-xl border border-[#3157D5] bg-[#EEF2FF] p-4 ring-1 ring-[#3157D5]">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-[#14243A]">الدفع عند الاستلام</p>
+            <p className="mt-1 text-xs leading-5 text-[#526174]">
+              ادفع نقدًا لمندوب التوصيل عند استلام طلبك. لا رسوم إضافية حاليًا.
+            </p>
+          </div>
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 border-[#3157D5] bg-[#3157D5]">
+            <span className="h-2 w-2 rounded-full bg-white" />
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
