@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getSiteRole, setSiteRole } from "@/lib/role";
-import { getCustomerSession } from "@/lib/customer";
+import { supabase } from "@/lib/supabase";
+import { setSiteRole } from "@/lib/role";
 import { getMerchantSession } from "@/lib/merchant";
+import {
+  loadAccountIdentity,
+  type AccountIdentity,
+} from "@/lib/account-identity";
 
+/** Public storefront + auth pages — no login required. */
 const PUBLIC_PREFIXES = [
   "/shop",
   "/categories",
@@ -32,18 +37,36 @@ const PUBLIC_PREFIXES = [
   "/account/pending",
   "/affiliate",
   "/supplier",
+  "/more",
+  "/wishlist",
 ];
 
-const CUSTOMER_ONLY = [
-  "/account",
-  "/cart",
-  "/checkout",
-  "/wishlist",
-  "/orders",
-];
+/** Customer account area — requires Supabase Auth (not legacy localStorage). */
+const CUSTOMER_ACCOUNT_PREFIXES = ["/account"];
 
 function isUnder(path: string, prefixes: string[]) {
   return prefixes.some((p) => path === p || path.startsWith(p + "/"));
+}
+
+function isPublicPath(path: string) {
+  return path === "/" || isUnder(path, PUBLIC_PREFIXES);
+}
+
+/** Apply chrome role from server identity (never from user-chosen local role). */
+function applyChromeRole(identity: AccountIdentity | null, hasMerchantLocal: boolean) {
+  if (hasMerchantLocal) {
+    setSiteRole("merchant");
+    return;
+  }
+  if (!identity) {
+    setSiteRole("guest");
+    return;
+  }
+  if (identity.accountType === "affiliate" || identity.accountType === "supplier") {
+    setSiteRole("merchant");
+    return;
+  }
+  setSiteRole("customer");
 }
 
 export function RoleGate({ children }: { children: React.ReactNode }) {
@@ -52,58 +75,120 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const path = pathname || "/";
-    const isPublic = path === "/" || isUnder(path, PUBLIC_PREFIXES);
-    const merchant = getMerchantSession();
-    const customer = getCustomerSession();
+    let cancelled = false;
 
-    if (merchant) {
-      setSiteRole("merchant");
-      if (isUnder(path, CUSTOMER_ONLY) && !path.startsWith("/account/pending") && !path.startsWith("/account/profile")) {
-        router.replace("/merchant");
+    (async () => {
+      const path = pathname || "/";
+      const merchantLocal = getMerchantSession();
+
+      // Legacy marketer session still uses /merchant portal until fully migrated.
+      if (merchantLocal) {
+        applyChromeRole(null, true);
+        if (
+          isUnder(path, CUSTOMER_ACCOUNT_PREFIXES) &&
+          !path.startsWith("/account/pending") &&
+          !path.startsWith("/account/profile")
+        ) {
+          router.replace("/merchant");
+          return;
+        }
+        if (!cancelled) setReady(true);
         return;
       }
-      setReady(true);
-      return;
-    }
 
-    if (customer) {
-      setSiteRole("customer");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        applyChromeRole(null, false);
+
+        // Customer account requires Auth — never legacy muqat_customer_session.
+        if (isUnder(path, CUSTOMER_ACCOUNT_PREFIXES) && !path.startsWith("/account/pending")) {
+          router.replace(`/login?next=${encodeURIComponent(path)}`);
+          return;
+        }
+
+        if (
+          path.startsWith("/merchant") &&
+          path !== "/merchant/login" &&
+          path !== "/merchant/register" &&
+          !path.startsWith("/merchant/login") &&
+          !path.startsWith("/merchant/register")
+        ) {
+          router.replace("/login");
+          return;
+        }
+
+        if (!isPublicPath(path) && path !== "/checkout") {
+          // Soft: allow unknown public-ish paths; checkout guards itself.
+        }
+
+        if (!cancelled) setReady(true);
+        return;
+      }
+
+      const idRes = await loadAccountIdentity();
+      if (cancelled) return;
+
+      if (!idRes.ok) {
+        applyChromeRole(null, false);
+        if (isUnder(path, CUSTOMER_ACCOUNT_PREFIXES) && !path.startsWith("/account/pending")) {
+          router.replace(`/login?next=${encodeURIComponent(path)}`);
+          return;
+        }
+        if (!cancelled) setReady(true);
+        return;
+      }
+
+      const identity = idRes.identity;
+      applyChromeRole(identity, false);
+
+      if (!identity.isActive) {
+        router.replace("/login?suspended=1");
+        return;
+      }
+
+      // Partnership accounts must not use customer shopping account as home when pending.
+      if (identity.accountType === "affiliate") {
+        const pending =
+          identity.affiliateStatus && identity.affiliateStatus !== "approved";
+        if (pending && path.startsWith("/merchant") && !path.startsWith("/merchant/login")) {
+          router.replace("/account/pending?type=affiliate");
+          return;
+        }
+      }
+      if (identity.accountType === "supplier") {
+        const pending =
+          identity.supplierStatus && identity.supplierStatus !== "approved";
+        if (pending && !path.startsWith("/account/pending") && path.startsWith("/supplier")) {
+          router.replace("/account/pending?type=supplier");
+          return;
+        }
+      }
+
+      // Authenticated customer should not open marketer portal.
       if (
+        identity.accountType === "customer" &&
         path.startsWith("/merchant") &&
         path !== "/merchant/login" &&
-        path !== "/merchant/register" &&
-        !path.startsWith("/merchant/login") &&
-        !path.startsWith("/merchant/register")
+        path !== "/merchant/register"
       ) {
-        router.replace("/");
+        router.replace("/account");
         return;
       }
-      setReady(true);
-      return;
-    }
 
-    const role = getSiteRole();
-    if (!role && !isPublic) {
-      router.replace("/login");
-      return;
-    }
+      if (!cancelled) setReady(true);
+    })();
 
-    if (
-      path.startsWith("/merchant") &&
-      path !== "/merchant/login" &&
-      path !== "/merchant/register"
-    ) {
-      router.replace("/login");
-      return;
-    }
-
-    setReady(true);
+    return () => {
+      cancelled = true;
+    };
   }, [pathname, router]);
 
   if (!ready) {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center text-sm text-muted bg-page">
+      <div className="min-h-[50vh] flex items-center justify-center text-sm text-[#718096] bg-[#F6F8FB]">
         جاري التحميل...
       </div>
     );

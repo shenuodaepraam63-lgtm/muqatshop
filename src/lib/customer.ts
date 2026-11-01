@@ -1,3 +1,11 @@
+/**
+ * LEGACY MODULE — do not use for auth or route protection.
+ * Customer identity is Supabase Auth + profiles / v_account_identity only (MQS-AUTH-002).
+ *
+ * Kept only so signOutEverywhere can clear old localStorage keys from previous builds.
+ * OTP helpers remain for any leftover admin tooling; customer UX must not call them.
+ */
+
 import { supabase } from "@/lib/supabase";
 
 export type CustomerSession = {
@@ -7,12 +15,13 @@ export type CustomerSession = {
   phone: string | null;
 };
 
-/** كل العمليات الحساسة تعتمد رمز تحقق رقمي — مش روابط */
+/** @deprecated OTP is not the default customer UX (use email magic links). */
 export type OtpPurpose = "register" | "reset" | "delete" | "login";
 
 const SESSION_KEY = "muqat_customer_session";
 export const CUSTOMER_SESSION_EVENT = "muqat-customer-session";
 
+/** @deprecated */
 export async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(`muqat_c_v1:${password}`);
   const buf = await crypto.subtle.digest("SHA-256", data);
@@ -21,33 +30,33 @@ export async function hashPassword(password: string): Promise<string> {
     .join("");
 }
 
-export function saveCustomerSession(c: CustomerSession) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(SESSION_KEY, JSON.stringify(c));
-  window.dispatchEvent(new Event(CUSTOMER_SESSION_EVENT));
+/** @deprecated Do not establish customer identity from localStorage. */
+export function saveCustomerSession(_c: CustomerSession) {
+  // no-op: legacy write disabled
 }
 
+/** @deprecated Always null — use loadAccountIdentity / supabase.auth */
 export function getCustomerSession(): CustomerSession | null {
-  if (typeof window === "undefined") return null;
+  return null;
+}
+
+/** Clears leftover key from older app versions. */
+export function clearCustomerSession() {
+  if (typeof window === "undefined") return;
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    localStorage.removeItem(SESSION_KEY);
+    window.dispatchEvent(new Event(CUSTOMER_SESSION_EVENT));
   } catch {
-    return null;
+    /* */
   }
 }
 
-export function clearCustomerSession() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(SESSION_KEY);
-  window.dispatchEvent(new Event(CUSTOMER_SESSION_EVENT));
-}
-
+/** @deprecated */
 export function generateOtpCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+/** @deprecated */
 export async function createAndStoreOtp(
   email: string,
   purpose: OtpPurpose = "register"
@@ -74,6 +83,7 @@ export async function createAndStoreOtp(
   return code;
 }
 
+/** @deprecated */
 export async function verifyOtp(
   email: string,
   code: string,
@@ -99,6 +109,7 @@ export async function verifyOtp(
   return { ok: true };
 }
 
+/** @deprecated */
 export async function sendCustomerMail(payload: {
   email: string;
   name?: string;

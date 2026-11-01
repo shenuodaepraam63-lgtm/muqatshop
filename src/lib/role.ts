@@ -28,19 +28,13 @@ export function clearSiteRole() {
   window.dispatchEvent(new Event(ROLE_EVENT));
 }
 
-/** هل يقدر يشتري / سلة / أمنيات شراء؟ */
+/**
+ * Soft UI hint only. Real purchase gate is ensureCanPurchaseAsync() (Supabase Auth).
+ * Does NOT read legacy muqat_customer_session.
+ */
 export function canPurchase(): boolean {
   const role = getSiteRole();
-  if (role === "guest") return false;
-  if (role === "merchant") return true; // تاجر يطلب لعملائه
-  if (role === "customer") {
-    // يحتاج جلسة عميل
-    try {
-      const raw = localStorage.getItem("muqat_customer_session");
-      return !!raw;
-    } catch {
-      return false;
-    }
-  }
-  return false;
+  if (role === "guest" || role === null) return false;
+  // merchant marketer or authenticated customer chrome role
+  return role === "merchant" || role === "customer";
 }

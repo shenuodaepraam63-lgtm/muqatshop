@@ -1,6 +1,5 @@
 import { supabase } from "@/lib/supabase";
 import { setSiteRole, type SiteRole } from "@/lib/role";
-import { saveCustomerSession } from "@/lib/customer";
 import { saveMerchantSession } from "@/lib/merchant";
 
 export type AccountType = "customer" | "affiliate" | "supplier" | "admin";
@@ -130,16 +129,11 @@ export function resolvePostLoginPath(identity: AccountIdentity): string {
   }
 }
 
-/** Bridge: keep legacy Local Storage sessions in sync for old pages during transition. */
+/**
+ * Bridge for marketer portal only during transition.
+ * Does NOT write legacy muqat_customer_session — customer identity is Auth-only.
+ */
 export function mirrorLegacySession(identity: AccountIdentity) {
-  if (identity.customerId) {
-    saveCustomerSession({
-      id: identity.customerId,
-      email: identity.email,
-      name: identity.fullName || identity.email.split("@")[0],
-      phone: identity.phone,
-    });
-  }
   if (identity.merchantId) {
     saveMerchantSession({
       id: identity.merchantId,
@@ -155,7 +149,7 @@ export function mirrorLegacySession(identity: AccountIdentity) {
     siteRole = "merchant";
   }
   if (identity.accountType === "admin") {
-    siteRole = "customer"; // admin uses /admin path; site chrome stays neutral
+    siteRole = "customer";
   }
   setSiteRole(siteRole);
 }

@@ -1,11 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import { saveCustomerSession, type CustomerSession } from "@/lib/customer";
+import { setSiteRole } from "@/lib/role";
 import {
   saveMerchantSession,
   makeMerchantCode,
   type MerchantSession,
 } from "@/lib/merchant";
-import { setSiteRole } from "@/lib/role";
 
 const SITE_URL =
   typeof window !== "undefined"
@@ -17,10 +16,20 @@ export function authRedirectTo(path: string) {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-/** بعد جلسة Auth ناجحة: مزامنة صف customers + auth_user_id + جلسة الواجهة */
+export type SyncedCustomer = {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+};
+
+/**
+ * After successful Auth: ensure customers row + auth_user_id.
+ * Does NOT write legacy localStorage customer session.
+ */
 export async function syncCustomerFromAuthUser(opts?: {
   name?: string;
-}): Promise<{ ok: true; session: CustomerSession } | { ok: false; error: string }> {
+}): Promise<{ ok: true; customer: SyncedCustomer } | { ok: false; error: string }> {
   const {
     data: { user },
     error,
@@ -78,18 +87,19 @@ export async function syncCustomerFromAuthUser(opts?: {
 
   if (!row) return { ok: false, error: "تعذر مزامنة الحساب" };
 
-  const session: CustomerSession = {
-    id: row.id,
-    email: row.email,
-    name: row.name,
-    phone: row.phone,
-  };
-  saveCustomerSession(session);
   setSiteRole("customer");
-  return { ok: true, session };
+  return {
+    ok: true,
+    customer: {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      phone: row.phone,
+    },
+  };
 }
 
-/** بعد تأكيد بريد التاجر: مزامنة merchants + auth_user_id + محفظة + جلسة */
+/** After merchant email confirm: sync merchants + wallet + local marketer session. */
 export async function syncMerchantFromAuthUser(opts?: {
   name?: string;
   phone?: string | null;

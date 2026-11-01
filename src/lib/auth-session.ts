@@ -5,13 +5,14 @@ import { clearCustomerSession } from "@/lib/customer";
 import { clearMerchantSession } from "@/lib/merchant";
 import { clearSiteRole } from "@/lib/role";
 
-/** Full sign-out: Auth session + legacy local sessions. Does not delete account data. */
+/** Full sign-out: Auth session + any leftover local sessions. Does not delete account data. */
 export async function signOutEverywhere(): Promise<void> {
   try {
     await supabase.auth.signOut();
   } catch {
     // ignore network errors on sign-out
   }
+  // Wipe legacy keys if still present from older builds
   try {
     clearCustomerSession();
   } catch {
