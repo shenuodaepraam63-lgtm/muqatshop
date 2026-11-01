@@ -40,9 +40,10 @@ export default async function ShopPage({
   const maxPrice = sp.max != null && sp.max !== "" ? Number(sp.max) : null;
   const pageNum = Math.max(1, parseInt(sp.page || "1", 10) || 1);
 
+  // Keep select to columns that exist in current schema (image optional)
   const { data: catRows } = await supabase
     .from("categories")
-    .select("id, name, slug, parent_id, image, description")
+    .select("id, name, slug, parent_id, image")
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
@@ -52,7 +53,7 @@ export default async function ShopPage({
     slug: c.slug as string,
     parent_id: (c.parent_id as string | null) || null,
     image: (c.image as string | null) || null,
-    description: (c.description as string | null) || null,
+    description: null as string | null,
   }));
 
   let categoryId: string | null = null;
@@ -60,7 +61,6 @@ export default async function ShopPage({
   let subtitle = "اكتشف المنتجات والتصنيفات والعروض في مكان واحد.";
   let resolvedCategorySlug = categorySlug;
 
-  // Validate subcategory belongs to parent
   if (subcategorySlug) {
     const sub = categories.find((c) => c.slug === subcategorySlug);
     if (sub) {
@@ -71,7 +71,6 @@ export default async function ShopPage({
         title = sub.name;
         subtitle = parent.name;
       } else {
-        // orphan subcategory — treat as main
         categoryId = sub.id;
         resolvedCategorySlug = sub.slug;
         title = sub.name;
@@ -82,9 +81,8 @@ export default async function ShopPage({
     if (cat) {
       categoryId = cat.id;
       title = cat.name;
-      subtitle = cat.description || "منتجات التصنيف";
+      subtitle = "منتجات التصنيف";
     } else {
-      // invalid / inactive category slug → ignore, show all
       resolvedCategorySlug = "";
     }
   }
