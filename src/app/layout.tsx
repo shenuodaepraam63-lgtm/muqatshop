@@ -5,6 +5,8 @@ import "./homepage.css";
 import { MerchantRefCaptureGate } from "@/components/layout/MerchantRefCaptureGate";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { SiteChrome } from "@/components/layout/SiteChrome";
+import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
+import { CartOwnerSync } from "@/components/cart/CartOwnerSync";
 
 const changa = Changa({
   subsets: ["arabic", "latin"],
@@ -45,10 +47,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ar" dir="rtl">
       <body className={`${changa.variable} ${cairo.variable} ${inter.variable} font-sans antialiased`}>
-        <MerchantRefCaptureGate />
-        <RoleGate>
-          <SiteChrome>{children}</SiteChrome>
-        </RoleGate>
+        <AuthSessionProvider>
+          <CartOwnerSync />
+          <MerchantRefCaptureGate />
+          <RoleGate>
+            <SiteChrome>{children}</SiteChrome>
+          </RoleGate>
+        </AuthSessionProvider>
       </body>
     </html>
   );

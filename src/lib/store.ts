@@ -23,6 +23,8 @@ export type AddCartItemInput = Omit<CartItem, "id" | "quantity" | "basePrice"> &
 
 type CartState = {
   items: CartItem[];
+  /** owner of current cart snapshot — guest = null */
+  ownerUserId: string | null;
   addItem: (item: AddCartItemInput) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
@@ -31,12 +33,15 @@ type CartState = {
   totalItems: () => number;
   totalPrice: () => number;
   totalBase: () => number;
+  /** Call after login: attach cart to user; after logout switch to guest without leaking items to next user */
+  bindOwner: (userId: string | null) => void;
 };
 
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      ownerUserId: null,
       addItem: (item) => {
         const base = item.basePrice ?? item.price;
         const existing = get().items.find(
@@ -96,6 +101,25 @@ export const useCartStore = create<CartState>()(
           (sum, i) => sum + (i.basePrice ?? i.price) * i.quantity,
           0
         ),
+      bindOwner: (userId) => {
+        const current = get().ownerUserId;
+        // Switching to a different logged-in user → start empty (privacy)
+        if (userId && current && userId !== current) {
+          set({ items: [], ownerUserId: userId });
+          return;
+        }
+        // Login from guest: keep items, stamp owner
+        if (userId && !current) {
+          set({ ownerUserId: userId });
+          return;
+        }
+        // Logout: keep items as guest cart for continuity of shopping
+        if (!userId) {
+          set({ ownerUserId: null });
+          return;
+        }
+        set({ ownerUserId: userId });
+      },
     }),
     { name: "muqatshop-cart" }
   )
