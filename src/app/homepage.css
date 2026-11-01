@@ -3,11 +3,11 @@
   overflow-x: clip;
   background: #fff;
   color: #202b3c;
-  font-family: var(--font-inter), var(--font-cairo), system-ui, sans-serif;
+  font-family: var(--font-cairo), var(--font-inter), system-ui, sans-serif;
 }
 
 .muqat-home :where(h1, h2, h3, h4, p, a, button, input, summary) {
-  font-family: var(--font-inter), var(--font-cairo), system-ui, sans-serif;
+  font-family: inherit;
 }
 
 .muqat-home .home-announcement {

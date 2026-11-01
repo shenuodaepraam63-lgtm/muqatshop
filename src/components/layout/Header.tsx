@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, ShoppingBag, Heart, Menu, X, User } from "lucide-react";
+import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { useCartStore } from "@/lib/store";
 import { useWishlistStore } from "@/lib/wishlist";
 import { BrandLogo } from "@/components/brand/BrandLogo";
@@ -15,6 +15,12 @@ import { supabase } from "@/lib/supabase";
 import { signOutToHome } from "@/lib/auth-session";
 import { loadAccountIdentity } from "@/lib/account-identity";
 
+const mainLinks = [
+  { href: "/shop", label: "المنتجات" },
+  { href: "/categories", label: "التصنيفات" },
+  { href: "/more", label: "المزيد" },
+];
+
 export function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
   const wishCount = useWishlistStore((s) => s.items.length);
@@ -22,116 +28,127 @@ export function Header() {
   const [userLabel, setUserLabel] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [open, setOpen] = useState(false);
+  const [visible, setVisible] = useState(true);
 
   const refresh = async () => {
-    setMerchant(getMerchantSession());
+    const legacyMerchant = getMerchantSession();
     const { data } = await supabase.auth.getSession();
     const session = data.session;
-    setLoggedIn(Boolean(session?.user) || Boolean(getMerchantSession()));
+
     if (session?.user) {
-      const id = await loadAccountIdentity();
-      if (id.ok) setUserLabel(id.identity.fullName || id.identity.email.split("@")[0]);
-      else setUserLabel(session.user.email?.split("@")[0] || "حسابي");
-    } else if (getMerchantSession()) {
-      setUserLabel(getMerchantSession()!.name);
+      const identity = await loadAccountIdentity();
+      const isPartner =
+        identity.ok &&
+        (identity.identity.accountType === "affiliate" || identity.identity.accountType === "supplier");
+      setMerchant(isPartner ? legacyMerchant : null);
+      setLoggedIn(true);
+      setUserLabel(
+        identity.ok
+          ? identity.identity.fullName || identity.identity.email.split("@")[0]
+          : session.user.email?.split("@")[0] || "حسابي"
+      );
     } else {
-      setUserLabel(null);
+      setMerchant(legacyMerchant);
+      setLoggedIn(Boolean(legacyMerchant));
+      setUserLabel(legacyMerchant?.name || null);
     }
   };
 
   useEffect(() => {
-    refresh();
-    window.addEventListener(MERCHANT_SESSION_EVENT, () => {
-      void refresh();
-    });
-    window.addEventListener("focus", () => {
-      void refresh();
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      void refresh();
-    });
+    void refresh();
+
+    const onMerchantSession = () => void refresh();
+    const onFocus = () => void refresh();
+    window.addEventListener(MERCHANT_SESSION_EVENT, onMerchantSession);
+    window.addEventListener("focus", onFocus);
+    const { data: subscription } = supabase.auth.onAuthStateChange(() => void refresh());
+
     return () => {
-      window.removeEventListener(MERCHANT_SESSION_EVENT, () => {
-        void refresh();
-      });
-      window.removeEventListener("focus", () => {
-        void refresh();
-      });
-      sub.subscription.unsubscribe();
+      window.removeEventListener(MERCHANT_SESSION_EVENT, onMerchantSession);
+      window.removeEventListener("focus", onFocus);
+      subscription.subscription.unsubscribe();
     };
   }, []);
 
-  const mainLinks = [
-    { href: "/shop", label: "المتجر" },
-    { href: "/categories", label: "التصنيفات" },
-    { href: "/more", label: "المزيد" },
-  ];
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const nextY = window.scrollY;
+      if (nextY < 12 || nextY < lastY) setVisible(true);
+      else if (nextY > lastY + 4) setVisible(false);
+      lastY = nextY;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
-  let accountLinks: { href: string; label: string }[] = [];
-  if (merchant) {
-    accountLinks = [
-      { href: "/merchant", label: "بوابة المسوق" },
-      { href: "/account/profile", label: "الملف الشخصي" },
-    ];
-  } else if (loggedIn) {
-    accountLinks = [
-      { href: "/account", label: "حسابي" },
-      { href: "/account/orders", label: "طلباتي" },
-      { href: "/account/profile", label: "الملف الشخصي" },
-    ];
-  } else {
-    accountLinks = [
-      { href: "/login", label: "دخول" },
-      { href: "/register", label: "إنشاء حساب" },
-    ];
-  }
+  const accountLinks = merchant
+    ? [
+        { href: "/merchant", label: "بوابة الشريك" },
+        { href: "/account/profile", label: "الملف الشخصي" },
+      ]
+    : loggedIn
+      ? [
+          { href: "/account", label: "حسابي" },
+          { href: "/account/orders", label: "طلباتي" },
+        ]
+      : [
+          { href: "/login", label: "تسجيل الدخول" },
+          { href: "/register", label: "إنشاء حساب" },
+        ];
 
   const logout = async () => {
+    setOpen(false);
     await signOutToHome();
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-page/90 backdrop-blur-md shadow-header border-b border-border/70">
-      <div className="max-w-page mx-auto px-4 md:px-8 h-16 sm:h-20 flex items-center justify-between">
+    <header
+      className={`sticky top-0 z-40 border-b border-[#E4E9F0] bg-white/95 text-[#14243A] backdrop-blur-md transition-transform duration-300 ${
+        visible ? "translate-y-0" : "-translate-y-full"
+      }`}
+    >
+      <div className="mx-auto flex h-[68px] max-w-[1280px] items-center justify-between gap-3 px-4 sm:h-[76px] sm:px-6 lg:px-8">
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="md:hidden p-2 -mr-2 rounded-xl hover:bg-surface-2 transition"
-            onClick={() => setOpen((v) => !v)}
-            aria-label="القائمة"
+            className="rounded-lg p-2 hover:bg-[#F6F8FB] md:hidden"
+            onClick={() => setOpen((value) => !value)}
+            aria-label={open ? "إغلاق القائمة" : "فتح القائمة"}
+            aria-expanded={open}
           >
-            {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <Link href="/" className="shrink-0" aria-label="Muqatshop">
-            <BrandLogo size="sm" />
+          <Link href="/" className="shrink-0" aria-label="Muqatshop — الرئيسية">
+            <BrandLogo size="sm" tone="navy" className="max-h-12" />
           </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-1 text-sm font-medium">
-          {mainLinks.map((l) => (
+        <nav className="hidden items-center gap-1 text-sm font-semibold lg:flex" aria-label="القائمة الرئيسية">
+          {mainLinks.map((link) => (
             <Link
-              key={l.href}
-              href={l.href}
-              className="px-3 py-2 rounded-xl text-ink-soft hover:text-ink hover:bg-surface-2 transition"
+              key={link.href}
+              href={link.href}
+              className="rounded-lg px-3 py-2 text-[#526174] transition hover:bg-[#F6F8FB] hover:text-[#3157D5]"
             >
-              {l.label}
+              {link.label}
             </Link>
           ))}
-          <span className="w-px h-4 bg-border mx-1" />
-          {accountLinks.map((l) => (
+          <span className="mx-2 h-5 w-px bg-[#E4E9F0]" aria-hidden="true" />
+          {accountLinks.map((link) => (
             <Link
-              key={l.href}
-              href={l.href}
-              className="px-3 py-2 rounded-xl text-brand-dark font-semibold hover:bg-surface-2 transition"
+              key={link.href}
+              href={link.href}
+              className="rounded-lg px-3 py-2 text-[#3157D5] transition hover:bg-[#EEF3FF]"
             >
-              {l.label}
+              {link.label}
             </Link>
           ))}
           {loggedIn && (
             <button
               type="button"
-              className="px-3 py-2 text-xs text-sale hover:bg-red-50 rounded-xl transition"
-              onClick={logout}
+              className="rounded-lg px-3 py-2 text-xs font-semibold text-[#D64C4C] transition hover:bg-red-50"
+              onClick={() => void logout()}
             >
               خروج
             </button>
@@ -142,28 +159,32 @@ export function Header() {
           {loggedIn && userLabel && (
             <Link
               href={merchant ? "/merchant" : "/account"}
-              className="hidden sm:flex items-center gap-1.5 text-xs font-medium bg-ink text-white px-3 py-1.5 rounded-full max-w-[140px] truncate shadow-soft"
+              className="hidden max-w-[150px] items-center gap-1.5 truncate rounded-full bg-[#14243A] px-3 py-1.5 text-xs font-semibold text-white sm:flex"
               title={userLabel}
             >
-              <User className="w-3.5 h-3.5 shrink-0" />
+              <User className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{userLabel}</span>
             </Link>
           )}
-          <Link href="/search" className="p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="بحث">
-            <Search className="w-5 h-5" strokeWidth={1.5} />
+          <Link href="/search" className="rounded-lg p-2.5 transition hover:bg-[#F6F8FB]" aria-label="بحث">
+            <Search className="h-5 w-5" strokeWidth={1.8} />
           </Link>
-          <Link href={loggedIn ? "/account/wishlist" : "/wishlist"} className="relative p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="الأمنيات">
-            <Heart className="w-5 h-5" strokeWidth={1.5} />
+          <Link
+            href={loggedIn ? "/account/wishlist" : "/wishlist"}
+            className="relative rounded-lg p-2.5 transition hover:bg-[#F6F8FB]"
+            aria-label="المفضلة"
+          >
+            <Heart className="h-5 w-5" strokeWidth={1.8} />
             {wishCount > 0 && (
-              <span className="absolute top-1 right-1 bg-sale text-white text-[10px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-0.5">
+              <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-[#18A999] px-1 text-center text-[10px] font-bold leading-4 text-white">
                 {wishCount}
               </span>
             )}
           </Link>
-          <Link href="/cart" className="relative p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="السلة">
-            <ShoppingBag className="w-5 h-5" strokeWidth={1.5} />
+          <Link href="/cart" className="relative rounded-lg p-2.5 transition hover:bg-[#F6F8FB]" aria-label="السلة">
+            <ShoppingBag className="h-5 w-5" strokeWidth={1.8} />
             {totalItems > 0 && (
-              <span className="absolute top-1 right-1 bg-brand text-white text-[10px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-0.5">
+              <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-[#3157D5] px-1 text-center text-[10px] font-bold leading-4 text-white">
                 {totalItems}
               </span>
             )}
@@ -172,39 +193,36 @@ export function Header() {
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-border bg-page/98 backdrop-blur-md px-4 pb-4">
-          <nav className="flex flex-col gap-0.5 pt-2 text-sm font-medium">
-            {mainLinks.map((l) => (
+        <div className="border-t border-[#E4E9F0] bg-white px-4 pb-4 md:hidden">
+          <nav className="mx-auto flex max-w-[1280px] flex-col gap-1 pt-2" aria-label="قائمة الهاتف">
+            {mainLinks.map((link) => (
               <Link
-                key={l.href}
-                href={l.href}
+                key={link.href}
+                href={link.href}
                 onClick={() => setOpen(false)}
-                className="py-3 px-2 rounded-xl border-b border-border/80 hover:bg-surface-2"
+                className="rounded-lg px-3 py-3 text-sm font-semibold text-[#526174] hover:bg-[#F6F8FB]"
               >
-                {l.label}
+                {link.label}
               </Link>
             ))}
-            <p className="text-[11px] text-muted pt-3 pb-1 px-2">الحساب</p>
-            {accountLinks.map((l) => (
+            <p className="px-3 pb-1 pt-3 text-[11px] font-semibold text-[#718096]">الحساب</p>
+            {accountLinks.map((link) => (
               <Link
-                key={l.href}
-                href={l.href}
+                key={link.href}
+                href={link.href}
                 onClick={() => setOpen(false)}
-                className="py-3 px-2 rounded-xl border-b border-border/80 text-brand-dark font-semibold"
+                className="rounded-lg px-3 py-3 text-sm font-semibold text-[#3157D5] hover:bg-[#EEF3FF]"
               >
-                {l.label}
+                {link.label}
               </Link>
             ))}
             {loggedIn && (
               <button
                 type="button"
-                className="py-3 px-2 text-right text-sale rounded-xl"
-                onClick={() => {
-                  setOpen(false);
-                  void logout();
-                }}
+                className="rounded-lg px-3 py-3 text-right text-sm font-semibold text-[#D64C4C] hover:bg-red-50"
+                onClick={() => void logout()}
               >
-                خروج إلى الرئيسية
+                تسجيل الخروج
               </button>
             )}
           </nav>

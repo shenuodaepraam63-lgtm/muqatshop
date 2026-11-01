@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Fragment } from "react";
 import { supabase, isSupabaseConfigured, type Category, type Product } from "@/lib/supabase";
 import { DEFAULT_HOMEPAGE_CONFIG, isAnnouncementActive, normalizeHomepageConfig, type HomeSectionKey } from "@/lib/homepage-config";
-import { HomeHeader } from "@/components/home/HomeHeader";
-import { HomeFooter } from "@/components/home/HomeFooter";
+import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
 import { CategorySection, DealsSection, FaqSection, FeaturedProductsSection, FinalCtaSection, HomeHero, HowItWorksSection, JoinSection, PartnershipSection, TrustSection, WhyUsSection } from "@/components/home/HomeSections";
 
 export const dynamic = "force-dynamic";
@@ -108,7 +108,7 @@ export default async function HomePage() {
 
   return <div className="muqat-home" dir="rtl">
     {announcementVisible && <div className="home-announcement" role="region" aria-label="إعلان"><a href={config.announcement.href} className="mx-auto block max-w-[1280px] px-4 py-2 text-center text-xs font-semibold text-white sm:text-[13px]">{config.announcement.text}</a></div>}
-    <HomeHeader categories={categories} />
+    <Header />
     <main id="main-content">
       {config.sectionOrder.map((key) => {
         if (!config.sectionVisibility[key]) return null;
@@ -117,7 +117,7 @@ export default async function HomePage() {
         return <Fragment key={key}>{content[key]}</Fragment>;
       })}
     </main>
-    <HomeFooter email={config.contactEmail} />
+    <Footer />
   </div>;
 }
 
