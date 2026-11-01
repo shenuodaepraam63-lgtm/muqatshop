@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { loadAccountIdentity, type AccountIdentity } from "@/lib/account-identity";
 import { signOutToHome } from "@/lib/auth-session";
+import {
+  SUPPORT_WHATSAPP_DISPLAY,
+  buildSupportWhatsAppUrl,
+} from "@/lib/support-contact";
 
 export default function AccountSettingsPage() {
   const [identity, setIdentity] = useState<AccountIdentity | null>(null);
@@ -14,6 +18,17 @@ export default function AccountSettingsPage() {
       if (res.ok) setIdentity(res.identity);
     })();
   }, []);
+
+  const waUrl = useMemo(
+    () =>
+      buildSupportWhatsAppUrl({
+        fullName: identity?.fullName,
+        email: identity?.email,
+        phone: identity?.phone,
+        topic: "طلب حذف حساب / إعدادات",
+      }),
+    [identity]
+  );
 
   return (
     <div className="space-y-5">
@@ -64,13 +79,23 @@ export default function AccountSettingsPage() {
       </section>
 
       <section className="rounded-2xl border border-[#E4E9F0] bg-white p-5 shadow-sm space-y-3">
-        <h3 className="text-sm font-bold text-[#14243A]">الإشعارات</h3>
+        <h3 className="text-sm font-bold text-[#14243A]">الدعم الفوري</h3>
         <p className="text-sm text-[#718096]">
-          تفضيلات الإشعارات داخل الموقع وواتساب ستُربط هنا بعد تفعيل خدمة الإشعارات في
-          الخادم. حاليًا لا توجد جداول إشعارات مخصصة للعميل.
+          واتساب الدعم:{" "}
+          <span className="font-semibold text-[#14243A]" dir="ltr">
+            {SUPPORT_WHATSAPP_DISPLAY}
+          </span>
         </p>
-        <Link href="/account/notifications" className="text-sm font-semibold text-[#3157D5]">
-          عرض صفحة الإشعارات
+        <a
+          href={waUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex rounded-xl bg-[#18A999] px-4 py-2.5 text-sm font-semibold text-white"
+        >
+          فتح واتساب الآن
+        </a>
+        <Link href="/account/support" className="block text-sm font-semibold text-[#3157D5]">
+          صفحة الدعم الكاملة
         </Link>
       </section>
 
@@ -93,12 +118,16 @@ export default function AccountSettingsPage() {
       <section className="rounded-2xl border border-dashed border-[#E4E9F0] bg-[#F6F8FB] p-5">
         <h3 className="text-sm font-bold text-[#14243A]">حذف الحساب</h3>
         <p className="mt-2 text-sm leading-7 text-[#718096]">
-          حذف الحساب متاح وفق سياسة المنصة. لم يُفعَّل مسار الحذف الذاتي بعد في الواجهة —
-          تواصل مع الدعم لطلب حذف البيانات.
+          لطلب حذف الحساب والبيانات، تواصل عبر واتساب الدعم وسننفّذ الطلب وفق سياسة المنصة.
         </p>
-        <Link href="/account/support" className="mt-3 inline-block text-sm font-semibold text-[#3157D5]">
-          فتح الدعم
-        </Link>
+        <a
+          href={waUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-block text-sm font-semibold text-[#18A999]"
+        >
+          طلب حذف عبر واتساب
+        </a>
       </section>
     </div>
   );

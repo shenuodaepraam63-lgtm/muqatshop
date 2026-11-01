@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Clock } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { loadAccountIdentity } from "@/lib/account-identity";
+import { buildSupportWhatsAppUrl } from "@/lib/support-contact";
 
 const STATUS_AR: Record<string, string> = {
   pending: "قيد المراجعة",
@@ -22,6 +23,7 @@ function PendingInner() {
   const [status, setStatus] = useState("pending");
   const [loaded, setLoaded] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -33,10 +35,21 @@ function PendingInner() {
           res.identity.supplierStatus || res.identity.affiliateStatus || "pending";
         setStatus(st);
         setEmail(res.identity.email);
+        setName(res.identity.fullName);
       }
       setLoaded(true);
     })();
   }, []);
+
+  const waUrl = useMemo(
+    () =>
+      buildSupportWhatsAppUrl({
+        fullName: name,
+        email,
+        topic: `متابعة طلب انضمام (${typeLabel})`,
+      }),
+    [name, email, typeLabel]
+  );
 
   return (
     <AuthShell
@@ -83,10 +96,12 @@ function PendingInner() {
           الملف الشخصي
         </Link>
         <a
-          href="mailto:muqatshop@gmail.com"
-          className="w-full h-[48px] rounded-[10px] border border-[#E4E9F0] font-semibold flex items-center justify-center text-sm"
+          href={waUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full h-[48px] rounded-[10px] border border-[#18A999]/40 bg-[#EFF8F6] font-semibold flex items-center justify-center text-sm text-[#149486]"
         >
-          التواصل مع الدعم
+          تواصل واتساب مع الدعم
         </a>
       </div>
     </AuthShell>
