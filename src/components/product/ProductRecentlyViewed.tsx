@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getRecentlyViewed } from "@/lib/recently-viewed";
+import { readRecentlyViewed } from "@/lib/recently-viewed";
 import { MarketplaceProductCard } from "@/components/home/MarketplaceProductCard";
 import type { Product } from "@/lib/supabase";
 
@@ -9,7 +9,7 @@ export function ProductRecentlyViewed({ excludeId }: { excludeId: string }) {
   const [items, setItems] = useState<Product[]>([]);
 
   useEffect(() => {
-    const list = getRecentlyViewed()
+    const list = readRecentlyViewed()
       .filter((p) => p.id !== excludeId)
       .slice(0, 8)
       .map(
