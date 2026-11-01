@@ -13,8 +13,7 @@ const AUTH_BARE = [
   "/verify-email",
   "/forgot-password",
   "/reset-password",
-  "/account/pending",
-  "/account/profile",
+  "/account",
   "/affiliate/pending",
   "/supplier/pending",
 ];
@@ -26,7 +25,8 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
   const bare =
     AUTH_BARE.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
     pathname.startsWith("/merchant") ||
-    pathname.startsWith("/auth");
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/admin");
 
   if (bare) {
     return <main className="min-h-screen">{children}</main>;

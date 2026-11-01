@@ -11,34 +11,53 @@ import {
   MERCHANT_SESSION_EVENT,
   type MerchantSession,
 } from "@/lib/merchant";
-import {
-  getCustomerSession,
-  CUSTOMER_SESSION_EVENT,
-  type CustomerSession,
-} from "@/lib/customer";
-import { signOutEverywhere } from "@/lib/auth-session";
+import { supabase } from "@/lib/supabase";
+import { signOutToHome } from "@/lib/auth-session";
+import { loadAccountIdentity } from "@/lib/account-identity";
 
 export function Header() {
   const totalItems = useCartStore((s) => s.totalItems());
   const wishCount = useWishlistStore((s) => s.items.length);
   const [merchant, setMerchant] = useState<MerchantSession | null>(null);
-  const [customer, setCustomer] = useState<CustomerSession | null>(null);
+  const [userLabel, setUserLabel] = useState<string | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
   const [open, setOpen] = useState(false);
 
-  const refresh = () => {
+  const refresh = async () => {
     setMerchant(getMerchantSession());
-    setCustomer(getCustomerSession());
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+    setLoggedIn(Boolean(session?.user) || Boolean(getMerchantSession()));
+    if (session?.user) {
+      const id = await loadAccountIdentity();
+      if (id.ok) setUserLabel(id.identity.fullName || id.identity.email.split("@")[0]);
+      else setUserLabel(session.user.email?.split("@")[0] || "حسابي");
+    } else if (getMerchantSession()) {
+      setUserLabel(getMerchantSession()!.name);
+    } else {
+      setUserLabel(null);
+    }
   };
 
   useEffect(() => {
     refresh();
-    window.addEventListener(MERCHANT_SESSION_EVENT, refresh);
-    window.addEventListener(CUSTOMER_SESSION_EVENT, refresh);
-    window.addEventListener("focus", refresh);
+    window.addEventListener(MERCHANT_SESSION_EVENT, () => {
+      void refresh();
+    });
+    window.addEventListener("focus", () => {
+      void refresh();
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      void refresh();
+    });
     return () => {
-      window.removeEventListener(MERCHANT_SESSION_EVENT, refresh);
-      window.removeEventListener(CUSTOMER_SESSION_EVENT, refresh);
-      window.removeEventListener("focus", refresh);
+      window.removeEventListener(MERCHANT_SESSION_EVENT, () => {
+        void refresh();
+      });
+      window.removeEventListener("focus", () => {
+        void refresh();
+      });
+      sub.subscription.unsubscribe();
     };
   }, []);
 
@@ -54,9 +73,10 @@ export function Header() {
       { href: "/merchant", label: "بوابة المسوق" },
       { href: "/account/profile", label: "الملف الشخصي" },
     ];
-  } else if (customer) {
+  } else if (loggedIn) {
     accountLinks = [
       { href: "/account", label: "حسابي" },
+      { href: "/account/orders", label: "طلباتي" },
       { href: "/account/profile", label: "الملف الشخصي" },
     ];
   } else {
@@ -67,8 +87,7 @@ export function Header() {
   }
 
   const logout = async () => {
-    await signOutEverywhere();
-    window.location.href = "/";
+    await signOutToHome();
   };
 
   return (
@@ -108,7 +127,7 @@ export function Header() {
               {l.label}
             </Link>
           ))}
-          {(merchant || customer) && (
+          {loggedIn && (
             <button
               type="button"
               className="px-3 py-2 text-xs text-sale hover:bg-red-50 rounded-xl transition"
@@ -120,14 +139,14 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-0.5 sm:gap-1">
-          {(merchant || customer) && (
+          {loggedIn && userLabel && (
             <Link
               href={merchant ? "/merchant" : "/account"}
               className="hidden sm:flex items-center gap-1.5 text-xs font-medium bg-ink text-white px-3 py-1.5 rounded-full max-w-[140px] truncate shadow-soft"
-              title={merchant?.name || customer?.name}
+              title={userLabel}
             >
               <User className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{merchant?.name || customer?.name}</span>
+              <span className="truncate">{userLabel}</span>
             </Link>
           )}
           <Link href="/search" className="p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="بحث">
@@ -176,16 +195,16 @@ export function Header() {
                 {l.label}
               </Link>
             ))}
-            {(merchant || customer) && (
+            {loggedIn && (
               <button
                 type="button"
                 className="py-3 px-2 text-right text-sale rounded-xl"
                 onClick={() => {
                   setOpen(false);
-                  logout();
+                  void logout();
                 }}
               >
-                خروج
+                خروج إلى الرئيسية
               </button>
             )}
           </nav>
