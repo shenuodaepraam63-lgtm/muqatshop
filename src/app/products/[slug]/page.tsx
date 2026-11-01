@@ -177,7 +177,6 @@ export default async function ProductPage({
   if (product.dimensions?.trim()) specs.push({ label: "الأبعاد", value: product.dimensions.trim() });
   if (product.origin_country?.trim())
     specs.push({ label: "بلد المنشأ", value: product.origin_country.trim() });
-  if (product.sku?.trim()) specs.push({ label: "كود المنتج", value: product.sku.trim() });
 
   for (const s of product.detail_sections || []) {
     if (s.kind === "specs" || (s.rows && s.rows.length)) {
