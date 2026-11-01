@@ -1,0 +1,29 @@
+{
+  "routes": [
+    { "path": "/", "title": "الرئيسية" },
+    { "path": "/shop", "title": "المتجر" },
+    { "path": "/categories", "title": "التصنيفات" },
+    { "path": "/categories/:slug", "title": "تصنيف" },
+    { "path": "/product/:slug", "title": "المنتج" },
+    { "path": "/products/:slug", "title": "المنتج" },
+    { "path": "/search", "title": "البحث" },
+    { "path": "/wishlist", "title": "المفضلة القديمة" },
+    { "path": "/account", "title": "حسابي" },
+    { "path": "/account/orders", "title": "طلباتي" },
+    { "path": "/account/orders/:id", "title": "تفاصيل الطلب" },
+    { "path": "/account/orders/:id/tracking", "title": "تتبع الطلب" },
+    { "path": "/account/addresses", "title": "عناويني" },
+    { "path": "/account/profile", "title": "بياناتي الشخصية" },
+    { "path": "/account/wishlist", "title": "المفضلة" },
+    { "path": "/account/notifications", "title": "الإشعارات" },
+    { "path": "/account/support", "title": "الدعم" },
+    { "path": "/account/support/:id", "title": "تفاصيل التذكرة" },
+    { "path": "/account/settings", "title": "إعدادات الحساب" },
+    { "path": "/account/pending", "title": "حالة الطلب" },
+    { "path": "/cart", "title": "السلة" },
+    { "path": "/checkout", "title": "إتمام الطلب" },
+    { "path": "/order-success", "title": "نجاح الطلب" },
+    { "path": "/login", "title": "تسجيل الدخول" },
+    { "path": "/register", "title": "إنشاء حساب" }
+  ]
+}

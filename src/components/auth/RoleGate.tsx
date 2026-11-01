@@ -80,28 +80,14 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
     (async () => {
       const path = pathname || "/";
       const merchantLocal = getMerchantSession();
-
-      // Legacy marketer session still uses /merchant portal until fully migrated.
-      if (merchantLocal) {
-        applyChromeRole(null, true);
-        if (
-          isUnder(path, CUSTOMER_ACCOUNT_PREFIXES) &&
-          !path.startsWith("/account/pending") &&
-          !path.startsWith("/account/profile")
-        ) {
-          router.replace("/merchant");
-          return;
-        }
-        if (!cancelled) setReady(true);
-        return;
-      }
-
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        applyChromeRole(null, false);
+        // Legacy marketer session is only a storefront chrome hint. It must
+        // never grant access to, or redirect away from, the customer account.
+        applyChromeRole(null, Boolean(merchantLocal));
 
         // Customer account requires Auth — never legacy muqat_customer_session.
         if (isUnder(path, CUSTOMER_ACCOUNT_PREFIXES) && !path.startsWith("/account/pending")) {

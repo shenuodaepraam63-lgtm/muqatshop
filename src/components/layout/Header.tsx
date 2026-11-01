@@ -152,7 +152,7 @@ export function Header() {
           <Link href="/search" className="p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="بحث">
             <Search className="w-5 h-5" strokeWidth={1.5} />
           </Link>
-          <Link href="/wishlist" className="relative p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="الأمنيات">
+          <Link href={loggedIn ? "/account/wishlist" : "/wishlist"} className="relative p-2.5 rounded-xl hover:bg-surface-2 transition" aria-label="الأمنيات">
             <Heart className="w-5 h-5" strokeWidth={1.5} />
             {wishCount > 0 && (
               <span className="absolute top-1 right-1 bg-sale text-white text-[10px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-0.5">

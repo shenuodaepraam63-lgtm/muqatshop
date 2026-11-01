@@ -41,7 +41,7 @@ const sections: MoreSection[] = [
       },
       { href: "/search", label: "بحث", desc: "ابحث عن منتج", icon: Search },
       {
-        href: "/wishlist",
+        href: "/account/wishlist",
         label: "المفضلة",
         desc: "تُفتح داخل الحساب",
         icon: Heart,
