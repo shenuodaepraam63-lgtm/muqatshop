@@ -5,8 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCartStore } from "@/lib/store";
 import { formatPrice } from "@/lib/utils";
-import { Trash2, Minus, Plus, ShoppingBag, Store } from "lucide-react";
-import { CheckoutForm } from "@/components/cart/CheckoutForm";
+import { Trash2, Minus, Plus, ShoppingBag, Store, ArrowLeft } from "lucide-react";
 import { getMerchantSession } from "@/lib/merchant";
 import { CartGuard } from "./CartGuard";
 
@@ -346,7 +345,7 @@ function CartPageInner() {
             })}
           </ul>
 
-          {/* Summary + Checkout */}
+          {/* Summary only — checkout moved to /checkout */}
           <aside className="space-y-4 lg:sticky lg:top-24">
             <div className="rounded-[14px] border border-[#E5EAF1] bg-white p-4 sm:p-5">
               <h2 className="mb-4 text-lg font-bold text-[#14243A] sm:text-xl">
@@ -367,7 +366,7 @@ function CartPageInner() {
                 )}
                 <div className="flex justify-between text-[#667085]">
                   <span>الشحن</span>
-                  <span className="text-xs">يُحسب عند اختيار العنوان</span>
+                  <span className="text-xs">يُحسب في صفحة إتمام الطلب</span>
                 </div>
                 <div className="border-t border-[#E5EAF1] pt-3">
                   <div className="flex items-baseline justify-between gap-2">
@@ -381,16 +380,18 @@ function CartPageInner() {
                   </p>
                 </div>
               </div>
-              <a
-                href="#checkout-form"
-                className="mt-4 flex h-12 w-full items-center justify-center rounded-[10px] bg-[#3157D5] text-[15px] font-bold text-white hover:bg-[#2447B8] sm:h-[52px]"
+
+              <Link
+                href="/checkout"
+                className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-[10px] bg-[#3157D5] text-[15px] font-bold text-white hover:bg-[#2447B8] sm:h-[52px]"
               >
                 إتمام الطلب
-              </a>
-            </div>
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
 
-            <div id="checkout-form">
-              <CheckoutForm />
+              <p className="mt-3 text-center text-[11px] text-[#667085]">
+                الدفع عند الاستلام · بياناتك محمية
+              </p>
             </div>
           </aside>
         </div>
