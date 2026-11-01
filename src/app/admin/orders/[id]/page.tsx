@@ -10,16 +10,19 @@ import { formatPrice } from "@/lib/utils";
 const statusOptions = [
   { value: "new", label: "جديد" },
   { value: "confirmed", label: "مؤكد" },
+  { value: "processing", label: "قيد التجهيز" },
   { value: "shipped", label: "تم الشحن" },
   { value: "delivered", label: "تم التسليم" },
   { value: "cancelled", label: "ملغي" },
 ];
 
+type OrderWithVersion = Order & { version?: number };
+
 export default function AdminOrderInvoicePage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<OrderWithVersion | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -31,7 +34,7 @@ export default function AdminOrderInvoicePage() {
       .eq("id", id)
       .maybeSingle()
       .then(({ data }) => {
-        setOrder(data as Order | null);
+        setOrder(data as OrderWithVersion | null);
         setLoading(false);
       });
   }, [id]);
@@ -39,14 +42,53 @@ export default function AdminOrderInvoicePage() {
   const updateStatus = async (status: string) => {
     if (!order) return;
     setSaving(true);
-    const { data } = await supabase
-      .from("orders")
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq("id", order.id)
-      .select()
-      .single();
-    if (data) setOrder(data as Order);
-    setSaving(false);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (token) {
+        const res = await fetch(`/api/orders/${order.id}/status`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            status,
+            expectedVersion: order.version,
+          }),
+        });
+        const body = await res.json().catch(() => null);
+        if (res.ok && body?.ok) {
+          setOrder({
+            ...order,
+            status: body.status || status,
+            updated_at: body.updatedAt || new Date().toISOString(),
+            version: body.version ?? order.version,
+          });
+          return;
+        }
+        if (body?.code === "VERSION_CONFLICT") {
+          alert(body.error || "تم تحديث الطلب من جهة أخرى — أعد التحميل");
+          const { data } = await supabase
+            .from("orders")
+            .select("*")
+            .eq("id", order.id)
+            .maybeSingle();
+          if (data) setOrder(data as OrderWithVersion);
+          return;
+        }
+      }
+      // Fallback if API unavailable
+      const { data } = await supabase
+        .from("orders")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", order.id)
+        .select()
+        .single();
+      if (data) setOrder(data as OrderWithVersion);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -68,100 +110,53 @@ export default function AdminOrderInvoicePage() {
 
   return (
     <div className="max-w-2xl">
-      <Link href="/admin/orders" className="text-sm text-muted hover:text-ink mb-4 inline-block">
+      <Link href="/admin/orders" className="mb-4 inline-block text-sm text-muted hover:text-ink">
         ← كل الطلبات
       </Link>
 
-      {/* Invoice card */}
-      <div className="bg-white border border-[#e8e2d9] rounded-2xl overflow-hidden shadow-sm">
-        <div className="bg-ink text-page px-6 py-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="overflow-hidden rounded-2xl border border-[#e8e2d9] bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-ink px-6 py-5 text-page">
           <div>
             <p className="text-xs opacity-70">فاتورة طلب</p>
-            <p className="text-lg font-bold font-mono">{order.order_number}</p>
+            <p className="font-mono text-lg font-bold">{order.order_number}</p>
           </div>
           <div className="text-left text-sm">
-            {new Date(order.created_at).toLocaleString("ar-EG", {
-              dateStyle: "full",
-              timeStyle: "short",
-            })}
+            {new Date(order.created_at).toLocaleString("ar-EG")}
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Customer */}
+        <div className="space-y-6 p-6">
           <section>
-            <h2 className="text-xs font-semibold tracking-widest uppercase text-muted mb-3">
-              بيانات العميل
-            </h2>
-            <div className="grid sm:grid-cols-2 gap-3 text-sm">
-              <p>
-                <span className="text-muted">الاسم: </span>
-                <strong>{order.customer_name}</strong>
-              </p>
-              <p>
-                <span className="text-muted">الهاتف: </span>
-                <a href={`tel:${order.phone}`} className="font-medium underline">
-                  {order.phone}
-                </a>
-              </p>
-              {order.phone_alt && (
-                <p>
-                  <span className="text-muted">احتياطي: </span>
-                  <a href={`tel:${order.phone_alt}`}>{order.phone_alt}</a>
-                </p>
-              )}
-            </div>
-          </section>
-
-          {/* Address */}
-          <section>
-            <h2 className="text-xs font-semibold tracking-widest uppercase text-muted mb-3">
-              عنوان التوصيل
-            </h2>
-            <p className="text-sm leading-relaxed">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
+              العميل
+            </h3>
+            <p className="text-sm font-medium">{order.customer_name}</p>
+            <p className="text-sm text-muted">{order.phone}</p>
+            <p className="text-sm text-muted">
               {order.governorate} — {order.center}
               {order.area ? ` — ${order.area}` : ""}
-              {order.street ? (
-                <>
-                  <br />
-                  شارع: {order.street}
-                </>
-              ) : null}
-              {order.apartment ? (
-                <>
-                  <br />
-                  شقة/مبنى: {order.apartment}
-                </>
-              ) : null}
             </p>
-            {order.notes && (
-              <p className="text-sm mt-2 bg-[#f8f5f0] rounded-lg px-3 py-2">
-                <span className="text-muted">ملاحظات: </span>
-                {order.notes}
-              </p>
-            )}
           </section>
 
-          {/* Items */}
           <section>
-            <h2 className="text-xs font-semibold tracking-widest uppercase text-muted mb-3">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
               المنتجات
-            </h2>
-            <ul className="divide-y divide-[#e8e2d9] border border-[#e8e2d9] rounded-xl overflow-hidden">
+            </h3>
+            <ul className="divide-y divide-[#e8e2d9] overflow-hidden rounded-xl border border-[#e8e2d9]">
               {items.map((item, i) => (
-                <li key={i} className="flex gap-3 p-3 items-center">
-                  <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-[#f0ebe3] shrink-0">
+                <li key={i} className="flex items-center gap-3 p-3">
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[#f0ebe3]">
                     {item.image ? (
                       <Image src={item.image} alt="" fill className="object-cover" sizes="56px" />
                     ) : null}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium line-clamp-2">{item.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 text-sm font-medium">{item.name}</p>
                     <p className="text-xs text-muted">
                       {item.quantity} × {formatPrice(Number(item.price))}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold shrink-0">
+                  <p className="shrink-0 text-sm font-semibold">
                     {formatPrice(Number(item.price) * Number(item.quantity))}
                   </p>
                 </li>
@@ -169,8 +164,7 @@ export default function AdminOrderInvoicePage() {
             </ul>
           </section>
 
-          {/* Totals */}
-          <section className="border-t border-[#e8e2d9] pt-4 space-y-2 text-sm">
+          <section className="space-y-2 border-t border-[#e8e2d9] pt-4 text-sm">
             <div className="flex justify-between">
               <span className="text-muted">المجموع الفرعي</span>
               <span>{formatPrice(Number(order.subtotal))}</span>
@@ -179,22 +173,21 @@ export default function AdminOrderInvoicePage() {
               <span className="text-muted">التوصيل</span>
               <span>{formatPrice(Number(order.shipping))}</span>
             </div>
-            <div className="flex justify-between text-base font-bold pt-2">
+            <div className="flex justify-between pt-2 text-base font-bold">
               <span>الإجمالي</span>
               <span>{formatPrice(Number(order.total))}</span>
             </div>
           </section>
 
-          {/* Status */}
           <section>
-            <label className="block text-xs font-semibold tracking-widest uppercase text-muted mb-2">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-muted">
               حالة الطلب
             </label>
             <select
               value={order.status}
               disabled={saving}
               onChange={(e) => updateStatus(e.target.value)}
-              className="w-full sm:w-auto rounded-xl border border-[#e8e2d9] px-4 py-2.5 text-sm bg-white"
+              className="w-full rounded-xl border border-[#e8e2d9] bg-white px-4 py-2.5 text-sm sm:w-auto"
             >
               {statusOptions.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -202,6 +195,10 @@ export default function AdminOrderInvoicePage() {
                 </option>
               ))}
             </select>
+            <p className="mt-2 text-[11px] text-muted">
+              التحديث يُسجَّل في سجل الحالات ويزيد رقم النسخة (version)
+              {order.version != null ? ` · النسخة الحالية: ${order.version}` : ""}
+            </p>
           </section>
         </div>
       </div>
