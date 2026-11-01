@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { loadAccountIdentity } from "@/lib/account-identity";
-import { fetchCustomerOrders, resolveCustomerId, type CustomerOrder } from "@/lib/customer-account";
+import {
+  fetchCustomerOrders,
+  resolveCustomerId,
+  type CustomerOrder,
+} from "@/lib/customer-account";
 import { orderStatusLabel, orderStatusTone } from "@/lib/order-status";
 import { formatPrice } from "@/lib/utils";
 
@@ -17,15 +21,20 @@ export default function AccountOrdersPage() {
   useEffect(() => {
     (async () => {
       const idRes = await loadAccountIdentity();
-      if (!idRes.ok) return;
-      const customerId = await resolveCustomerId(idRes.identity);
-      if (!customerId) {
-        setErr("تعذر ربط حساب العميل");
+      if (!idRes.ok) {
+        setErr("يجب تسجيل الدخول لعرض الطلبات");
         setLoading(false);
         return;
       }
+
+      const customerId = await resolveCustomerId(idRes.identity);
+      // Always try loading orders — even if customer row link failed (email fallback)
       const res = await fetchCustomerOrders(customerId, idRes.identity.email);
       if (res.error) setErr(res.error);
+      else if (!customerId && res.orders.length === 0) {
+        // Soft notice only when both link + orders empty — not a hard block
+        setErr("");
+      }
       setOrders(res.orders);
       setLoading(false);
     })();
@@ -75,9 +84,15 @@ export default function AccountOrdersPage() {
 
       {!loading && !filtered.length && (
         <div className="rounded-2xl border border-dashed border-[#D6DDEA] bg-white px-4 py-10 text-center">
-          <p className="font-semibold text-[#14243A]">لا توجد طلبات</p>
-          <Link href="/shop" className="mt-3 inline-block text-sm font-bold text-[#3157D5]">
-            ابدأ التسوق
+          <p className="font-semibold text-[#14243A]">لا توجد طلبات بعد</p>
+          <p className="mt-2 text-sm leading-7 text-[#718096]">
+            عند إتمام طلب وأنت مسجّل الدخول، هيظهر هنا تلقائيًا مرتبطًا بحسابك.
+          </p>
+          <Link
+            href="/account"
+            className="mt-4 inline-block text-sm font-bold text-[#3157D5]"
+          >
+            العودة لنظرة عامة الحساب
           </Link>
         </div>
       )}
@@ -91,14 +106,18 @@ export default function AccountOrdersPage() {
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-mono text-sm font-bold text-[#14243A]">{o.order_number}</p>
-                <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${orderStatusTone(o.status)}`}>
+                <span
+                  className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${orderStatusTone(o.status)}`}
+                >
                   {orderStatusLabel(o.status)}
                 </span>
               </div>
               <p className="mt-2 text-xs text-[#718096]">
                 {new Date(o.created_at).toLocaleString("ar-EG")}
               </p>
-              <p className="mt-1 text-sm font-semibold text-[#14243A]">{formatPrice(Number(o.total))}</p>
+              <p className="mt-1 text-sm font-semibold text-[#14243A]">
+                {formatPrice(Number(o.total))}
+              </p>
             </Link>
           </li>
         ))}

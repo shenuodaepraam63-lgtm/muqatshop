@@ -12,7 +12,11 @@ import {
   User,
 } from "lucide-react";
 import { loadAccountIdentity } from "@/lib/account-identity";
-import { fetchCustomerOrders, resolveCustomerId, type CustomerOrder } from "@/lib/customer-account";
+import {
+  fetchCustomerOrders,
+  resolveCustomerId,
+  type CustomerOrder,
+} from "@/lib/customer-account";
 import { orderStatusLabel, orderStatusTone } from "@/lib/order-status";
 import { formatPrice } from "@/lib/utils";
 
@@ -27,15 +31,18 @@ export default function AccountOverviewPage() {
       if (!idRes.ok) return;
       setName(idRes.identity.fullName || idRes.identity.email.split("@")[0]);
       const customerId = await resolveCustomerId(idRes.identity);
-      if (customerId) {
-        const { orders: list } = await fetchCustomerOrders(customerId, idRes.identity.email);
-        setOrders(list);
-      }
+      const { orders: list } = await fetchCustomerOrders(
+        customerId,
+        idRes.identity.email
+      );
+      setOrders(list);
       setLoading(false);
     })();
   }, []);
 
-  const active = orders.filter((o) => !["delivered", "cancelled", "rejected"].includes(o.status));
+  const active = orders.filter(
+    (o) => !["delivered", "cancelled", "rejected"].includes(o.status)
+  );
   const delivered = orders.filter((o) => o.status === "delivered");
   const latest = orders[0];
 
@@ -67,7 +74,9 @@ export default function AccountOverviewPage() {
         ) : !latest ? (
           <div className="rounded-xl border border-dashed border-[#D6DDEA] bg-[#F6F8FB] px-4 py-8 text-center">
             <p className="text-sm font-semibold text-[#14243A]">لا توجد طلبات بعد</p>
-            <p className="mt-2 text-xs text-[#718096]">عند إتمام طلب من السلة سيظهر هنا.</p>
+            <p className="mt-2 text-xs text-[#718096]">
+              الطلبات المرتبطة بحسابك تظهر هنا بعد إتمام الشراء وأنت مسجّل الدخول.
+            </p>
           </div>
         ) : (
           <Link
@@ -96,7 +105,7 @@ export default function AccountOverviewPage() {
         <QuickLink href="/account/profile" icon={User} title="بياناتي" body="الاسم والهاتف" />
         <QuickLink href="/account/wishlist" icon={Heart} title="المفضلة" body="المنتجات المحفوظة" />
         <QuickLink href="/account/notifications" icon={Bell} title="الإشعارات" body="تنبيهات الحساب" />
-        <QuickLink href="/account/support" icon={LifeBuoy} title="الدعم" body="المساعدة والتذاكر" />
+        <QuickLink href="/account/support" icon={LifeBuoy} title="الدعم" body="واتساب فوري" />
         <QuickLink href="/account/settings" icon={Settings} title="الإعدادات" body="الأمان والخروج" />
       </div>
     </div>
