@@ -2,6 +2,38 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import { mapShipment, mapStatusEvent } from "@/lib/order-foundation";
 
+type OrderRow = {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  governorate: string;
+  center: string;
+  area: string | null;
+  street: string | null;
+  apartment: string | null;
+  phone: string;
+  phone_alt: string | null;
+  notes: string | null;
+  items: unknown;
+  subtotal: number;
+  shipping: number;
+  discount: number | null;
+  coupon_code: string | null;
+  total: number;
+  status: string;
+  created_at: string;
+  updated_at: string | null;
+  customer_id: string | null;
+  customer_email: string | null;
+  version?: number | null;
+};
+
+const ORDER_SELECT =
+  "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email, version";
+
+const ORDER_SELECT_NO_VERSION =
+  "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email";
+
 /**
  * Customer-only order details (permanent foundation).
  * Ownership verified on server. Includes shipments + recent status events.
@@ -63,31 +95,34 @@ export async function GET(
       if (byEmail?.id) customerId = byEmail.id as string;
     }
 
-    const { data: row, error } = await admin
-      .from("orders")
-      .select(
-        "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email, version"
-      )
-      .eq("id", orderId)
-      .maybeSingle();
+    let row: OrderRow | null = null;
 
-    if (error) {
-      // Retry without version if column missing (migration not applied)
-      if (String(error.message || "").includes("version")) {
-        const retry = await admin
-          .from("orders")
-          .select(
-            "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email"
-          )
-          .eq("id", orderId)
-          .maybeSingle();
-        if (retry.error || !retry.data) {
+    {
+      const first = await admin
+        .from("orders")
+        .select(ORDER_SELECT)
+        .eq("id", orderId)
+        .maybeSingle();
+
+      if (first.error) {
+        const msg = String(first.error.message || "");
+        if (msg.includes("version")) {
+          const retry = await admin
+            .from("orders")
+            .select(ORDER_SELECT_NO_VERSION)
+            .eq("id", orderId)
+            .maybeSingle();
+          if (retry.error) {
+            console.error("order detail fetch error", retry.error);
+            return NextResponse.json({ ok: false, error: "تعذر تحميل الطلب" }, { status: 500 });
+          }
+          row = (retry.data as OrderRow | null) ?? null;
+        } else {
+          console.error("order detail fetch error", first.error);
           return NextResponse.json({ ok: false, error: "تعذر تحميل الطلب" }, { status: 500 });
         }
-        Object.assign(row as object, retry.data);
       } else {
-        console.error("order detail fetch error", error);
-        return NextResponse.json({ ok: false, error: "تعذر تحميل الطلب" }, { status: 500 });
+        row = (first.data as OrderRow | null) ?? null;
       }
     }
 
@@ -115,7 +150,6 @@ export async function GET(
       variant: typeof it.variant === "string" ? it.variant : null,
     }));
 
-    // Shipments from foundation table
     let shipments: ReturnType<typeof mapShipment>[] = [];
     const { data: shipRows } = await admin
       .from("order_shipments")
@@ -144,7 +178,6 @@ export async function GET(
       ];
     }
 
-    // Recent events (first page)
     let events: ReturnType<typeof mapStatusEvent>[] = [];
     const { data: eventRows } = await admin
       .from("order_status_events")
@@ -161,7 +194,7 @@ export async function GET(
       id: row.id,
       orderNumber: row.order_number,
       status: row.status,
-      version: Number((row as { version?: number }).version) || 1,
+      version: Number(row.version) || 1,
       customerName: row.customer_name,
       phone: row.phone,
       phoneAlt: row.phone_alt,
