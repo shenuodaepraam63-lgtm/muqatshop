@@ -1,23 +1,36 @@
 import { supabase } from "@/lib/supabase";
 import type { AccountIdentity } from "@/lib/account-identity";
 
-/** Resolve legacy customers.id for the signed-in user (create thin row if missing). */
+/**
+ * Resolve customers.id for the signed-in user.
+ * Creates a thin row if missing so orders.customer_id can always be set for customers.
+ */
 export async function resolveCustomerId(identity: AccountIdentity): Promise<string | null> {
   if (identity.customerId) return identity.customerId;
 
   const email = identity.email.toLowerCase().trim();
-  const { data: existing } = await supabase
+
+  // Prefer auth_user_id match
+  const { data: byAuth } = await supabase
     .from("customers")
     .select("id")
+    .eq("auth_user_id", identity.userId)
+    .maybeSingle();
+  if (byAuth?.id) return byAuth.id as string;
+
+  const { data: existing } = await supabase
+    .from("customers")
+    .select("id, auth_user_id")
     .eq("email", email)
     .maybeSingle();
 
   if (existing?.id) {
-    await supabase
-      .from("customers")
-      .update({ auth_user_id: identity.userId })
-      .eq("id", existing.id)
-      .is("auth_user_id", null);
+    if (!existing.auth_user_id) {
+      await supabase
+        .from("customers")
+        .update({ auth_user_id: identity.userId })
+        .eq("id", existing.id);
+    }
     return existing.id as string;
   }
 
@@ -27,7 +40,7 @@ export async function resolveCustomerId(identity: AccountIdentity): Promise<stri
       email,
       name: identity.fullName || email.split("@")[0],
       phone: identity.phone,
-      password_hash: "supabase_auth",
+      password_hash: `auth:${identity.userId}`,
       email_verified: identity.authEmailConfirmed,
       is_active: true,
       auth_user_id: identity.userId,
@@ -65,12 +78,13 @@ export type CustomerOrder = {
 };
 
 export async function fetchCustomerOrders(customerId: string, email: string) {
+  const emailNorm = email.toLowerCase().trim();
   const { data, error } = await supabase
     .from("orders")
     .select(
       "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email"
     )
-    .or(`customer_id.eq.${customerId},customer_email.eq.${email.toLowerCase()}`)
+    .or(`customer_id.eq.${customerId},customer_email.eq.${emailNorm}`)
     .order("created_at", { ascending: false });
 
   if (error) return { orders: [] as CustomerOrder[], error: error.message };
@@ -86,11 +100,13 @@ export async function fetchCustomerOrder(id: string, customerId: string, email: 
     .eq("id", id)
     .maybeSingle();
 
-  if (error || !data) return { order: null as CustomerOrder | null, error: error?.message || "غير موجود" };
+  if (error || !data)
+    return { order: null as CustomerOrder | null, error: error?.message || "غير موجود" };
 
   const owns =
     data.customer_id === customerId ||
-    (data.customer_email && data.customer_email.toLowerCase() === email.toLowerCase());
+    (data.customer_email &&
+      data.customer_email.toLowerCase() === email.toLowerCase().trim());
   if (!owns) return { order: null, error: "غير مصرح" };
   return { order: data as CustomerOrder, error: null };
 }

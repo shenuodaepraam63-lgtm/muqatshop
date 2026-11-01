@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -22,6 +22,7 @@ import { getMerchantRef, clearMerchantRef } from "@/lib/merchant-ref";
 import { notifyOrderWhatsApp } from "@/lib/whatsapp/client-notify";
 import { loadAccountIdentity } from "@/lib/account-identity";
 import { resolveCustomerId } from "@/lib/customer-account";
+import { syncCustomerFromAuthUser } from "@/lib/auth-customer";
 import { ensureCanPurchaseAsync, purchaseLoginHref } from "@/lib/purchase-guard";
 
 /** Checkout + delivery form for cart (export required for Next typecheck). */
@@ -31,6 +32,7 @@ export function CheckoutForm() {
   const clearCart = useCartStore((s) => s.clearCart);
   const subtotal = useCartStore((s) => s.totalPrice());
   const baseSubtotal = useCartStore((s) => s.totalBase());
+  const submittingRef = useRef(false);
 
   const [selfMerchantId, setSelfMerchantId] = useState<string | null>(null);
   const [selfMerchantName, setSelfMerchantName] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export function CheckoutForm() {
   const [error, setError] = useState("");
   const [authReady, setAuthReady] = useState(false);
   const [canCheckout, setCanCheckout] = useState(false);
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
 
   const [shipSettings, setShipSettings] = useState<ShippingSettings>({
     fee: DEFAULT_SHIPPING_FEE,
@@ -66,6 +69,22 @@ export function CheckoutForm() {
       const ok = await ensureCanPurchaseAsync();
       setCanCheckout(ok);
       setAuthReady(true);
+
+      if (!ok) return;
+
+      // Prefill from Auth identity for customers (not marketer self-order)
+      if (!getMerchantSession()) {
+        const idRes = await loadAccountIdentity();
+        if (idRes.ok) {
+          setAccountEmail(idRes.identity.email);
+          if (idRes.identity.fullName) setFullName(idRes.identity.fullName);
+          if (idRes.identity.phone) setPhone(idRes.identity.phone);
+          // Ensure customers row exists before checkout
+          await syncCustomerFromAuthUser({
+            name: idRes.identity.fullName || undefined,
+          }).catch(() => null);
+        }
+      }
     })();
   }, []);
 
@@ -144,6 +163,8 @@ export function CheckoutForm() {
     e.preventDefault();
     setError("");
 
+    if (submittingRef.current) return;
+
     const allowed = await ensureCanPurchaseAsync();
     if (!allowed) {
       window.location.href = purchaseLoginHref("/cart");
@@ -169,6 +190,7 @@ export function CheckoutForm() {
       }
     }
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       let finalDiscount = discount;
@@ -180,6 +202,7 @@ export function CheckoutForm() {
         if (!re.ok) {
           setError(re.error);
           setLoading(false);
+          submittingRef.current = false;
           return;
         }
         finalDiscount = re.discount;
@@ -238,16 +261,39 @@ export function CheckoutForm() {
           `إحالة تاجر: ${refMerchantName || refMerchantId.slice(0, 8)}`
         );
 
+      // Customer path: require customer_id linkage (MQ-CUSTOMER / PR-3)
       let linkedCustomerId: string | null = null;
       let linkedCustomerEmail: string | null = null;
-      try {
+
+      if (!selfMerchantId) {
         const idRes = await loadAccountIdentity();
-        if (idRes.ok) {
-          linkedCustomerEmail = idRes.identity.email.toLowerCase();
-          linkedCustomerId = await resolveCustomerId(idRes.identity);
+        if (!idRes.ok) {
+          setError("يجب تسجيل الدخول لإتمام الطلب.");
+          window.location.href = purchaseLoginHref("/cart");
+          return;
         }
-      } catch {
-        /* blocked earlier if guest */
+        linkedCustomerEmail = idRes.identity.email.toLowerCase();
+        await syncCustomerFromAuthUser({
+          name: idRes.identity.fullName || fullName.trim() || undefined,
+        }).catch(() => null);
+        linkedCustomerId = await resolveCustomerId(idRes.identity);
+        if (!linkedCustomerId) {
+          setError("تعذر ربط الطلب بحسابك. حدّث الصفحة وحاول مرة أخرى.");
+          setLoading(false);
+          submittingRef.current = false;
+          return;
+        }
+      } else {
+        // Marketer order for a client — optional identity link if Auth session exists
+        try {
+          const idRes = await loadAccountIdentity();
+          if (idRes.ok) {
+            linkedCustomerEmail = idRes.identity.email.toLowerCase();
+            linkedCustomerId = await resolveCustomerId(idRes.identity);
+          }
+        } catch {
+          /* optional */
+        }
       }
 
       const payload: Record<string, unknown> = {
@@ -297,6 +343,7 @@ export function CheckoutForm() {
           ? String((err as { message: string }).message)
           : "حدث خطأ أثناء إرسال الطلب";
       setError(msg);
+      submittingRef.current = false;
     } finally {
       setLoading(false);
     }
@@ -319,10 +366,16 @@ export function CheckoutForm() {
           السلة تبقى محفوظة على هذا الجهاز.
         </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-          <Link href={purchaseLoginHref("/cart")} className="btn-primary inline-flex justify-center">
+          <Link
+            href={purchaseLoginHref("/cart")}
+            className="btn-primary inline-flex justify-center"
+          >
             تسجيل الدخول لإتمام الطلب
           </Link>
-          <Link href="/register/customer" className="btn-secondary inline-flex justify-center">
+          <Link
+            href="/register/customer"
+            className="btn-secondary inline-flex justify-center"
+          >
             إنشاء حساب عميل
           </Link>
         </div>
@@ -339,7 +392,9 @@ export function CheckoutForm() {
       <p className="text-xs text-muted mb-4">
         {selfMerchantId
           ? "أدخل بيانات العميل — الطلب يُسجَّل على حسابك كمسوق"
-          : "الحقول المعلّمة * مطلوبة"}
+          : accountEmail
+            ? `الطلب سيُربط بحسابك (${accountEmail})`
+            : "الحقول المعلّمة * مطلوبة"}
       </p>
 
       {!selfMerchantId && refMerchantId && (

@@ -3,7 +3,10 @@
 import { supabase } from "@/lib/supabase";
 import { getMerchantSession } from "@/lib/merchant";
 
-/** Checkout requires Supabase session (or legacy merchant marketer session). Guest cart is allowed. */
+/**
+ * Checkout requires Supabase Auth session, or legacy marketer session (merchant placing orders).
+ * Guest may keep a local cart; purchase is blocked until login.
+ */
 export async function ensureCanPurchaseAsync(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   if (getMerchantSession()) return true;
@@ -11,7 +14,7 @@ export async function ensureCanPurchaseAsync(): Promise<boolean> {
   return Boolean(data.session?.user);
 }
 
-/** @deprecated prefer ensureCanPurchaseAsync — sync check only for merchant marketer path */
+/** @deprecated prefer ensureCanPurchaseAsync */
 export function ensureCanPurchase(): boolean {
   if (typeof window === "undefined") return false;
   return Boolean(getMerchantSession());
