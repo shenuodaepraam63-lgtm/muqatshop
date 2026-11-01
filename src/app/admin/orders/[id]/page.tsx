@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { supabase, type Order } from "@/lib/supabase";
 import { formatPrice } from "@/lib/utils";
+import type { OrderShipment } from "@/lib/order-foundation";
 
 const statusOptions = [
   { value: "new", label: "جديد" },
@@ -23,8 +24,21 @@ export default function AdminOrderInvoicePage() {
   const router = useRouter();
   const id = params?.id as string;
   const [order, setOrder] = useState<OrderWithVersion | null>(null);
+  const [shipments, setShipments] = useState<OrderShipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [shipSaving, setShipSaving] = useState(false);
+
+  const loadShipments = async (orderId: string) => {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token) return;
+    const res = await fetch(`/api/orders/${orderId}/shipments`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await res.json().catch(() => null);
+    if (body?.ok) setShipments(body.shipments || []);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -36,6 +50,7 @@ export default function AdminOrderInvoicePage() {
       .then(({ data }) => {
         setOrder(data as OrderWithVersion | null);
         setLoading(false);
+        if (data?.id) void loadShipments(data.id as string);
       });
   }, [id]);
 
@@ -52,10 +67,7 @@ export default function AdminOrderInvoicePage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            status,
-            expectedVersion: order.version,
-          }),
+          body: JSON.stringify({ status, expectedVersion: order.version }),
         });
         const body = await res.json().catch(() => null);
         if (res.ok && body?.ok) {
@@ -65,10 +77,11 @@ export default function AdminOrderInvoicePage() {
             updated_at: body.updatedAt || new Date().toISOString(),
             version: body.version ?? order.version,
           });
+          void loadShipments(order.id);
           return;
         }
         if (body?.code === "VERSION_CONFLICT") {
-          alert(body.error || "تم تحديث الطلب من جهة أخرى — أعد التحميل");
+          alert(body.error || "تم تحديث الطلب من جهة أخرى");
           const { data } = await supabase
             .from("orders")
             .select("*")
@@ -78,7 +91,6 @@ export default function AdminOrderInvoicePage() {
           return;
         }
       }
-      // Fallback if API unavailable
       const { data } = await supabase
         .from("orders")
         .update({ status, updated_at: new Date().toISOString() })
@@ -91,14 +103,56 @@ export default function AdminOrderInvoicePage() {
     }
   };
 
-  if (loading) {
-    return <p className="text-muted text-sm">جاري التحميل...</p>;
-  }
+  const saveShipment = async (
+    shipmentId: string,
+    patch: { carrier?: string; trackingNumber?: string; label?: string }
+  ) => {
+    if (!order) return;
+    setShipSaving(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) return;
+      await fetch(`/api/orders/${order.id}/shipments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ shipmentId, ...patch }),
+      });
+      await loadShipments(order.id);
+    } finally {
+      setShipSaving(false);
+    }
+  };
 
+  const addShipment = async () => {
+    if (!order) return;
+    setShipSaving(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) return;
+      await fetch(`/api/orders/${order.id}/shipments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ create: true, status: order.status }),
+      });
+      await loadShipments(order.id);
+    } finally {
+      setShipSaving(false);
+    }
+  };
+
+  if (loading) return <p className="text-sm text-muted">جاري التحميل...</p>;
   if (!order) {
     return (
       <div>
-        <p className="text-muted mb-4">الطلب غير موجود</p>
+        <p className="mb-4 text-muted">الطلب غير موجود</p>
         <button type="button" onClick={() => router.back()} className="text-sm underline">
           رجوع
         </button>
@@ -196,9 +250,59 @@ export default function AdminOrderInvoicePage() {
               ))}
             </select>
             <p className="mt-2 text-[11px] text-muted">
-              التحديث يُسجَّل في سجل الحالات ويزيد رقم النسخة (version)
-              {order.version != null ? ` · النسخة الحالية: ${order.version}` : ""}
+              يُسجَّل في سجل الحالات + إشعار العميل · version{" "}
+              {order.version != null ? order.version : "—"}
             </p>
+          </section>
+
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted">
+                الشحنات
+              </h3>
+              <button
+                type="button"
+                disabled={shipSaving}
+                onClick={() => void addShipment()}
+                className="text-xs font-semibold text-[#3157D5]"
+              >
+                + شحنة إضافية
+              </button>
+            </div>
+            <ul className="space-y-3">
+              {shipments.map((s) => (
+                <li
+                  key={s.id}
+                  className="space-y-2 rounded-xl border border-[#e8e2d9] p-3"
+                >
+                  <p className="text-sm font-semibold">{s.label}</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      className="rounded-lg border border-[#e8e2d9] px-3 py-2 text-sm"
+                      placeholder="شركة الشحن"
+                      defaultValue={s.carrier || ""}
+                      onBlur={(e) =>
+                        void saveShipment(s.id, { carrier: e.target.value })
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-[#e8e2d9] px-3 py-2 text-sm"
+                      placeholder="رقم التتبع"
+                      defaultValue={s.trackingNumber || ""}
+                      onBlur={(e) =>
+                        void saveShipment(s.id, {
+                          trackingNumber: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted">الحالة: {s.status}</p>
+                </li>
+              ))}
+              {shipments.length === 0 && (
+                <p className="text-sm text-muted">لا توجد شحنات بعد</p>
+              )}
+            </ul>
           </section>
         </div>
       </div>

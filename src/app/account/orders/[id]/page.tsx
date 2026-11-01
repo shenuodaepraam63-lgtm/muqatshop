@@ -4,13 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import {
   fetchOrderDetail,
   fetchOrderEvents,
   type CustomerOrderDetail,
 } from "@/lib/order-detail-client";
 import type { OrderShipment, OrderStatusEvent } from "@/lib/order-foundation";
+import { useOrderRealtime } from "@/lib/use-order-realtime";
 import {
   orderStatusLabel,
   orderStatusTone,
@@ -19,10 +19,6 @@ import {
 } from "@/lib/order-status";
 import { formatPrice } from "@/lib/utils";
 
-/**
- * Customer order details — permanent foundation
- * Server ownership · shipments · status events · realtime · retry
- */
 export default function AccountOrderDetailPage() {
   const params = useParams();
   const id = params?.id as string;
@@ -36,10 +32,9 @@ export default function AccountOrderDetailPage() {
   const [err, setErr] = useState("");
   const [offline, setOffline] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  const [live, setLive] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const retryCount = useRef(0);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const load = useCallback(
     async (opts?: { soft?: boolean }) => {
@@ -114,66 +109,38 @@ export default function AccountOrderDetailPage() {
     };
   }, [load]);
 
-  useEffect(() => {
-    if (!id || !order?.id) return;
-    if (channelRef.current) {
-      void supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-    const channel = supabase
-      .channel(`customer-order-${id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "orders",
-          filter: `id=eq.${id}`,
-        },
-        (payload) => {
-          const next = payload.new as {
-            status?: string;
-            updated_at?: string;
-            version?: number;
-          };
-          setOrder((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: next.status || prev.status,
-                  updatedAt: next.updated_at || prev.updatedAt,
-                  version: next.version ?? prev.version,
-                }
-              : prev
-          );
-          setShipments((prev) =>
-            prev.map((s, i) =>
-              i === 0
-                ? {
-                    ...s,
-                    status: next.status || s.status,
-                    updatedAt: next.updated_at || s.updatedAt,
-                  }
-                : s
-            )
-          );
-          // Soft-refresh events so history stays accurate
-          void fetchOrderDetail(id).then((res) => {
-            if (res.ok) {
-              setEvents(res.events || []);
-              setEventsCursor(res.eventsNextCursor);
+  const { live } = useOrderRealtime(order?.id, (patch) => {
+    setOrder((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: patch.status || prev.status,
+            updatedAt: patch.updated_at || prev.updatedAt,
+            version: patch.version ?? prev.version,
+          }
+        : prev
+    );
+    setShipments((prev) =>
+      prev.map((s, i) =>
+        i === 0
+          ? {
+              ...s,
+              status: patch.status || s.status,
+              updatedAt: patch.updated_at || s.updatedAt,
             }
-          });
-        }
+          : s
       )
-      .subscribe((status) => setLive(status === "SUBSCRIBED"));
-    channelRef.current = channel;
-    return () => {
-      void supabase.removeChannel(channel);
-      channelRef.current = null;
-      setLive(false);
-    };
-  }, [id, order?.id]);
+    );
+    if (id) {
+      void fetchOrderDetail(id).then((res) => {
+        if (res.ok) {
+          setEvents(res.events || []);
+          setEventsCursor(res.eventsNextCursor);
+          setShipments(res.shipments || []);
+        }
+      });
+    }
+  });
 
   const loadMoreEvents = async () => {
     if (!id || !eventsCursor || loadingMoreEvents) return;
@@ -191,7 +158,6 @@ export default function AccountOrderDetailPage() {
       <div className="space-y-3">
         <div className="h-6 w-40 animate-pulse rounded bg-[#E5EAF1]" />
         <div className="h-28 animate-pulse rounded-2xl bg-[#E5EAF1]" />
-        <div className="h-40 animate-pulse rounded-2xl bg-[#E5EAF1]" />
       </div>
     );
   }
@@ -214,9 +180,9 @@ export default function AccountOrderDetailPage() {
           </button>
           <Link
             href="/account/orders"
-            className="rounded-xl border border-[#E4E9F0] px-4 py-2 text-sm font-semibold text-[#14243A]"
+            className="rounded-xl border border-[#E4E9F0] px-4 py-2 text-sm font-semibold"
           >
-            رجوع للطلبات
+            رجوع
           </Link>
         </div>
       </div>
@@ -228,6 +194,22 @@ export default function AccountOrderDetailPage() {
 
   return (
     <div className="space-y-4">
+      {lightbox && (
+        <button
+          type="button"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightbox(null)}
+          aria-label="إغلاق"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightbox}
+            alt=""
+            className="max-h-[90vh] max-w-full rounded-lg object-contain"
+          />
+        </button>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <Link href="/account/orders" className="text-sm font-semibold text-[#3157D5]">
           ← طلباتي
@@ -267,7 +249,6 @@ export default function AccountOrderDetailPage() {
             {orderStatusLabel(order.status)}
           </span>
         </div>
-
         {!cancelled && (
           <ol className="mt-5 flex flex-wrap gap-2 border-t border-[#E4E9F0] pt-4">
             {ORDER_TIMELINE.map((t, i) => {
@@ -296,10 +277,7 @@ export default function AccountOrderDetailPage() {
         <h2 className="text-sm font-bold text-[#14243A]">الشحنات</h2>
         <ul className="mt-3 space-y-2">
           {shipments.map((s) => (
-            <li
-              key={s.id}
-              className="rounded-xl border border-[#E5EAF1] bg-[#F6F8FB] px-3 py-3"
-            >
+            <li key={s.id} className="rounded-xl border border-[#E5EAF1] bg-[#F6F8FB] px-3 py-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-[#14243A]">{s.label}</p>
                 <span
@@ -316,9 +294,6 @@ export default function AccountOrderDetailPage() {
                   {s.carrier ? ` · ${s.carrier}` : ""}
                 </p>
               )}
-              <p className="mt-1 text-[11px] text-[#718096]">
-                آخر تحديث: {new Date(s.updatedAt).toLocaleString("ar-EG")}
-              </p>
             </li>
           ))}
         </ul>
@@ -338,14 +313,11 @@ export default function AccountOrderDetailPage() {
                     {orderStatusLabel(ev.toStatus)}
                     {ev.fromStatus ? (
                       <span className="font-normal text-[#718096]">
-                        {" "}
-                        (من {orderStatusLabel(ev.fromStatus)})
+                        {" "}(من {orderStatusLabel(ev.fromStatus)})
                       </span>
                     ) : null}
                   </p>
-                  {ev.note && (
-                    <p className="text-xs text-[#526174]">{ev.note}</p>
-                  )}
+                  {ev.note && <p className="text-xs text-[#526174]">{ev.note}</p>}
                   <p className="text-[11px] text-[#718096]">
                     {new Date(ev.createdAt).toLocaleString("ar-EG")}
                   </p>
@@ -359,7 +331,7 @@ export default function AccountOrderDetailPage() {
             type="button"
             onClick={() => void loadMoreEvents()}
             disabled={loadingMoreEvents}
-            className="mt-3 w-full rounded-xl border border-[#E5EAF1] py-2 text-sm font-semibold text-[#3157D5] disabled:opacity-60"
+            className="mt-3 w-full rounded-xl border border-[#E5EAF1] py-2 text-sm font-semibold text-[#3157D5]"
           >
             {loadingMoreEvents ? "جاري التحميل..." : "تحميل المزيد"}
           </button>
@@ -371,7 +343,12 @@ export default function AccountOrderDetailPage() {
         <ul className="mt-3 space-y-3">
           {order.items.map((item, idx) => (
             <li key={`${item.productId}-${idx}`} className="flex gap-3">
-              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#E4E9F0] bg-[#F6F8FB]">
+              <button
+                type="button"
+                className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#E4E9F0] bg-[#F6F8FB]"
+                onClick={() => item.image && setLightbox(item.image)}
+                disabled={!item.image}
+              >
                 {item.image ? (
                   <Image
                     src={item.image}
@@ -379,9 +356,10 @@ export default function AccountOrderDetailPage() {
                     fill
                     className="object-contain p-0.5"
                     sizes="56px"
+                    loading="lazy"
                   />
                 ) : null}
-              </div>
+              </button>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[#202B3C]">{item.name}</p>
                 {item.variant && (
@@ -416,7 +394,6 @@ export default function AccountOrderDetailPage() {
             <span>الإجمالي</span>
             <span>{formatPrice(order.total)}</span>
           </div>
-          <p className="pt-1 text-[11px] text-[#718096]">الدفع عند الاستلام</p>
         </div>
       </section>
 
