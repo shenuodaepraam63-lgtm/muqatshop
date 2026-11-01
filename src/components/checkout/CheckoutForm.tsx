@@ -334,6 +334,8 @@ export function CheckoutForm() {
     void submit();
   };
 
+  const ctaLabel = selfMerchantId ? "إرسال طلب المسوق" : "تأكيد الطلب وإرساله";
+
   if (!authReady) {
     return (
       <div className="rounded-[14px] border border-[#E5EAF1] bg-white p-5 text-sm text-[#667085]">
@@ -371,7 +373,7 @@ export function CheckoutForm() {
 
   return (
     <>
-      <form onSubmit={onFormSubmit} className="space-y-4">
+      <form onSubmit={onFormSubmit} className="space-y-4 pb-4">
         <CustomerInformation
           fullName={fullName}
           phone={phone}
@@ -411,23 +413,46 @@ export function CheckoutForm() {
           onClear={clearCoupon}
         />
 
+        {/* Always-visible order summary on small screens */}
+        <div className="lg:hidden">
+          <OrderSummaryPanel
+            items={items}
+            subtotal={subtotal}
+            discount={discount}
+            shipping={shipping}
+            total={total}
+            governorate={addressForm.governorate}
+            appliedCode={appliedCode}
+            markupProfit={markupProfit}
+            freeShippingHint={freeShippingHint}
+          />
+        </div>
+
         {error && (
           <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-[#DC3545]">
             {error}
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={loading || items.length === 0}
-          className="hidden h-[52px] w-full rounded-[10px] bg-[#3157D5] text-[15px] font-bold text-white hover:bg-[#2447B8] disabled:opacity-60 md:block"
-        >
-          {loading
-            ? "جاري إرسال الطلب..."
-            : selfMerchantId
-              ? "إرسال طلب المسوق"
-              : "تأكيد الطلب"}
-        </button>
+        {/* Primary CTA — visible on ALL breakpoints */}
+        <div className="rounded-[14px] border border-[#E5EAF1] bg-white p-4">
+          <div className="mb-3 flex items-center justify-between text-sm">
+            <span className="text-[#667085]">الإجمالي</span>
+            <span className="text-lg font-bold text-[#14243A]">
+              {formatPrice(total)}
+            </span>
+          </div>
+          <button
+            type="submit"
+            disabled={loading || items.length === 0}
+            className="flex h-[52px] w-full items-center justify-center rounded-[10px] bg-[#3157D5] text-[16px] font-bold text-white shadow-sm hover:bg-[#2447B8] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "جاري إرسال الطلب..." : ctaLabel}
+          </button>
+          <p className="mt-2 text-center text-[11px] text-[#667085]">
+            بالضغط على الزر يتم إرسال طلبك للإدارة · الدفع عند الاستلام
+          </p>
+        </div>
       </form>
 
       <div className="mt-4 hidden lg:block">
@@ -448,7 +473,7 @@ export function CheckoutForm() {
         total={total}
         loading={loading}
         disabled={items.length === 0}
-        label={selfMerchantId ? "إرسال طلب المسوق" : "تأكيد الطلب"}
+        label={ctaLabel}
         onPlaceOrder={() => void submit()}
       />
     </>

@@ -8,11 +8,6 @@ import { CheckoutForm } from "@/components/checkout/CheckoutForm";
 import { ensureCanPurchaseAsync, purchaseLoginHref } from "@/lib/purchase-guard";
 import { ShoppingBag, ChevronLeft } from "lucide-react";
 
-/**
- * Checkout page — Blueprint layout
- * Phase 1: route separation
- * Phase 2: modular sections + saved addresses + mobile bar
- */
 export default function CheckoutPage() {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
@@ -48,7 +43,7 @@ export default function CheckoutPage() {
   if (items.length === 0) return null;
 
   return (
-    <div className="min-h-screen bg-[#F6F8FB] pb-28 md:pb-12">
+    <div className="min-h-screen bg-[#F6F8FB] pb-36 md:pb-12">
       <nav className="border-b border-[#E5EAF1] bg-white text-[12px] text-[#667085]">
         <div className="mx-auto flex max-w-[1200px] items-center gap-2 px-4 py-2.5 sm:px-6">
           <Link href="/" className="hover:text-[#3157D5]">
@@ -134,20 +129,8 @@ export default function CheckoutPage() {
             </div>
           </div>
         ) : (
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,65%)_minmax(0,35%)]">
-            <div className="order-2 min-w-0 lg:order-1">
-              <CheckoutForm />
-            </div>
-            {/* Summary column shown inside form on lg via OrderSummaryPanel duplicate avoided:
-                form already renders summary for lg; this keeps grid balance on mobile-first */}
-            <aside className="order-1 lg:order-2 lg:hidden">
-              {/* Mobile: short intro card only — full summary is in form + bottom bar */}
-              <div className="rounded-[14px] border border-[#E5EAF1] bg-white p-4">
-                <p className="text-sm text-[#667085]">
-                  {items.length} منتج · أكمل البيانات بالأسفل ثم اضغط تأكيد الطلب
-                </p>
-              </div>
-            </aside>
+          <div className="max-w-3xl lg:max-w-none">
+            <CheckoutForm />
           </div>
         )}
       </div>
