@@ -1,130 +1,273 @@
 import type { Metadata } from "next";
-import { Fragment } from "react";
-import { supabase, isSupabaseConfigured, type Category, type Product } from "@/lib/supabase";
-import { DEFAULT_HOMEPAGE_CONFIG, isAnnouncementActive, normalizeHomepageConfig, type HomeSectionKey } from "@/lib/homepage-config";
+import {
+  supabase,
+  isSupabaseConfigured,
+  productMainImage,
+  type Category,
+  type Product,
+} from "@/lib/supabase";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { CategorySection, DealsSection, FaqSection, FeaturedProductsSection, FinalCtaSection, HomeHero, HowItWorksSection, JoinSection, PartnershipSection, TrustSection, WhyUsSection } from "@/components/home/HomeSections";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { PromoSlider, type PromoSlide } from "@/components/home/PromoSlider";
+import { StoreBenefits } from "@/components/home/StoreBenefits";
+import { CategoryCards } from "@/components/home/CategoryCards";
+import { SectionHeader } from "@/components/home/SectionHeader";
+import { HorizontalProductRail } from "@/components/home/HorizontalProductRail";
+import { ProductGrid } from "@/components/home/ProductGrid";
+import { RecentlyViewedSection } from "@/components/home/RecentlyViewedSection";
+import { isSaleActive } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://muqatshop.vercel.app"),
-  title: "Muqatshop | منصة للتسوق والتجارة والتسويق بالعمولة",
-  description: "اكتشف Muqatshop، منصة تجمع العملاء والتجار والمسوقين في تجربة تجارة إلكترونية متكاملة. تصفح المنتجات، وانضم كشريك تجاري أو مسوق.",
+  title: "Muqatshop | تسوق منتجات متنوعة",
+  description:
+    "اكتشف منتجات Muqatshop، تصفح التصنيفات والعروض، وأتمم طلبك بسهولة.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Muqatshop",
-    description: "منصة تجارة إلكترونية متكاملة.",
+    description: "متجر إلكتروني حديث — منتجات وعروض حقيقية.",
     url: "https://muqatshop.vercel.app/",
     locale: "ar_EG",
     type: "website",
-    images: [{ url: "/images/muqat-home-og.webp", width: 1200, height: 630, alt: "Muqatshop — منصة للتسوق والتجارة والتسويق" }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Muqatshop",
-    description: "منصة تجارة إلكترونية متكاملة.",
-    images: ["/images/muqat-home-og.webp"],
   },
 };
 
 function available(product: Product): boolean {
-  if (product.variants?.length) return product.variants.some((variant) => Number(variant.stock) > 0);
+  if (product.variants?.length) return product.variants.some((v) => Number(v.stock) > 0);
   return Number(product.stock) > 0;
 }
 
-async function loadHomepage() {
+const PRODUCT_COLS =
+  "id,name,slug,price,compare_at_price,sale_ends_at,images,main_image_index,category_id,stock,variants,is_featured,is_active,created_at";
+
+async function loadHomeData() {
   if (!isSupabaseConfigured) {
-    return { config: DEFAULT_HOMEPAGE_CONFIG, featuredProducts: [] as Product[], deals: [] as Product[], categories: [] as Category[], hadProductError: false, hadCategoryError: false };
+    return {
+      categories: [] as Category[],
+      bestSellers: [] as Product[],
+      offers: [] as Product[],
+      recommended: [] as Product[],
+      categoryProducts: [] as Product[],
+      slides: defaultSlides(),
+    };
   }
 
-  const productColumns = "id,name,slug,price,compare_at_price,sale_ends_at,images,main_image_index,category_id,stock,variants,is_featured,is_active,created_at";
-  const [settingsResult, featuredResult, dealsResult, categoriesResult] = await Promise.all([
-    supabase.from("site_settings").select("value").eq("key", "homepage").maybeSingle(),
-    supabase.from("products")
-      .select(productColumns)
-      .eq("is_active", true)
-      .eq("is_featured", true)
-      .or("stock.gt.0,variants.not.is.null")
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase.from("products")
-      .select(productColumns)
-      .eq("is_active", true)
-      .not("compare_at_price", "is", null)
-      .or("stock.gt.0,variants.not.is.null")
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase.from("categories")
+  const [categoriesResult, featuredResult, offersResult, activeResult] = await Promise.all([
+    supabase
+      .from("categories")
       .select("id,name,slug,image,sort_order,group_id,parent_id")
       .eq("is_active", true)
       .is("parent_id", null)
       .order("sort_order", { ascending: true })
-      .limit(50),
+      .limit(10),
+    supabase
+      .from("products")
+      .select(PRODUCT_COLS)
+      .eq("is_active", true)
+      .eq("is_featured", true)
+      .order("created_at", { ascending: false })
+      .limit(24),
+    supabase
+      .from("products")
+      .select(PRODUCT_COLS)
+      .eq("is_active", true)
+      .not("compare_at_price", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(40),
+    supabase
+      .from("products")
+      .select(PRODUCT_COLS)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(40),
   ]);
 
-  const config = normalizeHomepageConfig(settingsResult.data?.value);
-  const featuredProducts = ((featuredResult.data || []) as Product[]).filter((product) => product.is_active && product.is_featured && available(product)).slice(0, 8);
-  const deals = ((dealsResult.data || []) as Product[]).filter((product) => {
-    const compare = Number(product.compare_at_price || 0);
-    const price = Number(product.price || 0);
-    const endIsValid = !product.sale_ends_at || new Date(product.sale_ends_at).getTime() > Date.now();
-    return product.is_active && available(product) && compare > price && endIsValid;
-  }).slice(0, 4);
-  const allCategories = (categoriesResult.data || []) as Category[];
-  const categories = config.featuredCategoryIds.length
-    ? config.featuredCategoryIds.map((id) => allCategories.find((item) => item.id === id)).filter((item): item is Category => Boolean(item))
-    : allCategories.slice(0, 10);
+  const categories = ((categoriesResult.data || []) as Category[]).slice(0, 10);
 
-  return {
-    config,
-    featuredProducts,
-    deals,
-    categories,
-    hadProductError: Boolean(featuredResult.error || dealsResult.error),
-    hadCategoryError: Boolean(categoriesResult.error),
-  };
+  const featured = ((featuredResult.data || []) as Product[]).filter(
+    (p) => p.is_active && available(p)
+  );
+  const active = ((activeResult.data || []) as Product[]).filter(
+    (p) => p.is_active && available(p)
+  );
+
+  // Best sellers: featured first (real sales ranking not available in DB yet)
+  const bestSellers = (featured.length ? featured : active).slice(0, 8);
+
+  const offers = ((offersResult.data || []) as Product[])
+    .filter((p) => {
+      const price = Number(p.price || 0);
+      const compare = Number(p.compare_at_price || 0);
+      return (
+        p.is_active &&
+        available(p) &&
+        isSaleActive(price, compare, p.sale_ends_at)
+      );
+    })
+    .slice(0, 8);
+
+  // Recommended = popular/active excluding already shown when possible
+  const used = new Set(bestSellers.map((p) => p.id));
+  const recommended = active.filter((p) => !used.has(p.id)).slice(0, 8);
+  if (recommended.length < 8) {
+    for (const p of active) {
+      if (recommended.length >= 8) break;
+      if (!recommended.some((x) => x.id === p.id)) recommended.push(p);
+    }
+  }
+
+  // Category products: products from first categories on home
+  const catIds = categories.slice(0, 3).map((c) => c.id);
+  let categoryProducts: Product[] = [];
+  if (catIds.length) {
+    const { data } = await supabase
+      .from("products")
+      .select(PRODUCT_COLS)
+      .eq("is_active", true)
+      .in("category_id", catIds)
+      .order("created_at", { ascending: false })
+      .limit(24);
+    categoryProducts = ((data || []) as Product[])
+      .filter((p) => available(p))
+      .filter((p) => !used.has(p.id))
+      .slice(0, 8);
+  }
+
+  const slides: PromoSlide[] = defaultSlides(
+    categories[0]
+      ? {
+          title: categories[0].name,
+          href: `/categories/${encodeURIComponent(categories[0].slug)}`,
+          image: categories[0].image,
+        }
+      : undefined,
+    offers[0]
+      ? {
+          title: offers[0].name,
+          href: `/products/${encodeURIComponent(offers[0].slug)}`,
+          image: productMainImage(offers[0]),
+        }
+      : undefined
+  );
+
+  return { categories, bestSellers, offers, recommended, categoryProducts, slides };
+}
+
+function defaultSlides(
+  cat?: { title: string; href: string; image?: string | null },
+  offer?: { title: string; href: string; image?: string | null }
+): PromoSlide[] {
+  return [
+    {
+      id: "shop",
+      title: "تسوق أحدث المنتجات على Muqatshop",
+      subtitle: "تجربة تسوق واضحة — منتجات حقيقية وأسعار من المتجر.",
+      href: "/shop",
+      tone: "navy",
+    },
+    cat
+      ? {
+          id: "cat",
+          title: `استكشف تصنيف ${cat.title}`,
+          subtitle: "تصفح المنتجات حسب التصنيف المناسب لك.",
+          href: cat.href,
+          image: cat.image,
+          tone: "blue",
+        }
+      : {
+          id: "categories",
+          title: "تصفح التصنيفات",
+          subtitle: "اعثر على ما تبحث عنه بسرعة.",
+          href: "/categories",
+          tone: "blue",
+        },
+    offer
+      ? {
+          id: "offer",
+          title: `عرض: ${offer.title}`,
+          subtitle: "خصم ساري على المنتج — التفاصيل داخل صفحة المنتج.",
+          href: offer.href,
+          image: offer.image,
+          tone: "teal",
+        }
+      : {
+          id: "offers",
+          title: "اكتشف العروض السارية",
+          subtitle: "نعرض فقط المنتجات ذات الخصم الحقيقي.",
+          href: "/shop",
+          tone: "teal",
+        },
+  ];
 }
 
 export default async function HomePage() {
-  const { config, featuredProducts, deals, categories, hadProductError, hadCategoryError } = await loadHomepage();
+  const data = await loadHomeData();
 
-  const content: Record<HomeSectionKey, React.ReactNode> = {
-    hero: <HomeHero config={config} />,
-    trust: <TrustSection />,
-    categories: hadCategoryError ? <CategoryLoadError /> : <CategorySection categories={categories} />,
-    featuredProducts: hadProductError ? <ProductLoadError /> : <FeaturedProductsSection products={featuredProducts} />,
-    howItWorks: <HowItWorksSection />,
-    partnerships: <PartnershipSection />,
-    deals: <DealsSection products={deals} />,
-    whyUs: <WhyUsSection />,
-    join: <JoinSection />,
-    faq: <FaqSection config={config} />,
-    finalCta: <FinalCtaSection />,
-  };
+  return (
+    <div className="muqat-home" dir="rtl">
+      <Header />
+      <main id="main-content" className="pb-20 md:pb-0">
+        <PromoSlider slides={data.slides} />
+        <StoreBenefits />
 
-  const announcementVisible = isAnnouncementActive(config);
+        {data.categories.length > 0 && (
+          <section className="home-section" aria-label="التصنيفات">
+            <div className="home-container">
+              <SectionHeader title="التصنيفات" href="/categories" />
+              <CategoryCards categories={data.categories} />
+            </div>
+          </section>
+        )}
 
-  return <div className="muqat-home" dir="rtl">
-    {announcementVisible && <div className="home-announcement" role="region" aria-label="إعلان"><a href={config.announcement.href} className="mx-auto block max-w-[1280px] px-4 py-2 text-center text-xs font-semibold text-white sm:text-[13px]">{config.announcement.text}</a></div>}
-    <Header />
-    <main id="main-content">
-      {config.sectionOrder.map((key) => {
-        if (!config.sectionVisibility[key]) return null;
-        if (key === "categories" && categories.length === 0) return null;
-        if (key === "deals" && deals.length === 0) return null;
-        return <Fragment key={key}>{content[key]}</Fragment>;
-      })}
-    </main>
-    <Footer />
-  </div>;
-}
+        {data.bestSellers.length > 0 && (
+          <section className="home-section" aria-label="الأكثر مبيعًا">
+            <div className="home-container">
+              <SectionHeader
+                title="الأكثر مبيعًا"
+                description="منتجات مميزة ونشطة من المتجر"
+                href="/shop"
+              />
+              <HorizontalProductRail products={data.bestSellers} />
+            </div>
+          </section>
+        )}
 
-function CategoryLoadError() {
-  return <section className="mx-auto max-w-[1280px] px-4 py-8 sm:px-6 lg:px-8" aria-live="polite"><p className="rounded-xl border border-[#E4E9F0] bg-[#F6F8FB] p-4 text-sm text-[#718096]">تعذر تحميل التصنيفات حاليًا، لكن بقية الصفحة متاحة.</p></section>;
-}
+        {data.offers.length > 0 && (
+          <section className="home-section" aria-label="العروض">
+            <div className="home-container">
+              <SectionHeader title="العروض" description="خصومات سارية فقط" href="/shop" />
+              <ProductGrid products={data.offers} />
+            </div>
+          </section>
+        )}
 
-function ProductLoadError() {
-  return <section className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-8" aria-live="polite"><div className="rounded-xl border border-[#E4E9F0] bg-[#F6F8FB] p-5 text-center"><p className="text-sm text-[#718096]">تعذر تحميل المنتجات حاليًا. حاول مرة أخرى.</p><a href="/shop" className="mt-3 inline-flex rounded-lg bg-[#3157D5] px-4 py-2 text-sm font-semibold text-white">فتح المتجر</a></div></section>;
+        {data.recommended.length > 0 && (
+          <section className="home-section" aria-label="مقترحة لك">
+            <div className="home-container">
+              <SectionHeader title="مقترحة لك" href="/shop" />
+              <HorizontalProductRail products={data.recommended} />
+            </div>
+          </section>
+        )}
+
+        {data.categoryProducts.length > 0 && (
+          <section className="home-section" aria-label="منتجات التصنيفات">
+            <div className="home-container">
+              <SectionHeader title="من التصنيفات" href="/categories" />
+              <ProductGrid products={data.categoryProducts} />
+            </div>
+          </section>
+        )}
+
+        <RecentlyViewedSection />
+
+        <StoreBenefits />
+      </main>
+      <Footer />
+      <BottomNav />
+    </div>
+  );
 }
