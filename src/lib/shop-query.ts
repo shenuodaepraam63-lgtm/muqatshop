@@ -4,6 +4,7 @@ import {
   collectCategoryIdsWithDescendants,
 } from "@/lib/supabase";
 import { isSaleActive } from "@/lib/utils";
+import { expandSearchTerms, scoreProductMatch } from "@/lib/search-normalize";
 
 export const SHOP_PAGE_SIZE = 20;
 
@@ -12,13 +13,13 @@ export type ShopSort =
   | "price_asc"
   | "price_desc"
   | "discount"
-  | "name";
+  | "name"
+  | "relevance";
 
 export type ShopQueryInput = {
   categoryId?: string | null;
   includeDescendants?: boolean;
   q?: string | null;
-  /** legacy product_type filter */
   type?: string | null;
   stock?: string | null;
   sort?: string | null;
@@ -52,7 +53,8 @@ export async function fetchShopProducts(f: ShopQueryInput): Promise<Product[]> {
 export async function fetchShopCatalog(f: ShopQueryInput): Promise<ShopQueryResult> {
   const pageSize = Math.min(Math.max(f.pageSize ?? SHOP_PAGE_SIZE, 1), 48);
   const page = Math.max(f.page ?? 1, 1);
-  const sort = (f.sort || "new") as ShopSort;
+  const hasQuery = Boolean(f.q?.trim());
+  const sort = (f.sort || (hasQuery ? "relevance" : "new")) as ShopSort;
 
   let req = supabase
     .from("products")
@@ -76,9 +78,16 @@ export async function fetchShopCatalog(f: ShopQueryInput): Promise<ShopQueryResu
 
   if (f.type && f.type !== "all") req = req.eq("product_type", f.type);
 
-  if (f.q?.trim()) {
-    const t = f.q.trim().replace(/[%_,]/g, " ");
-    req = req.or(`name.ilike.%${t}%,description.ilike.%${t}%,brand.ilike.%${t}%`);
+  if (hasQuery) {
+    const terms = expandSearchTerms(f.q!).slice(0, 5);
+    const orParts = terms
+      .map((t) => {
+        const safe = t.replace(/[%_,]/g, " ").trim();
+        if (!safe) return null;
+        return `name.ilike.%${safe}%,description.ilike.%${safe}%,brand.ilike.%${safe}%`;
+      })
+      .filter(Boolean);
+    if (orParts.length) req = req.or(orParts.join(","));
   }
 
   if (f.stock === "in") req = req.gt("stock", 0);
@@ -94,13 +103,15 @@ export async function fetchShopCatalog(f: ShopQueryInput): Promise<ShopQueryResu
     req = req.not("compare_at_price", "is", null);
   }
 
+  const needsPost = Boolean(
+    f.offers || sort === "discount" || sort === "relevance" || hasQuery
+  );
+
   if (sort === "price_asc") req = req.order("price", { ascending: true });
   else if (sort === "price_desc") req = req.order("price", { ascending: false });
   else if (sort === "name") req = req.order("name", { ascending: true });
   else req = req.order("created_at", { ascending: false });
 
-  // Fetch a wider window when offers/discount sort need post-filter
-  const needsPost = Boolean(f.offers || sort === "discount");
   if (needsPost) {
     req = req.limit(200);
   } else {
@@ -130,6 +141,14 @@ export async function fetchShopCatalog(f: ShopQueryInput): Promise<ShopQueryResu
     );
   }
 
+  if (sort === "relevance" && hasQuery) {
+    products = [...products]
+      .map((p) => ({ p, s: scoreProductMatch(f.q!, p) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .map((x) => x.p);
+  }
+
   if (sort === "discount") {
     products = [...products].sort((a, b) => {
       const da =
@@ -146,7 +165,7 @@ export async function fetchShopCatalog(f: ShopQueryInput): Promise<ShopQueryResu
 
   if (needsPost) {
     const total = products.length;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
     const safePage = Math.min(page, totalPages);
     const start = (safePage - 1) * pageSize;
     return {
@@ -154,7 +173,7 @@ export async function fetchShopCatalog(f: ShopQueryInput): Promise<ShopQueryResu
       total,
       page: safePage,
       pageSize,
-      totalPages,
+      totalPages: total === 0 ? 0 : totalPages,
     };
   }
 
@@ -165,6 +184,6 @@ export async function fetchShopCatalog(f: ShopQueryInput): Promise<ShopQueryResu
     total,
     page: Math.min(page, totalPages),
     pageSize,
-    totalPages,
+    totalPages: total === 0 ? 0 : totalPages,
   };
 }

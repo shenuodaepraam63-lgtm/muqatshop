@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
+import { Heart, Menu, ShoppingBag, User, X } from "lucide-react";
 import { useCartStore } from "@/lib/store";
 import { useWishlistStore } from "@/lib/wishlist";
 import { BrandLogo } from "@/components/brand/BrandLogo";
@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { signOutToHome } from "@/lib/auth-session";
 import { loadAccountIdentity } from "@/lib/account-identity";
+import { SearchBar } from "@/components/search/SearchBar";
 
 const navLinks = [
   { href: "/", label: "الرئيسية" },
@@ -29,7 +30,6 @@ export function Header() {
   const [userLabel, setUserLabel] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
 
   const refresh = async () => {
     const legacyMerchant = getMerchantSession();
@@ -75,16 +75,6 @@ export function Header() {
   const logout = async () => {
     setOpen(false);
     await signOutToHome();
-  };
-
-  const onSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const term = q.trim();
-    if (!term) {
-      window.location.href = "/shop";
-      return;
-    }
-    window.location.href = `/shop?q=${encodeURIComponent(term)}`;
   };
 
   return (
@@ -140,28 +130,11 @@ export function Header() {
       </div>
 
       <div className="border-t border-[#E5EAF1] bg-[#F6F8FB]">
-        <form
-          onSubmit={onSearch}
-          className="mx-auto flex max-w-[1440px] items-center gap-2 px-[4%] py-2.5"
-          role="search"
-        >
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#718096]" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="ابحث عن منتج أو تصنيف..."
-              className="h-11 w-full rounded-xl border border-[#E5EAF1] bg-white pr-10 pl-3 text-sm outline-none focus:border-[#3157D5]"
-              aria-label="بحث"
-            />
-          </div>
-          <button
-            type="submit"
-            className="hidden h-11 rounded-xl bg-[#3157D5] px-5 text-sm font-semibold text-white sm:inline-flex sm:items-center"
-          >
-            بحث
-          </button>
-        </form>
+        <div className="mx-auto max-w-[1440px] px-[4%] py-2.5">
+          <Suspense fallback={<div className="h-12 animate-pulse rounded-[10px] bg-white" />}>
+            <SearchBar />
+          </Suspense>
+        </div>
       </div>
 
       <div className="hidden border-t border-[#E5EAF1] md:block">

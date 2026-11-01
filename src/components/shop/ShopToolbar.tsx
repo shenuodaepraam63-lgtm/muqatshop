@@ -3,13 +3,6 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
 
-const SORTS = [
-  { value: "new", label: "الأحدث" },
-  { value: "price_asc", label: "السعر ↑" },
-  { value: "price_desc", label: "السعر ↓" },
-  { value: "discount", label: "أكبر خصم" },
-] as const;
-
 export function ShopToolbar({
   total,
   onOpenFilters,
@@ -19,11 +12,27 @@ export function ShopToolbar({
 }) {
   const router = useRouter();
   const sp = useSearchParams();
-  const sort = sp.get("sort") || "new";
+  const hasQuery = Boolean(sp.get("q")?.trim());
+  const sort = sp.get("sort") || (hasQuery ? "relevance" : "new");
+
+  const SORTS = hasQuery
+    ? [
+        { value: "relevance", label: "الأكثر صلة" },
+        { value: "new", label: "الأحدث" },
+        { value: "price_asc", label: "السعر ↑" },
+        { value: "price_desc", label: "السعر ↓" },
+        { value: "discount", label: "أكبر خصم" },
+      ]
+    : [
+        { value: "new", label: "الأحدث" },
+        { value: "price_asc", label: "السعر ↑" },
+        { value: "price_desc", label: "السعر ↓" },
+        { value: "discount", label: "أكبر خصم" },
+      ];
 
   const setSort = (value: string) => {
     const next = new URLSearchParams(sp.toString());
-    if (!value || value === "new") next.delete("sort");
+    if (!value || value === (hasQuery ? "relevance" : "new")) next.delete("sort");
     else next.set("sort", value);
     next.delete("page");
     const q = next.toString();
