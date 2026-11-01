@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useCartStore } from "@/lib/store";
 import { formatPrice } from "@/lib/utils";
@@ -21,6 +22,7 @@ import { getMerchantRef, clearMerchantRef } from "@/lib/merchant-ref";
 import { notifyOrderWhatsApp } from "@/lib/whatsapp/client-notify";
 import { loadAccountIdentity } from "@/lib/account-identity";
 import { resolveCustomerId } from "@/lib/customer-account";
+import { ensureCanPurchaseAsync, purchaseLoginHref } from "@/lib/purchase-guard";
 
 /** Checkout + delivery form for cart (export required for Next typecheck). */
 export function CheckoutForm() {
@@ -46,6 +48,8 @@ export function CheckoutForm() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [authReady, setAuthReady] = useState(false);
+  const [canCheckout, setCanCheckout] = useState(false);
 
   const [shipSettings, setShipSettings] = useState<ShippingSettings>({
     fee: DEFAULT_SHIPPING_FEE,
@@ -56,6 +60,14 @@ export function CheckoutForm() {
   const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null);
   const [appliedCode, setAppliedCode] = useState<string | null>(null);
   const [couponMsg, setCouponMsg] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const ok = await ensureCanPurchaseAsync();
+      setCanCheckout(ok);
+      setAuthReady(true);
+    })();
+  }, []);
 
   useEffect(() => {
     const s = getMerchantSession();
@@ -131,6 +143,12 @@ export function CheckoutForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    const allowed = await ensureCanPurchaseAsync();
+    if (!allowed) {
+      window.location.href = purchaseLoginHref("/cart");
+      return;
+    }
 
     if (!fullName.trim() || !governorate || !center || !phone.trim()) {
       setError("من فضلك أكمل الحقول المطلوبة");
@@ -229,7 +247,7 @@ export function CheckoutForm() {
           linkedCustomerId = await resolveCustomerId(idRes.identity);
         }
       } catch {
-        /* guest checkout still allowed in this phase */
+        /* blocked earlier if guest */
       }
 
       const payload: Record<string, unknown> = {
@@ -283,6 +301,34 @@ export function CheckoutForm() {
       setLoading(false);
     }
   };
+
+  if (!authReady) {
+    return (
+      <div className="bg-white border border-border rounded-card p-5 text-sm text-muted">
+        جاري التحقق من الجلسة...
+      </div>
+    );
+  }
+
+  if (!canCheckout) {
+    return (
+      <div className="bg-white border border-border rounded-card p-5 md:p-6 space-y-4 shadow-card text-center">
+        <h2 className="text-lg font-bold text-ink">إتمام الطلب يتطلب حسابًا</h2>
+        <p className="text-sm text-muted leading-7">
+          يمكنك تصفح السلة كزائر. لتأكيد الطلب سجّل الدخول أو أنشئ حسابًا — محتويات
+          السلة تبقى محفوظة على هذا الجهاز.
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <Link href={purchaseLoginHref("/cart")} className="btn-primary inline-flex justify-center">
+            تسجيل الدخول لإتمام الطلب
+          </Link>
+          <Link href="/register/customer" className="btn-secondary inline-flex justify-center">
+            إنشاء حساب عميل
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form
