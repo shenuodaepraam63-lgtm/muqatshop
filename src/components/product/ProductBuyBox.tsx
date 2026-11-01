@@ -85,7 +85,8 @@ export function ProductBuyBox({
   const optionsComplete =
     (!needsSize || Boolean(size)) && (!needsColor || colorIdx != null);
   const isOut = stock <= 0;
-  const canAdd = !isOut && optionsComplete && !loading && status !== "loading";
+  const sessionReady = status !== "loading";
+  const canAdd = !isOut && optionsComplete && !loading && sessionReady;
 
   const sizeAvailable = (s: string) => {
     if (!hasMatrix) return true;
@@ -122,18 +123,10 @@ export function ProductBuyBox({
   const onAdd = async () => {
     if (!canAdd) return;
 
-    // Guest: local cart allowed — only redirect if we explicitly require auth for add
-    // Policy: guests may add; checkout will require login.
-    // If session still loading, wait.
-    if (status === "loading") return;
-
-    // Optional: if product page previously forced login, use async session check
-    // only when canPurchase is false we still allow guest cart (local).
-    // Authenticated path verified via async to avoid stale UI.
+    // Guest: local cart allowed. Authenticated: re-check session against races.
     if (canPurchase) {
       const ok = await ensureCanPurchaseAsync();
       if (!ok) {
-        // rare race after logout
         redirectToCustomerAuth(
           product.slug ? `/products/${encodeURIComponent(product.slug)}` : "/shop"
         );
@@ -289,7 +282,7 @@ export function ProductBuyBox({
             disabled={!canAdd}
             className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-[10px] bg-[#3157D5] text-[15px] font-bold text-white transition hover:bg-[#2447B8] disabled:cursor-not-allowed disabled:bg-[#C8D0DC] max-md:h-[46px] max-md:text-sm"
           >
-            {status === "loading" || loading ? (
+            {!sessionReady || loading ? (
               "جاري التحميل..."
             ) : done ? (
               <>
