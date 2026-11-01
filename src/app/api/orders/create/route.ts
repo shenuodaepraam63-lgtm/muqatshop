@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/response";
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import {
   DEFAULT_SHIPPING_FEE,
@@ -12,7 +12,6 @@ type OrderItemInput = {
   productId: string;
   quantity: number;
   variant?: string;
-  /** Client price — validated against DB; merchants may markup */
   price?: number;
   name?: string;
   image?: string;
@@ -32,7 +31,6 @@ type CreateOrderBody = {
   notes?: string;
   couponCode?: string | null;
   items: OrderItemInput[];
-  /** Merchant self-order session id (optional, validated lightly) */
   merchantId?: string | null;
   refMerchantId?: string | null;
 };
@@ -82,29 +80,6 @@ export async function POST(req: NextRequest) {
     }
     if (items.length === 0) return bad("السلة فارغة");
 
-    // —— Idempotency: same key within 15 min returns existing order ——
-    const idempotencyKey = String(body.idempotencyKey || "").trim().slice(0, 80);
-    if (idempotencyKey) {
-      const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-      const { data: existing } = await admin
-        .from("orders")
-        .select("id, order_number, total, status")
-        .eq("idempotency_key", idempotencyKey)
-        .gte("created_at", since)
-        .maybeSingle();
-      if (existing?.order_number) {
-        return NextResponse.json({
-          ok: true,
-          duplicate: true,
-          orderNumber: existing.order_number,
-          orderId: existing.id,
-          total: existing.total,
-          status: existing.status,
-        });
-      }
-    }
-
-    // —— Resolve / ensure customer ——
     const email = (user.email || "").toLowerCase().trim();
     let customerId: string | null = null;
 
@@ -153,7 +128,30 @@ export async function POST(req: NextRequest) {
       if (created?.id) customerId = created.id as string;
     }
 
-    // —— Load products & validate stock/prices ——
+    // Anti-duplicate: same customer + phone within last 90 seconds
+    const since = new Date(Date.now() - 90 * 1000).toISOString();
+    if (customerId) {
+      const { data: recent } = await admin
+        .from("orders")
+        .select("id, order_number, total, status, phone")
+        .eq("customer_id", customerId)
+        .eq("phone", phone)
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (recent?.order_number) {
+        return NextResponse.json({
+          ok: true,
+          duplicate: true,
+          orderNumber: recent.order_number,
+          orderId: recent.id,
+          total: recent.total,
+          status: recent.status,
+        });
+      }
+    }
+
     const productIds = [...new Set(items.map((i) => String(i.productId)))];
     const { data: products, error: prodErr } = await admin
       .from("products")
@@ -214,7 +212,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Customer cannot pay less than base; merchant may markup
       let unitPrice = unitBase;
       if (isMerchantOrder && raw.price != null) {
         const clientPrice = Number(raw.price);
@@ -242,7 +239,6 @@ export async function POST(req: NextRequest) {
       baseSubtotal += unitBase * qty;
     }
 
-    // —— Coupon (server-side) ——
     let discount = 0;
     let couponCode: string | null = null;
     let couponId: string | null = null;
@@ -278,7 +274,6 @@ export async function POST(req: NextRequest) {
       couponId = coupon.id;
     }
 
-    // —— Shipping ——
     let shipSettings: ShippingSettings = {
       fee: DEFAULT_SHIPPING_FEE,
       free_over: 1000,
@@ -305,7 +300,6 @@ export async function POST(req: NextRequest) {
     const shipping = shippingForGovernorate(governorate, net, shipSettings);
     const total = net + shipping;
 
-    // —— Merchant profit (ref or self) ——
     let merchantId: string | null = body.merchantId || body.refMerchantId || null;
     let merchantProfit = 0;
     if (body.merchantId) {
@@ -328,6 +322,7 @@ export async function POST(req: NextRequest) {
     const noteParts: string[] = [];
     if (body.notes?.trim()) noteParts.push(body.notes.trim());
 
+    // Core columns only (no migration required)
     const payload: Record<string, unknown> = {
       order_number: orderNumber,
       customer_name: fullName,
@@ -346,13 +341,13 @@ export async function POST(req: NextRequest) {
       coupon_code: couponCode,
       total,
       status: "new",
-      payment_method: "cod",
-      payment_status: "pending",
     };
 
     if (customerId) payload.customer_id = customerId;
     if (email) payload.customer_email = email;
-    if (idempotencyKey) payload.idempotency_key = idempotencyKey;
+
+    // Optional columns — ignored if not in schema
+    payload.payment_method = "cod";
 
     if (merchantId) {
       payload.merchant_id = merchantId;
@@ -361,36 +356,42 @@ export async function POST(req: NextRequest) {
       payload.profit_released = false;
     }
 
-    const { data: order, error: insertError } = await admin
-      .from("orders")
-      .insert(payload)
-      .select("id, order_number, total, status")
-      .maybeSingle();
+    let order: { id: string; order_number: string; total: number; status: string } | null =
+      null;
 
-    if (insertError) {
-      // Unique violation on idempotency_key → treat as duplicate
-      if (insertError.code === "23505" && idempotencyKey) {
-        const { data: again } = await admin
-          .from("orders")
-          .select("id, order_number, total, status")
-          .eq("idempotency_key", idempotencyKey)
-          .maybeSingle();
-        if (again?.order_number) {
-          return NextResponse.json({
-            ok: true,
-            duplicate: true,
-            orderNumber: again.order_number,
-            orderId: again.id,
-            total: again.total,
-            status: again.status,
-          });
+    {
+      const { data, error: insertError } = await admin
+        .from("orders")
+        .insert(payload)
+        .select("id, order_number, total, status")
+        .maybeSingle();
+
+      if (insertError) {
+        // Retry without payment_method if column missing
+        if (
+          insertError.message?.includes("payment_method") ||
+          insertError.code === "PGRST204"
+        ) {
+          delete payload.payment_method;
+          const retry = await admin
+            .from("orders")
+            .insert(payload)
+            .select("id, order_number, total, status")
+            .maybeSingle();
+          if (retry.error) {
+            console.error("order insert failed", retry.error);
+            return bad(retry.error.message || "تعذر إنشاء الطلب", 500);
+          }
+          order = retry.data;
+        } else {
+          console.error("order insert failed", insertError);
+          return bad(insertError.message || "تعذر إنشاء الطلب", 500);
         }
+      } else {
+        order = data;
       }
-      console.error("order insert failed", insertError);
-      return bad(insertError.message || "تعذر إنشاء الطلب", 500);
     }
 
-    // —— Decrement stock (best-effort per item) ——
     for (const item of validatedItems) {
       try {
         const product = productMap.get(item.productId);
@@ -433,7 +434,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // —— Coupon use count ——
     if (couponId) {
       const { data: c } = await admin
         .from("coupons")
