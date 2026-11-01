@@ -15,6 +15,7 @@ import { SimilarProducts } from "@/components/product/SimilarProducts";
 import { SaleCountdown } from "@/components/product/SaleCountdown";
 import { SizeGuide } from "@/components/product/SizeGuide";
 import { ProductReviews } from "@/components/product/ProductReviews";
+import { RecordRecentlyViewed } from "@/components/product/RecordRecentlyViewed";
 
 export const dynamic = "force-dynamic";
 
@@ -208,6 +209,16 @@ export default async function ProductPage({
 
   return (
     <div className="bg-page min-h-screen">
+      <RecordRecentlyViewed
+        id={product.id}
+        name={product.name}
+        slug={product.slug}
+        price={Number(product.price)}
+        compare_at_price={product.compare_at_price}
+        sale_ends_at={product.sale_ends_at}
+        image={main}
+        stock={product.stock}
+      />
       <div className="bg-[#e8e2d4] text-[11px] tracking-wide uppercase text-muted">
         <div className="max-w-page mx-auto px-4 md:px-8 py-2.5 flex flex-wrap gap-1 items-center">
           <Link href="/" className="hover:text-ink">
