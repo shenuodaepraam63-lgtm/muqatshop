@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
   supabase,
   productMainImage,
@@ -7,15 +8,14 @@ import {
   type ProductColor,
   type ProductVariant,
 } from "@/lib/supabase";
-import { formatPrice } from "@/lib/utils";
+import { isSaleActive, salePercent } from "@/lib/utils";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductBuyBox } from "@/components/product/ProductBuyBox";
-import { ProductAccordion } from "@/components/product/ProductAccordion";
 import { SimilarProducts } from "@/components/product/SimilarProducts";
-import { SaleCountdown } from "@/components/product/SaleCountdown";
-import { SizeGuide } from "@/components/product/SizeGuide";
 import { ProductReviews } from "@/components/product/ProductReviews";
 import { RecordRecentlyViewed } from "@/components/product/RecordRecentlyViewed";
+import { ProductRecentlyViewed } from "@/components/product/ProductRecentlyViewed";
+import { SizeGuide } from "@/components/product/SizeGuide";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +38,23 @@ async function getProduct(rawSlug: string): Promise<Product | null> {
     data = byId.data;
   }
   return data as Product | null;
+}
+
+async function getCategoryChain(categoryId: string | null | undefined) {
+  if (!categoryId) return [] as { name: string; slug: string }[];
+  const chain: { name: string; slug: string }[] = [];
+  let currentId: string | null = categoryId;
+  for (let i = 0; i < 4 && currentId; i++) {
+    const { data } = await supabase
+      .from("categories")
+      .select("id, name, slug, parent_id")
+      .eq("id", currentId)
+      .maybeSingle();
+    if (!data) break;
+    chain.unshift({ name: data.name as string, slug: data.slug as string });
+    currentId = (data.parent_id as string | null) || null;
+  }
+  return chain;
 }
 
 async function getSimilar(product: Product): Promise<Product[]> {
@@ -64,21 +81,6 @@ async function getSimilar(product: Product): Promise<Product[]> {
   return (fallback as Product[]) || [];
 }
 
-async function getReturnPolicy(): Promise<string | null> {
-  const { data } = await supabase
-    .from("site_settings")
-    .select("value")
-    .eq("key", "return_policy")
-    .maybeSingle();
-  if (!data?.value) return null;
-  if (typeof data.value === "string") return data.value.trim() || null;
-  if (typeof data.value === "object" && data.value !== null && "text" in data.value) {
-    const t = (data.value as { text?: string }).text;
-    return t?.trim() || null;
-  }
-  return null;
-}
-
 async function getSizeGuideText(): Promise<string | null> {
   const { data } = await supabase
     .from("site_settings")
@@ -93,10 +95,24 @@ async function getSizeGuideText(): Promise<string | null> {
   return null;
 }
 
-function showMugTryOn(product: Product): boolean {
-  if (product.product_type === "mug") return true;
-  const t = `${product.name} ${product.description || ""} ${product.slug}`.toLowerCase();
-  return /مج|كوب|كباية|mug|cup|كبايه/.test(t);
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProduct(slug);
+  if (!product) return { title: "منتج غير موجود | Muqatshop" };
+  const img = productMainImage(product);
+  return {
+    title: `${product.name} | Muqatshop`,
+    description: (product.description || product.name).slice(0, 160),
+    openGraph: {
+      title: product.name,
+      description: (product.description || "").slice(0, 160),
+      images: img ? [img] : [],
+    },
+  };
 }
 
 export default async function ProductPage({
@@ -108,10 +124,10 @@ export default async function ProductPage({
   const product = await getProduct(slug);
   if (!product) notFound();
 
-  const [similar, returnPolicy, sizeGuideText] = await Promise.all([
+  const [similar, sizeGuideText, categoryChain] = await Promise.all([
     getSimilar(product),
-    getReturnPolicy(),
     getSizeGuideText(),
+    getCategoryChain(product.category_id),
   ]);
 
   const images = product.images?.length ? product.images : [];
@@ -123,198 +139,229 @@ export default async function ProductPage({
     ? product.features.split("\n").map((s) => s.trim()).filter(Boolean)
     : [];
 
-  const saleEndsAt = product.sale_ends_at || null;
-  const saleActive =
-    saleEndsAt != null &&
-    !Number.isNaN(new Date(saleEndsAt).getTime()) &&
-    new Date(saleEndsAt).getTime() > Date.now();
+  const price = Number(product.price);
+  const compare =
+    product.compare_at_price == null ? null : Number(product.compare_at_price);
+  const onSale = isSaleActive(price, compare, product.sale_ends_at);
+  const percent = onSale && compare ? salePercent(price, compare) : 0;
 
-  const onSale =
-    product.compare_at_price != null &&
-    Number(product.compare_at_price) > Number(product.price) &&
-    (saleEndsAt == null || saleActive);
+  const stockNum = Number(product.stock) || 0;
+  const hasVariantStock =
+    variants.length > 0 && variants.some((v) => Number(v.stock) > 0);
+  const available = variants.length > 0 ? hasVariantStock : stockNum > 0;
 
-  const tryMug = showMugTryOn(product);
+  const badges: { label: string; tone?: "sale" | "new" | "out" }[] = [];
+  if (!available) badges.push({ label: "غير متوفر", tone: "out" });
+  else if (percent > 0) badges.push({ label: `خصم ${percent}%`, tone: "sale" });
 
-  const accordionItems: { title: string; content: React.ReactNode }[] = [];
-
-  if (product.description?.trim()) {
-    accordionItems.push({ title: "الوصف", content: product.description.trim() });
-  }
-  if (features.length) {
-    accordionItems.push({
-      title: "المميزات",
-      content: features.map((f) => `• ${f}`).join("\n"),
-    });
-  }
-  if (product.specs?.trim()) {
-    accordionItems.push({ title: "المواصفات", content: product.specs.trim() });
-  }
-  if (product.care_instructions?.trim()) {
-    accordionItems.push({
-      title: "تعليمات العناية",
-      content: product.care_instructions.trim(),
-    });
-  }
-
-  const extra: string[] = [];
-  if (product.material?.trim()) extra.push(`الخامة: ${product.material.trim()}`);
-  if (product.weight?.trim()) extra.push(`الوزن: ${product.weight.trim()}`);
+  // مواصفات من حقول المنتج فقط
+  const specs: { label: string; value: string }[] = [];
+  if (product.brand?.trim()) specs.push({ label: "العلامة التجارية", value: product.brand.trim() });
+  if (product.material?.trim()) specs.push({ label: "الخامة", value: product.material.trim() });
+  if (product.weight?.trim()) specs.push({ label: "الوزن", value: product.weight.trim() });
   else if (product.weight_value != null)
-    extra.push(`الوزن: ${product.weight_value} جرام`);
-  if (product.dimensions?.trim()) extra.push(`الأبعاد: ${product.dimensions.trim()}`);
+    specs.push({ label: "الوزن", value: `${product.weight_value} جرام` });
+  if (product.dimensions?.trim()) specs.push({ label: "الأبعاد", value: product.dimensions.trim() });
   if (product.origin_country?.trim())
-    extra.push(`بلد المنشأ: ${product.origin_country.trim()}`);
-  if (extra.length) {
-    accordionItems.push({ title: "تفاصيل إضافية", content: extra.join("\n") });
-  }
+    specs.push({ label: "بلد المنشأ", value: product.origin_country.trim() });
+  if (product.sku?.trim()) specs.push({ label: "كود المنتج", value: product.sku.trim() });
 
-  const customSections = product.detail_sections || [];
-  for (const s of customSections) {
-    const title = (s.title || "").trim();
-    if (!title) continue;
-    const rows = (s.rows || []).filter((r) => (r.label || "").trim() || (r.value || "").trim());
-    const isSpecs = s.kind === "specs" || rows.length > 0;
-    if (isSpecs && rows.length) {
-      accordionItems.push({
-        title,
-        content: (
-          <dl className="space-y-2">
-            {rows.map((r, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-[minmax(0,40%)_1fr] gap-2 text-sm border-b border-[#f0ebe3] pb-2 last:border-0"
-              >
-                <dt className="font-medium text-ink">{r.label}</dt>
-                <dd className="text-muted">{r.value}</dd>
-              </div>
-            ))}
-          </dl>
-        ),
-      });
-    } else if ((s.content || "").trim()) {
-      accordionItems.push({
-        title,
-        content: (s.content || "").trim(),
-      });
+  for (const s of product.detail_sections || []) {
+    if (s.kind === "specs" || (s.rows && s.rows.length)) {
+      for (const r of s.rows || []) {
+        if ((r.label || "").trim() && (r.value || "").trim()) {
+          specs.push({ label: r.label.trim(), value: r.value.trim() });
+        }
+      }
     }
   }
 
-  if (returnPolicy) {
-    accordionItems.push({
-      title: "سياسة الاستبدال والاسترجاع",
-      content: returnPolicy,
-    });
-  }
+  const shortDesc = product.description?.trim() || "";
 
   return (
-    <div className="bg-page min-h-screen">
+    <div className="min-h-screen bg-[#F6F8FB] pb-24 md:pb-8">
       <RecordRecentlyViewed
         id={product.id}
         name={product.name}
         slug={product.slug}
-        price={Number(product.price)}
+        price={price}
         compare_at_price={product.compare_at_price}
         sale_ends_at={product.sale_ends_at}
         image={main}
         stock={product.stock}
       />
-      <div className="bg-[#e8e2d4] text-[11px] tracking-wide uppercase text-muted">
-        <div className="max-w-page mx-auto px-4 md:px-8 py-2.5 flex flex-wrap gap-1 items-center">
-          <Link href="/" className="hover:text-ink">
+
+      {/* Breadcrumb */}
+      <nav
+        className="border-b border-[#E5EAF1] bg-white text-[11px] text-[#667085] sm:text-[13px]"
+        aria-label="مسار التنقل"
+      >
+        <div className="home-container flex flex-wrap items-center gap-2 py-2.5">
+          <Link href="/" className="hover:text-[#3157D5]">
             الرئيسية
           </Link>
-          <span>/</span>
-          <Link href="/shop" className="hover:text-ink">
+          <span aria-hidden>/</span>
+          <Link href="/shop" className="hover:text-[#3157D5]">
             المتجر
           </Link>
-          <span>/</span>
-          <span className="text-ink line-clamp-1">{product.name}</span>
+          {categoryChain.map((c, idx) => (
+            <span key={c.slug} className="contents">
+              <span aria-hidden>/</span>
+              <Link
+                href={
+                  idx === 0 && categoryChain.length > 1
+                    ? `/shop?category=${encodeURIComponent(c.slug)}`
+                    : `/shop?category=${encodeURIComponent(categoryChain[0].slug)}${
+                        idx > 0 ? `&subcategory=${encodeURIComponent(c.slug)}` : ""
+                      }`
+                }
+                className="hover:text-[#3157D5]"
+              >
+                {c.name}
+              </Link>
+            </span>
+          ))}
+          <span aria-hidden>/</span>
+          <span className="line-clamp-1 font-semibold text-[#14243A]">{product.name}</span>
         </div>
-      </div>
+      </nav>
 
-      <div className="max-w-page mx-auto px-4 md:px-8 py-5 md:py-10">
-        <div className="grid min-w-0 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-start">
+      <div className="home-container py-5 sm:py-8">
+        {/* Main section: gallery | info | buy — stacks on mobile */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,42%)_minmax(0,34%)_minmax(0,24%)] lg:gap-5">
+          {/* Gallery */}
           <div className="min-w-0">
-            <ProductGallery images={images} name={product.name} />
+            <ProductGallery images={images} name={product.name} badges={badges} />
           </div>
 
-          <div className="min-w-0 md:sticky md:top-28">
+          {/* Info */}
+          <div className="min-w-0 space-y-4">
             {product.brand?.trim() && (
-              <p className="text-[11px] tracking-widest uppercase text-muted mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#667085]">
                 {product.brand.trim()}
               </p>
             )}
-
-            <h1 className="text-2xl md:text-3xl font-bold text-ink leading-tight mb-3">
+            <h1 className="text-[21px] font-bold leading-[1.5] text-[#14243A] sm:text-[28px]">
               {product.name}
             </h1>
 
-            <div className="flex items-baseline gap-3 mb-4 flex-wrap">
-              <span className="text-xl md:text-2xl font-bold text-ink">
-                {formatPrice(Number(product.price))}
-              </span>
-              {onSale && (
-                <span className="text-base text-muted line-through">
-                  {formatPrice(Number(product.compare_at_price))}
-                </span>
-              )}
-              {onSale && saleActive && (
-                <span className="text-[11px] font-bold bg-sale/10 text-sale px-2 py-0.5 rounded-full">
-                  عرض محدود
-                </span>
-              )}
-            </div>
-
-            {saleActive && saleEndsAt && <SaleCountdown endsAt={saleEndsAt} />}
-
-            {product.description?.trim() && (
-              <p className="text-sm text-muted leading-relaxed mb-6 line-clamp-3">
-                {product.description.trim()}
+            {shortDesc && (
+              <p className="text-[13px] leading-7 text-[#667085] sm:text-[15px] line-clamp-5">
+                {shortDesc}
               </p>
             )}
 
-            {tryMug && (
-              <Link
-                href={`/try-mug?product=${encodeURIComponent(product.slug)}&name=${encodeURIComponent(product.name)}`}
-                className="mb-5 flex items-center justify-center gap-2 w-full border-2 border-ink text-ink py-3 rounded-full text-sm font-semibold hover:bg-ink hover:text-page transition"
-              >
-                ☕ جرّب المج قبل الشراء
-              </Link>
+            {features.length > 0 && (
+              <ul className="space-y-2 rounded-[12px] border border-[#E5EAF1] bg-white p-4">
+                {features.slice(0, 5).map((f) => (
+                  <li key={f} className="flex gap-2 text-sm text-[#14243A]">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#18A999]" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
             )}
 
-            <ProductBuyBox
-              product={{
-                id: product.id,
-                name: product.name,
-                price: Number(product.price),
-                compareAtPrice:
-                  product.compare_at_price != null
-                    ? Number(product.compare_at_price)
-                    : null,
-                image: main,
-                slug: product.slug,
-                stock: product.stock,
-              }}
-              colors={colors}
-              sizes={sizes}
-              variants={variants}
-            />
-
-            <SizeGuide productType={product.product_type} customText={sizeGuideText} />
-
-            {accordionItems.length > 0 && (
-              <ProductAccordion items={accordionItems} />
-            )}
+            {/* Mobile buy box under info */}
+            <div className="lg:hidden">
+              <div className="rounded-[12px] border border-[#E5EAF1] bg-white p-4">
+                <ProductBuyBox
+                  product={{
+                    id: product.id,
+                    name: product.name,
+                    price,
+                    compareAtPrice: compare,
+                    saleEndsAt: product.sale_ends_at,
+                    image: main,
+                    slug: product.slug,
+                    stock: product.stock,
+                  }}
+                  colors={colors}
+                  sizes={sizes}
+                  variants={variants}
+                />
+              </div>
+            </div>
           </div>
+
+          {/* Purchase panel desktop */}
+          <aside className="hidden min-w-0 lg:block">
+            <div className="rounded-[16px] border border-[#E5EAF1] bg-white p-5">
+              <ProductBuyBox
+                product={{
+                  id: product.id,
+                  name: product.name,
+                  price,
+                  compareAtPrice: compare,
+                  saleEndsAt: product.sale_ends_at,
+                  image: main,
+                  slug: product.slug,
+                  stock: product.stock,
+                }}
+                colors={colors}
+                sizes={sizes}
+                variants={variants}
+              />
+            </div>
+          </aside>
         </div>
 
-        <div className="max-w-2xl">
+        {/* Description */}
+        {shortDesc && (
+          <section className="mt-8 rounded-[12px] border border-[#E5EAF1] bg-white p-3.5 sm:rounded-[14px] sm:p-6">
+            <h2 className="mb-3 text-lg font-bold text-[#14243A] sm:text-[22px]">وصف المنتج</h2>
+            <div className="whitespace-pre-wrap text-[13px] leading-[1.8] text-[#667085] sm:text-[15px]">
+              {shortDesc}
+            </div>
+          </section>
+        )}
+
+        {/* Specs */}
+        {specs.length > 0 && (
+          <section className="mt-5 rounded-[12px] border border-[#E5EAF1] bg-white p-3.5 sm:rounded-[14px] sm:p-6">
+            <h2 className="mb-3 text-lg font-bold text-[#14243A] sm:text-[22px]">المواصفات</h2>
+            <dl>
+              {specs.map((row) => (
+                <div
+                  key={row.label + row.value}
+                  className="grid grid-cols-[minmax(0,40%)_1fr] gap-2 border-b border-[#E5EAF1] py-3 text-sm last:border-0 sm:py-3.5"
+                >
+                  <dt className="font-semibold text-[#14243A]">{row.label}</dt>
+                  <dd className="text-[#667085]">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
+
+        {product.care_instructions?.trim() && (
+          <section className="mt-5 rounded-[12px] border border-[#E5EAF1] bg-white p-3.5 sm:p-6">
+            <h2 className="mb-2 text-lg font-bold text-[#14243A]">تعليمات العناية</h2>
+            <p className="whitespace-pre-wrap text-sm leading-7 text-[#667085]">
+              {product.care_instructions.trim()}
+            </p>
+          </section>
+        )}
+
+        {/* Delivery — general only, no invented fees */}
+        <section className="mt-5 rounded-[12px] border border-[#E5EAF1] bg-white p-3.5 sm:p-6">
+          <h2 className="mb-2 text-lg font-bold text-[#14243A]">التوصيل</h2>
+          <p className="text-sm leading-7 text-[#667085]">
+            يتم حساب رسوم ومدة التوصيل عند إتمام الطلب وفق عنوانك وخيارات الشحن المتاحة.
+            لا نعرض أسماء الموردين — التعامل مع Muqatshop مباشرة.
+          </p>
+        </section>
+
+        <SizeGuide productType={product.product_type} customText={sizeGuideText} />
+
+        {/* Reviews */}
+        <div className="mt-8 max-w-3xl">
           <ProductReviews productId={product.id} />
         </div>
       </div>
 
       <SimilarProducts products={similar} />
+      <ProductRecentlyViewed excludeId={product.id} />
     </div>
   );
 }
