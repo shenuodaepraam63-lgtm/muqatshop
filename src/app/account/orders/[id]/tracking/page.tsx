@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { loadAccountIdentity } from "@/lib/account-identity";
-import { fetchCustomerOrder, resolveCustomerId, type CustomerOrder } from "@/lib/customer-account";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { fetchOrderDetail, type CustomerOrderDetail } from "@/lib/order-detail-client";
 import {
   ORDER_TIMELINE,
   orderStatusLabel,
@@ -12,31 +12,71 @@ import {
   timelineIndex,
 } from "@/lib/order-status";
 
-/** Tracking uses real order status only — no invented carrier/tracking numbers. */
+/** Customer tracking — real status only, server ownership check. */
 export default function AccountOrderTrackingPage() {
   const params = useParams();
   const id = params?.id as string;
-  const [order, setOrder] = useState<CustomerOrder | null>(null);
+  const [order, setOrder] = useState<CustomerOrderDetail | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+  const [live, setLive] = useState(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setErr("");
+    const res = await fetchOrderDetail(id);
+    if (!res.ok) {
+      setErr(res.error);
+      setOrder(null);
+    } else {
+      setOrder(res.order);
+    }
+    setLoading(false);
+  }, [id]);
 
   useEffect(() => {
-    if (!id) return;
-    (async () => {
-      const idRes = await loadAccountIdentity();
-      if (!idRes.ok) return;
-      const customerId = await resolveCustomerId(idRes.identity);
-      if (!customerId) {
-        setErr("تعذر التحقق من الحساب");
-        setLoading(false);
-        return;
-      }
-      const res = await fetchCustomerOrder(id, customerId, idRes.identity.email);
-      if (res.error || !res.order) setErr(res.error || "الطلب غير موجود");
-      setOrder(res.order);
-      setLoading(false);
-    })();
-  }, [id]);
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!id || !order?.id) return;
+    if (channelRef.current) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    const channel = supabase
+      .channel(`customer-track-${id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `id=eq.${id}`,
+        },
+        (payload) => {
+          const next = payload.new as { status?: string; updated_at?: string };
+          setOrder((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: next.status || prev.status,
+                  updatedAt: next.updated_at || prev.updatedAt,
+                }
+              : prev
+          );
+        }
+      )
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
+    channelRef.current = channel;
+    return () => {
+      void supabase.removeChannel(channel);
+      channelRef.current = null;
+      setLive(false);
+    };
+  }, [id, order?.id]);
 
   if (loading) return <p className="text-sm text-[#718096]">جاري التحميل...</p>;
 
@@ -63,27 +103,35 @@ export default function AccountOrderTrackingPage() {
         <Link href="/account/orders" className="text-[#718096]">
           كل الطلبات
         </Link>
+        {live && (
+          <span className="rounded-full bg-[#EFF8F6] px-2 py-0.5 text-[10px] font-semibold text-[#21865B]">
+            متصل
+          </span>
+        )}
       </div>
 
       <div className="rounded-2xl border border-[#E4E9F0] bg-white p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs text-[#718096]">تتبع الطلب</p>
-            <p className="font-mono text-lg font-bold text-[#14243A]">{order.order_number}</p>
+            <p className="font-mono text-lg font-bold text-[#14243A]">{order.orderNumber}</p>
             <p className="mt-1 text-xs text-[#718096]">
-              آخر تحديث ظاهر:{" "}
-              {new Date(order.updated_at || order.created_at).toLocaleString("ar-EG")}
+              آخر تحديث: {new Date(order.updatedAt).toLocaleString("ar-EG")}
             </p>
           </div>
           <span
-            className={`rounded-full border px-3 py-1 text-xs font-semibold ${orderStatusTone(order.status)}`}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+              orderStatusTone(order.status)
+            }`}
           >
             {orderStatusLabel(order.status)}
           </span>
         </div>
 
         {cancelled ? (
-          <p className="mt-6 text-sm text-[#D64C4C]">هذا الطلب ملغي أو مرفوض — لا يوجد مسار شحن نشط.</p>
+          <p className="mt-6 text-sm text-[#D64C4C]">
+            هذا الطلب ملغي أو مرفوض — لا يوجد مسار شحن نشط.
+          </p>
         ) : (
           <ol className="mt-6 space-y-4 border-t border-[#E4E9F0] pt-5">
             {ORDER_TIMELINE.map((t, i) => {
@@ -110,9 +158,8 @@ export default function AccountOrderTrackingPage() {
           </ol>
         )}
 
-        <div className="mt-6 rounded-xl bg-[#F6F8FB] px-4 py-3 text-sm text-[#718096] leading-7">
-          رقم الشحنة وشركة الشحن يظهران هنا فقط عند تسجيلهما من الإدارة على الطلب. لا تُعرض
-          بيانات تتبع وهمية.
+        <div className="mt-6 rounded-xl bg-[#F6F8FB] px-4 py-3 text-sm leading-7 text-[#718096]">
+          التتبع داخلي حسب حالة الطلب من الإدارة. لا تُعرض بيانات شحن وهمية.
         </div>
       </div>
     </div>

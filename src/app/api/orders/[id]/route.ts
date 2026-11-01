@@ -45,7 +45,6 @@ export async function GET(
 
     const email = (user.email || "").toLowerCase().trim();
 
-    // Resolve customer id
     let customerId: string | null = null;
     const { data: byAuth } = await admin
       .from("customers")
@@ -63,10 +62,11 @@ export async function GET(
       if (byEmail?.id) customerId = byEmail.id as string;
     }
 
+    // Core columns only (no migration-dependent fields)
     const { data: row, error } = await admin
       .from("orders")
       .select(
-        "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email, payment_method"
+        "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email"
       )
       .eq("id", orderId)
       .maybeSingle();
@@ -87,11 +87,9 @@ export async function GET(
         String(row.customer_email).toLowerCase() === email);
 
     if (!owns) {
-      // Same message as not found — avoid leaking existence
       return NextResponse.json({ ok: false, error: "الطلب غير موجود" }, { status: 404 });
     }
 
-    // Customer-safe payload only (no merchant_id, profit, supplier, etc.)
     const items = Array.isArray(row.items) ? row.items : [];
     const safeItems = items.map((it: Record<string, unknown>) => ({
       productId: it.productId ?? it.product_id ?? null,
@@ -121,7 +119,7 @@ export async function GET(
       discount: Number(row.discount) || 0,
       couponCode: row.coupon_code,
       total: Number(row.total) || 0,
-      paymentMethod: row.payment_method || "cod",
+      paymentMethod: "cod",
       createdAt: row.created_at,
       updatedAt: row.updated_at || row.created_at,
     };
@@ -129,7 +127,6 @@ export async function GET(
     return NextResponse.json({
       ok: true,
       order,
-      // Single logical shipment until multi-shipment schema exists
       shipments: [
         {
           id: `ship-${row.id}`,
