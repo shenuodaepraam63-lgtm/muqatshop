@@ -28,3 +28,11 @@ export async function signOutEverywhere(): Promise<void> {
     /* */
   }
 }
+
+/** Sign out and land on the storefront home. */
+export async function signOutToHome(): Promise<void> {
+  await signOutEverywhere();
+  if (typeof window !== "undefined") {
+    window.location.href = "/";
+  }
+}

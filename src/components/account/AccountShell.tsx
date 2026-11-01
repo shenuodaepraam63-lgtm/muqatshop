@@ -17,9 +17,7 @@ import {
   mirrorLegacySession,
   type AccountIdentity,
 } from "@/lib/account-identity";
-import { clearCustomerSession } from "@/lib/customer";
-import { clearSiteRole } from "@/lib/role";
-import { supabase } from "@/lib/supabase";
+import { signOutToHome } from "@/lib/auth-session";
 
 const NAV = [
   { href: "/account", label: "نظرة عامة", icon: LayoutDashboard, exact: true },
@@ -55,10 +53,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   }, [pathname, router]);
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    clearCustomerSession();
-    clearSiteRole();
-    router.replace("/login");
+    await signOutToHome();
   };
 
   if (!ready || !identity) {
@@ -79,12 +74,20 @@ export function AccountShell({ children }: { children: ReactNode }) {
             <p className="text-xs font-semibold text-[#3157D5]">حساب العميل</p>
             <h1 className="text-base font-bold text-[#14243A] sm:text-lg">مرحبًا، {name}</h1>
           </div>
-          <Link
-            href="/shop"
-            className="rounded-lg border border-[#E4E9F0] px-3 py-2 text-xs font-semibold text-[#14243A] hover:bg-[#F6F8FB] sm:text-sm"
-          >
-            المتجر
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/"
+              className="rounded-lg border border-[#E4E9F0] px-3 py-2 text-xs font-semibold text-[#14243A] hover:bg-[#F6F8FB] sm:text-sm"
+            >
+              الرئيسية
+            </Link>
+            <Link
+              href="/shop"
+              className="rounded-lg border border-[#E4E9F0] px-3 py-2 text-xs font-semibold text-[#14243A] hover:bg-[#F6F8FB] sm:text-sm"
+            >
+              المتجر
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -137,6 +140,13 @@ export function AccountShell({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
+            <button
+              type="button"
+              onClick={logout}
+              className="shrink-0 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-semibold text-[#D64C4C]"
+            >
+              خروج
+            </button>
           </div>
           {children}
         </div>

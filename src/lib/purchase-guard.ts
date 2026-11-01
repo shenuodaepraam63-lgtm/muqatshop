@@ -1,19 +1,27 @@
 "use client";
 
-import { getSiteRole } from "@/lib/role";
-import { getCustomerSession } from "@/lib/customer";
+import { supabase } from "@/lib/supabase";
 import { getMerchantSession } from "@/lib/merchant";
 
-export function ensureCanPurchase(): boolean {
+/** Checkout requires Supabase session (or legacy merchant marketer session). Guest cart is allowed. */
+export async function ensureCanPurchaseAsync(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
   if (getMerchantSession()) return true;
-  if (getSiteRole() === "customer" && getCustomerSession()) return true;
-  return false;
+  const { data } = await supabase.auth.getSession();
+  return Boolean(data.session?.user);
+}
+
+/** @deprecated prefer ensureCanPurchaseAsync — sync check only for merchant marketer path */
+export function ensureCanPurchase(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(getMerchantSession());
 }
 
 export function purchaseLoginHref(returnTo?: string): string {
-  const params = new URLSearchParams({ tab: "customer" });
+  const params = new URLSearchParams();
   if (returnTo) params.set("next", returnTo);
-  return `/welcome?${params.toString()}`;
+  const q = params.toString();
+  return q ? `/login?${q}` : "/login";
 }
 
 export function redirectToCustomerAuth(returnTo?: string) {
