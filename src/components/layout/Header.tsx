@@ -18,8 +18,8 @@ import { loadAccountIdentity } from "@/lib/account-identity";
 const navLinks = [
   { href: "/", label: "الرئيسية" },
   { href: "/shop", label: "المتجر" },
-  { href: "/categories", label: "التصنيفات" },
-  { href: "/shop", label: "العروض" },
+  { href: "/shop", label: "التصنيفات" },
+  { href: "/shop?offers=true", label: "العروض" },
 ];
 
 export function Header() {
@@ -81,15 +81,14 @@ export function Header() {
     e.preventDefault();
     const term = q.trim();
     if (!term) {
-      window.location.href = "/search";
+      window.location.href = "/shop";
       return;
     }
-    window.location.href = `/search?q=${encodeURIComponent(term)}`;
+    window.location.href = `/shop?q=${encodeURIComponent(term)}`;
   };
 
   return (
     <header className="relative z-40 border-b border-[#E5EAF1] bg-white text-[#14243A]">
-      {/* Row 1 — brand + account + cart */}
       <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-between gap-3 px-[4%] sm:h-[64px]">
         <div className="flex items-center gap-2">
           <button
@@ -140,7 +139,6 @@ export function Header() {
         </div>
       </div>
 
-      {/* Row 2 — search */}
       <div className="border-t border-[#E5EAF1] bg-[#F6F8FB]">
         <form
           onSubmit={onSearch}
@@ -166,7 +164,6 @@ export function Header() {
         </form>
       </div>
 
-      {/* Row 3 — primary nav (desktop) */}
       <div className="hidden border-t border-[#E5EAF1] md:block">
         <nav
           className="mx-auto flex max-w-[1440px] items-center gap-1 px-[4%] py-2 text-sm font-semibold"
