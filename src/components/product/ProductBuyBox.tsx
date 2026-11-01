@@ -9,7 +9,11 @@ import type { ProductColor, ProductVariant } from "@/lib/supabase";
 import { findVariant, variantPrice, variantStock } from "@/lib/supabase";
 import { formatPrice, isSaleActive, salePercent } from "@/lib/utils";
 import { whatsappProductUrl } from "@/lib/whatsapp";
-import { ensureCanPurchase, redirectToCustomerAuth } from "@/lib/purchase-guard";
+import {
+  ensureCanPurchaseAsync,
+  redirectToCustomerAuth,
+} from "@/lib/purchase-guard";
+import { useAuthSession } from "@/components/auth/AuthSessionProvider";
 
 type Props = {
   product: {
@@ -36,8 +40,8 @@ export function ProductBuyBox({
   const addItem = useCartStore((s) => s.addItem);
   const toggleWish = useWishlistStore((s) => s.toggle);
   const wished = useWishlistStore((s) => s.has(product.id));
+  const { status, canPurchase } = useAuthSession();
   const [qty, setQty] = useState(1);
-  // لا اختيار تلقائي — العميل يختار
   const [size, setSize] = useState<string>("");
   const [colorIdx, setColorIdx] = useState<number | null>(null);
   const [done, setDone] = useState(false);
@@ -81,7 +85,7 @@ export function ProductBuyBox({
   const optionsComplete =
     (!needsSize || Boolean(size)) && (!needsColor || colorIdx != null);
   const isOut = stock <= 0;
-  const canAdd = !isOut && optionsComplete && !loading;
+  const canAdd = !isOut && optionsComplete && !loading && status !== "loading";
 
   const sizeAvailable = (s: string) => {
     if (!hasMatrix) return true;
@@ -117,12 +121,26 @@ export function ProductBuyBox({
 
   const onAdd = async () => {
     if (!canAdd) return;
-    if (!ensureCanPurchase()) {
-      redirectToCustomerAuth(
-        product.slug ? `/products/${encodeURIComponent(product.slug)}` : "/shop"
-      );
-      return;
+
+    // Guest: local cart allowed — only redirect if we explicitly require auth for add
+    // Policy: guests may add; checkout will require login.
+    // If session still loading, wait.
+    if (status === "loading") return;
+
+    // Optional: if product page previously forced login, use async session check
+    // only when canPurchase is false we still allow guest cart (local).
+    // Authenticated path verified via async to avoid stale UI.
+    if (canPurchase) {
+      const ok = await ensureCanPurchaseAsync();
+      if (!ok) {
+        // rare race after logout
+        redirectToCustomerAuth(
+          product.slug ? `/products/${encodeURIComponent(product.slug)}` : "/shop"
+        );
+        return;
+      }
     }
+
     setLoading(true);
     try {
       addItem({
@@ -154,7 +172,6 @@ export function ProductBuyBox({
   return (
     <>
       <div ref={panelRef} className="space-y-5">
-        {/* السعر */}
         <div>
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="text-[25px] font-bold text-[#14243A] sm:text-[30px]">
@@ -180,7 +197,6 @@ export function ProductBuyBox({
           </p>
         </div>
 
-        {/* المقاسات */}
         {sizes.length > 0 && (
           <div>
             <p className="mb-2.5 text-sm font-medium text-[#14243A]">
@@ -209,7 +225,6 @@ export function ProductBuyBox({
           </div>
         )}
 
-        {/* الألوان */}
         {colors.length > 0 && (
           <div>
             <p className="mb-2.5 text-sm font-medium text-[#14243A]">
@@ -236,7 +251,6 @@ export function ProductBuyBox({
           </div>
         )}
 
-        {/* الكمية */}
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium text-[#14243A]">الكمية</span>
           <div className="flex h-[42px] items-center overflow-hidden rounded-lg border border-[#E5EAF1] bg-white">
@@ -262,7 +276,6 @@ export function ProductBuyBox({
           </div>
         </div>
 
-        {/* ملخص الاختيار */}
         {(size || colorName) && (
           <p className="text-xs text-[#667085]">
             الاختيار: {[size, colorName].filter(Boolean).join(" · ")}
@@ -276,8 +289,8 @@ export function ProductBuyBox({
             disabled={!canAdd}
             className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-[10px] bg-[#3157D5] text-[15px] font-bold text-white transition hover:bg-[#2447B8] disabled:cursor-not-allowed disabled:bg-[#C8D0DC] max-md:h-[46px] max-md:text-sm"
           >
-            {loading ? (
-              "جاري الإضافة..."
+            {status === "loading" || loading ? (
+              "جاري التحميل..."
             ) : done ? (
               <>
                 <Check className="h-4 w-4" /> تمت الإضافة
@@ -331,17 +344,13 @@ export function ProductBuyBox({
         </a>
       </div>
 
-      {/* Sticky mobile bar */}
       {showSticky && (
-        <div className="fixed inset-x-0 bottom-[56px] z-40 border-t border-[#E5EAF1] bg-white/95 px-3 py-2 shadow-[0_-4px_16px_rgba(20,36,58,0.08)] backdrop-blur md:hidden safe-area-pb">
+        <div className="fixed inset-x-0 bottom-[56px] z-40 border-t border-[#E5EAF1] bg-white/95 px-3 py-2 shadow-[0_-4px_16px_rgba(20,36,58,0.08)] backdrop-blur md:hidden">
           <div className="mx-auto flex h-[56px] max-w-[1440px] items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-[#14243A]">
                 {formatPrice(unitPrice)}
               </p>
-              {!optionsComplete && !isOut && (
-                <p className="text-[11px] text-[#667085]">اختر الخيارات أولًا</p>
-              )}
             </div>
             <button
               type="button"

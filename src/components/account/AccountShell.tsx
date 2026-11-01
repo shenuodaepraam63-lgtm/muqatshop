@@ -12,6 +12,8 @@ import {
   MapPin,
   Package,
   Settings,
+  ShoppingBag,
+  Store,
   User,
 } from "lucide-react";
 import {
@@ -20,6 +22,7 @@ import {
   type AccountIdentity,
 } from "@/lib/account-identity";
 import { signOutToHome } from "@/lib/auth-session";
+import { useCartStore } from "@/lib/store";
 
 const NAV = [
   { href: "/account", label: "نظرة عامة", icon: LayoutDashboard, exact: true },
@@ -43,6 +46,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [identity, setIdentity] = useState<AccountIdentity | null>(null);
   const [ready, setReady] = useState(false);
+  const cartCount = useCartStore((s) => s.totalItems());
 
   const isPending = Boolean(pathname?.startsWith("/account/pending"));
 
@@ -52,7 +56,6 @@ export function AccountShell({ children }: { children: ReactNode }) {
       const res = await loadAccountIdentity();
       if (cancelled) return;
       if (!res.ok) {
-        // pending may still show after signup before session; allow soft pass
         if (isPending) {
           setReady(true);
           return;
@@ -73,7 +76,6 @@ export function AccountShell({ children }: { children: ReactNode }) {
     await signOutToHome();
   };
 
-  // Partnership pending uses AuthShell UI — no account chrome
   if (isPending) {
     if (!ready) {
       return (
@@ -112,7 +114,28 @@ export function AccountShell({ children }: { children: ReactNode }) {
               مرحبًا، {name}
             </h1>
           </div>
-          <p className="hidden text-xs font-semibold text-[#718096] sm:block">{pageTitle}</p>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/shop"
+              className="inline-flex items-center gap-1 rounded-lg border border-[#E5EAF1] px-2.5 py-1.5 text-xs font-semibold text-[#526174] hover:border-[#3157D5] hover:text-[#3157D5]"
+            >
+              <Store className="h-3.5 w-3.5" />
+              المتجر
+            </Link>
+            <Link
+              href="/cart"
+              className="relative inline-flex items-center gap-1 rounded-lg border border-[#E5EAF1] px-2.5 py-1.5 text-xs font-semibold text-[#526174] hover:border-[#3157D5] hover:text-[#3157D5]"
+            >
+              <ShoppingBag className="h-3.5 w-3.5" />
+              السلة
+              {cartCount > 0 && (
+                <span className="absolute -left-1 -top-1 min-w-4 rounded-full bg-[#3157D5] px-1 text-center text-[10px] font-bold leading-4 text-white">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
+            <p className="hidden text-xs font-semibold text-[#718096] sm:block">{pageTitle}</p>
+          </div>
         </div>
       </header>
 
