@@ -1,19 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useCartStore } from "@/lib/store";
 import { formatPrice } from "@/lib/utils";
 import {
   DEFAULT_SHIPPING_FEE,
-  calcShipping,
   shippingForGovernorate,
   type ShippingSettings,
 } from "@/lib/shipping";
-import { validateCoupon, incrementCouponUse } from "@/lib/coupons";
-import { decrementStockForItems } from "@/lib/stock";
-import { getMerchantSession, getMerchantSettings } from "@/lib/merchant";
+import { validateCoupon } from "@/lib/coupons";
+import { getMerchantSession } from "@/lib/merchant";
 import { getMerchantRef, clearMerchantRef } from "@/lib/merchant-ref";
 import { notifyOrderWhatsApp } from "@/lib/whatsapp/client-notify";
 import { loadAccountIdentity } from "@/lib/account-identity";
@@ -82,7 +80,6 @@ export function CheckoutForm() {
   const [appliedCode, setAppliedCode] = useState<string | null>(null);
   const [couponMsg, setCouponMsg] = useState("");
 
-  // Auth + identity + addresses
   useEffect(() => {
     (async () => {
       const ok = await ensureCanPurchaseAsync();
@@ -256,143 +253,70 @@ export function CheckoutForm() {
     submittingRef.current = true;
     setLoading(true);
     try {
-      let finalDiscount = discount;
-      let finalCoupon = appliedCode;
-      let couponId = appliedCouponId;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
 
-      if (appliedCode && !selfMerchantId) {
-        const re = await validateCoupon(appliedCode, subtotal);
-        if (!re.ok) {
-          setError(re.error);
-          setLoading(false);
-          submittingRef.current = false;
-          return;
-        }
-        finalDiscount = re.discount;
-        couponId = re.coupon.id;
-        finalCoupon = re.coupon.code;
+      if (!accessToken) {
+        setError("يجب تسجيل الدخول لإتمام الطلب.");
+        window.location.href = purchaseLoginHref("/checkout");
+        return;
       }
 
-      const net = Math.max(0, subtotal - finalDiscount);
-      const ship = shippingForGovernorate(
-        addressForm.governorate,
-        net,
-        shipSettings
-      );
-      const orderTotal = net + ship;
-
-      const linkedMerchantId = selfMerchantId || refMerchantId;
-      const orderNumber = linkedMerchantId
-        ? `MQ-M-${Date.now().toString(36).toUpperCase()}`
-        : `MQ-${Date.now().toString(36).toUpperCase()}`;
-
-      const orderItems = items.map((i) => ({
-        productId: i.productId,
-        name: i.name,
-        price: i.price,
-        basePrice: i.basePrice ?? i.price,
-        quantity: i.quantity,
-        image: i.image,
-        variant: i.variant,
-      }));
-
-      let profit = 0;
-      if (selfMerchantId) {
-        profit = Math.max(
-          0,
-          items.reduce(
-            (s, i) => s + (i.price - (i.basePrice ?? i.price)) * i.quantity,
-            0
-          )
-        );
-      } else if (refMerchantId) {
-        const settings = await getMerchantSettings();
-        const { data: m } = await supabase
-          .from("merchants")
-          .select("commission_percent")
-          .eq("id", refMerchantId)
-          .maybeSingle();
-        const pct =
-          m?.commission_percent != null
-            ? Number(m.commission_percent)
-            : settings.commission_percent;
-        profit = Math.round((net * pct) / 100);
-      }
-
-      const noteParts: string[] = [];
-      if (addressForm.notes.trim()) noteParts.push(addressForm.notes.trim());
-      if (selfMerchantId && selfMerchantName)
-        noteParts.push(`طلب تاجر: ${selfMerchantName}`);
-      if (!selfMerchantId && refMerchantId)
-        noteParts.push(
-          `إحالة تاجر: ${refMerchantName || refMerchantId.slice(0, 8)}`
-        );
-
-      let linkedCustomerId: string | null = customerId;
-      let linkedCustomerEmail: string | null = accountEmail;
-
-      if (!selfMerchantId) {
-        const idRes = await loadAccountIdentity();
-        if (!idRes.ok) {
-          setError("يجب تسجيل الدخول لإتمام الطلب.");
-          window.location.href = purchaseLoginHref("/checkout");
-          return;
-        }
-        linkedCustomerEmail = idRes.identity.email.toLowerCase();
-        await syncCustomerFromAuthUser({
-          name: idRes.identity.fullName || fullName.trim() || undefined,
-        }).catch(() => null);
-        linkedCustomerId = await resolveCustomerId(idRes.identity);
-        if (!linkedCustomerId) {
-          setError("تعذر ربط الطلب بحسابك. حدّث الصفحة وحاول مرة أخرى.");
-          setLoading(false);
-          submittingRef.current = false;
-          return;
-        }
-      }
-
-      const payload: Record<string, unknown> = {
-        order_number: orderNumber,
-        customer_name: fullName.trim(),
+      const payload = {
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        phoneAlt: phoneAlt.trim() || undefined,
         governorate: addressForm.governorate,
         center: addressForm.center,
-        area: addressForm.area.trim() || null,
-        street: addressForm.street.trim() || null,
-        apartment: addressForm.apartment.trim() || null,
-        phone: phone.trim(),
-        phone_alt: phoneAlt.trim() || null,
-        notes: noteParts.length ? noteParts.join(" | ") : null,
-        items: orderItems,
-        subtotal,
-        shipping: ship,
-        discount: finalDiscount,
-        coupon_code: finalCoupon,
-        total: orderTotal,
-        status: "new",
-        payment_method: "cod",
+        area: addressForm.area.trim() || undefined,
+        street: addressForm.street.trim() || undefined,
+        apartment: addressForm.apartment.trim() || undefined,
+        notes: addressForm.notes.trim() || undefined,
+        couponCode: appliedCode,
+        items: items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          variant: i.variant,
+          price: i.price,
+          name: i.name,
+          image: i.image,
+          basePrice: i.basePrice ?? i.price,
+        })),
+        merchantId: selfMerchantId,
+        refMerchantId: selfMerchantId ? null : refMerchantId,
       };
 
-      if (linkedCustomerId) payload.customer_id = linkedCustomerId;
-      if (linkedCustomerEmail) payload.customer_email = linkedCustomerEmail;
+      const res = await fetch("/api/orders/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-      if (linkedMerchantId) {
-        payload.merchant_id = linkedMerchantId;
-        payload.base_subtotal = selfMerchantId ? baseSubtotal : net;
-        payload.merchant_profit = profit;
-        payload.profit_released = false;
+      const data = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            orderNumber?: string;
+            duplicate?: boolean;
+          }
+        | null;
+
+      if (!res.ok || !data?.ok || !data.orderNumber) {
+        setError(data?.error || "حدث خطأ أثناء إرسال الطلب");
+        submittingRef.current = false;
+        setLoading(false);
+        return;
       }
 
-      const { error: insertError } = await supabase.from("orders").insert(payload);
-      if (insertError) throw insertError;
-
-      if (couponId) await incrementCouponUse(couponId);
-      await decrementStockForItems(orderItems);
       if (refMerchantId && !selfMerchantId) clearMerchantRef();
-
-      notifyOrderWhatsApp(orderNumber);
-
+      notifyOrderWhatsApp(data.orderNumber);
       clearCart();
-      router.push(`/order-success?n=${encodeURIComponent(orderNumber)}`);
+      router.push(`/order-success?n=${encodeURIComponent(data.orderNumber)}`);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
@@ -493,7 +417,6 @@ export function CheckoutForm() {
           </p>
         )}
 
-        {/* Desktop place order */}
         <button
           type="submit"
           disabled={loading || items.length === 0}
@@ -507,7 +430,6 @@ export function CheckoutForm() {
         </button>
       </form>
 
-      {/* Desktop sticky summary is rendered by parent page; mobile bar here */}
       <div className="mt-4 hidden lg:block">
         <OrderSummaryPanel
           items={items}
