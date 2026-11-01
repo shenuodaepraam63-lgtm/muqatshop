@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
+import { mapShipment, mapStatusEvent } from "@/lib/order-foundation";
 
 /**
- * Customer-only order details.
- * Ownership is verified on the server — order number alone is never enough.
+ * Customer-only order details (permanent foundation).
+ * Ownership verified on server. Includes shipments + recent status events.
  */
 export async function GET(
   req: NextRequest,
@@ -62,18 +63,32 @@ export async function GET(
       if (byEmail?.id) customerId = byEmail.id as string;
     }
 
-    // Core columns only (no migration-dependent fields)
     const { data: row, error } = await admin
       .from("orders")
       .select(
-        "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email"
+        "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email, version"
       )
       .eq("id", orderId)
       .maybeSingle();
 
     if (error) {
-      console.error("order detail fetch error", error);
-      return NextResponse.json({ ok: false, error: "تعذر تحميل الطلب" }, { status: 500 });
+      // Retry without version if column missing (migration not applied)
+      if (String(error.message || "").includes("version")) {
+        const retry = await admin
+          .from("orders")
+          .select(
+            "id, order_number, customer_name, governorate, center, area, street, apartment, phone, phone_alt, notes, items, subtotal, shipping, discount, coupon_code, total, status, created_at, updated_at, customer_id, customer_email"
+          )
+          .eq("id", orderId)
+          .maybeSingle();
+        if (retry.error || !retry.data) {
+          return NextResponse.json({ ok: false, error: "تعذر تحميل الطلب" }, { status: 500 });
+        }
+        Object.assign(row as object, retry.data);
+      } else {
+        console.error("order detail fetch error", error);
+        return NextResponse.json({ ok: false, error: "تعذر تحميل الطلب" }, { status: 500 });
+      }
     }
 
     if (!row) {
@@ -100,10 +115,53 @@ export async function GET(
       variant: typeof it.variant === "string" ? it.variant : null,
     }));
 
+    // Shipments from foundation table
+    let shipments: ReturnType<typeof mapShipment>[] = [];
+    const { data: shipRows } = await admin
+      .from("order_shipments")
+      .select(
+        "id, order_id, label, status, carrier, tracking_number, sort_order, shipped_at, delivered_at, created_at, updated_at"
+      )
+      .eq("order_id", orderId)
+      .order("sort_order", { ascending: true });
+
+    if (shipRows && shipRows.length) {
+      shipments = shipRows.map((r) => mapShipment(r as Record<string, unknown>));
+    } else {
+      shipments = [
+        {
+          id: `legacy-${row.id}`,
+          orderId: String(row.id),
+          label: "الشحنة الرئيسية",
+          status: String(row.status),
+          carrier: null,
+          trackingNumber: null,
+          sortOrder: 0,
+          shippedAt: null,
+          deliveredAt: null,
+          updatedAt: String(row.updated_at || row.created_at),
+        },
+      ];
+    }
+
+    // Recent events (first page)
+    let events: ReturnType<typeof mapStatusEvent>[] = [];
+    const { data: eventRows } = await admin
+      .from("order_status_events")
+      .select("id, order_id, from_status, to_status, actor_type, actor_id, note, created_at")
+      .eq("order_id", orderId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (eventRows?.length) {
+      events = eventRows.map((r) => mapStatusEvent(r as Record<string, unknown>));
+    }
+
     const order = {
       id: row.id,
       orderNumber: row.order_number,
       status: row.status,
+      version: Number((row as { version?: number }).version) || 1,
       customerName: row.customer_name,
       phone: row.phone,
       phoneAlt: row.phone_alt,
@@ -127,14 +185,10 @@ export async function GET(
     return NextResponse.json({
       ok: true,
       order,
-      shipments: [
-        {
-          id: `ship-${row.id}`,
-          label: "الشحنة الرئيسية",
-          status: row.status,
-          updatedAt: row.updated_at || row.created_at,
-        },
-      ],
+      shipments,
+      events,
+      eventsNextCursor:
+        events.length >= 20 ? events[events.length - 1]?.createdAt ?? null : null,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "خطأ غير متوقع";
