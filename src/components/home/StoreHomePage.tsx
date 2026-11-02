@@ -34,6 +34,9 @@ function available(product: Product): boolean {
 const PRODUCT_COLS =
   "id,name,slug,price,compare_at_price,sale_ends_at,images,main_image_index,category_id,stock,variants,is_featured,is_active,created_at";
 
+const CAMPAIGN_COLS =
+  "id,name,title,subtitle,image_url,mobile_image_url,link_url,button_text,sort_order,priority,is_active,status,starts_at,ends_at,created_at,updated_at,offer_price,offer_compare_price,duration_label";
+
 async function loadCampaignSlides(): Promise<{
   slides: PromoSlide[];
   autoplay: boolean;
@@ -43,15 +46,31 @@ async function loadCampaignSlides(): Promise<{
     return { slides: defaultSlides(), autoplay: true, intervalMs: 5000 };
   }
 
-  const [{ data: rows }, { data: settingsRow }] = await Promise.all([
-    supabase
+  let rows: CampaignRow[] | null = null;
+
+  const primary = await supabase
+    .from("gallery_slides")
+    .select(CAMPAIGN_COLS)
+    .order("priority", { ascending: false });
+
+  if (primary.error) {
+    // Columns may not exist until SQL migration — fallback without offer fields
+    const fallback = await supabase
       .from("gallery_slides")
       .select(
         "id,name,title,subtitle,image_url,mobile_image_url,link_url,button_text,sort_order,priority,is_active,status,starts_at,ends_at,created_at,updated_at"
       )
-      .order("priority", { ascending: false }),
-    supabase.from("site_settings").select("value").eq("key", "gallery").maybeSingle(),
-  ]);
+      .order("priority", { ascending: false });
+    rows = (fallback.data as CampaignRow[]) || [];
+  } else {
+    rows = (primary.data as CampaignRow[]) || [];
+  }
+
+  const { data: settingsRow } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "gallery")
+    .maybeSingle();
 
   const settings = (settingsRow?.value as {
     enabled?: boolean;
@@ -65,7 +84,7 @@ async function loadCampaignSlides(): Promise<{
 
   const now = new Date();
   const eligible = sortCampaigns(
-    ((rows as CampaignRow[]) || []).filter((r) => isCampaignEligible(r, now))
+    (rows || []).filter((r) => isCampaignEligible(r, now))
   );
 
   if (eligible.length > 0) {

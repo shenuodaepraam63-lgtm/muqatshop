@@ -27,6 +27,9 @@ type FormState = {
   status: CampaignStatus;
   starts_at: string;
   ends_at: string;
+  offer_price: string;
+  offer_compare_price: string;
+  duration_label: string;
 };
 
 type ProductHit = {
@@ -53,6 +56,14 @@ function fromLocalInput(v: string): string | null {
   return d.toISOString();
 }
 
+function numOrNull(v: string): number | null {
+  const t = v.trim();
+  if (!t) return null;
+  const n = Number(t.replace(/,/g, ""));
+  if (Number.isNaN(n) || n < 0) return null;
+  return n;
+}
+
 export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
   const router = useRouter();
   const deskRef = useRef<HTMLInputElement>(null);
@@ -77,12 +88,21 @@ export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
     status: (initial?.status as CampaignStatus) || "draft",
     starts_at: toLocalInput(initial?.starts_at),
     ends_at: toLocalInput(initial?.ends_at),
+    offer_price:
+      initial?.offer_price != null && initial.offer_price !== ("" as unknown)
+        ? String(initial.offer_price)
+        : "",
+    offer_compare_price:
+      initial?.offer_compare_price != null &&
+      initial.offer_compare_price !== ("" as unknown)
+        ? String(initial.offer_compare_price)
+        : "",
+    duration_label: initial?.duration_label || "",
   });
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  // Resolve linked product name on edit
   useEffect(() => {
     const slug = productSlugFromHref(form.link_url);
     if (!slug) {
@@ -134,7 +154,11 @@ export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
     if (!form.title.trim()) set("title", p.name);
     if (!form.name.trim()) set("name", `حملة — ${p.name}`);
     set("button_text", form.button_text || "اطلبها الآن");
-    // Optional: use product main image if campaign has no image yet
+    // Fill prices from product only if admin left them empty
+    if (!form.offer_price.trim()) set("offer_price", String(p.price));
+    if (!form.offer_compare_price.trim() && p.compare_at_price != null) {
+      set("offer_compare_price", String(p.compare_at_price));
+    }
     const img = p.images?.[0];
     if (img && !form.image_url) set("image_url", img);
     setLinkedName(p.name);
@@ -188,6 +212,17 @@ export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
       return;
     }
 
+    const offerPrice = numOrNull(form.offer_price);
+    const offerCompare = numOrNull(form.offer_compare_price);
+    if (form.offer_price.trim() && offerPrice == null) {
+      setError("سعر العرض غير صالح");
+      return;
+    }
+    if (form.offer_compare_price.trim() && offerCompare == null) {
+      setError("السعر قبل الخصم غير صالح");
+      return;
+    }
+
     const payload = {
       name: form.name.trim(),
       title: form.title.trim() || form.name.trim(),
@@ -202,6 +237,9 @@ export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
       is_active: form.status === "active",
       starts_at: starts,
       ends_at: ends,
+      offer_price: offerPrice,
+      offer_compare_price: offerCompare,
+      duration_label: form.duration_label.trim() || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -213,14 +251,22 @@ export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
         .eq("id", initial.id);
       setSaving(false);
       if (err) {
-        setError(err.message);
+        setError(
+          err.message.includes("offer_price") || err.message.includes("column")
+            ? `${err.message} — نفّذ ملف sql/campaign_offer_fields.sql في Supabase أولًا`
+            : err.message
+        );
         return;
       }
     } else {
       const { error: err } = await supabase.from("gallery_slides").insert(payload);
       setSaving(false);
       if (err) {
-        setError(err.message);
+        setError(
+          err.message.includes("offer_price") || err.message.includes("column")
+            ? `${err.message} — نفّذ ملف sql/campaign_offer_fields.sql في Supabase أولًا`
+            : err.message
+        );
         return;
       }
     }
@@ -245,7 +291,7 @@ export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
           />
         </div>
         <div>
-          <label className="text-xs text-muted block mb-1">عنوان الحملة (يظهر تحت الصورة)</label>
+          <label className="text-xs text-muted block mb-1">عنوان الحملة (تحت الصورة)</label>
           <input
             className={field}
             value={form.title}
@@ -254,7 +300,7 @@ export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
           />
         </div>
         <div>
-          <label className="text-xs text-muted block mb-1">وصف قصير تحت العنوان</label>
+          <label className="text-xs text-muted block mb-1">وصف قصير</label>
           <textarea
             className={`${field} min-h-[72px]`}
             value={form.subtitle}
@@ -265,10 +311,50 @@ export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
       </section>
 
       <section className="bg-white border border-[#e4e9f0] rounded-2xl p-5 space-y-3">
+        <h2 className="font-semibold text-ink">السعر ومدة العرض (تظهر في الكارت)</h2>
+        <p className="text-xs text-muted">
+          هذه القيم من لوحة الحملات وتظهر تحت الصورة. لو تركتها فارغة يُستخدم سعر المنتج المربوط إن وُجد.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-muted block mb-1">سعر العرض (جنيه)</label>
+            <input
+              className={field}
+              inputMode="decimal"
+              value={form.offer_price}
+              onChange={(e) => set("offer_price", e.target.value)}
+              placeholder="600"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted block mb-1">السعر قبل الخصم (اختياري)</label>
+            <input
+              className={field}
+              inputMode="decimal"
+              value={form.offer_compare_price}
+              onChange={(e) => set("offer_compare_price", e.target.value)}
+              placeholder="699"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">نص المدة تحت الزر</label>
+          <input
+            className={field}
+            value={form.duration_label}
+            onChange={(e) => set("duration_label", e.target.value)}
+            placeholder="عرض لمدة 30 يومًا"
+          />
+          <p className="mt-1 text-[11px] text-muted">
+            لو فاضي، يُحسب تلقائيًا من تاريخ نهاية العرض إن وُجد.
+          </p>
+        </div>
+      </section>
+
+      <section className="bg-white border border-[#e4e9f0] rounded-2xl p-5 space-y-3">
         <h2 className="font-semibold text-ink">ربط منتج للشراء</h2>
         <p className="text-xs text-muted">
-          ابحث عن منتج لربط الحملة بصفحته. عند الضغط على «اطلبها الآن» يتم توجيه العميل لصفحة المنتج.
-          السعر يظهر تلقائيًا من بيانات المنتج.
+          ابحث عن منتج لربط زر «اطلبها الآن» بصفحته.
         </p>
         <div className="relative">
           <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98A2B3]" />
@@ -354,9 +440,6 @@ export function CampaignForm({ initial }: { initial?: CampaignRow | null }) {
 
       <section className="bg-white border border-[#e4e9f0] rounded-2xl p-5 space-y-4">
         <h2 className="font-semibold text-ink">صورة الحملة</h2>
-        <p className="text-xs text-muted">
-          يُفضَّل صورة منتج واضحة بدون نصوص كثيرة. الصورة تظهر كاملة بدون قص.
-        </p>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-muted mb-2">رئيسية *</p>

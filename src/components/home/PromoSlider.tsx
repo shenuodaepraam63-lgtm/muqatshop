@@ -15,7 +15,6 @@ export type PromoSlide = {
   mobileImage?: string | null;
   buttonText?: string;
   tone?: "navy" | "blue" | "teal";
-  /** Optional prices when campaign is linked to a product */
   price?: number | null;
   compareAtPrice?: number | null;
   endsLabel?: string | null;
@@ -46,7 +45,9 @@ function toSlide(c: PublicCampaign | PromoSlide): PromoSlide {
 }
 
 function formatEgp(n: number) {
-  return `${Math.round(n).toLocaleString("ar-EG")} جنيه`;
+  const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return "";
+  return `${v.toLocaleString("en-EG")} جنيه`;
 }
 
 export function PromoSlider({
@@ -100,11 +101,15 @@ export function PromoSlider({
   const slide = list[index];
   const desktopImg = slide.image;
   const mobileImg = slide.mobileImage || slide.image;
-  const price = slide.price != null ? Number(slide.price) : null;
+  const price =
+    slide.price != null && Number.isFinite(Number(slide.price))
+      ? Number(slide.price)
+      : null;
   const compare =
-    slide.compareAtPrice != null ? Number(slide.compareAtPrice) : null;
-  const onSale =
-    price != null && compare != null && compare > price;
+    slide.compareAtPrice != null && Number.isFinite(Number(slide.compareAtPrice))
+      ? Number(slide.compareAtPrice)
+      : null;
+  const onSale = price != null && compare != null && compare > price;
 
   return (
     <section
@@ -128,11 +133,6 @@ export function PromoSlider({
             go(dx > 0 ? -1 : 1);
           }}
         >
-          {/*
-            كارت حملة نظيف:
-            - الصورة كاملة بدون قص (object-contain) في منطقة واسعة
-            - النصوص والسعر والزر تحت الصورة — مش فوقها
-          */}
           <article className="overflow-hidden rounded-[20px] max-md:rounded-[16px] bg-[#14243A] text-white shadow-[0_8px_30px_rgba(20,36,58,0.14)]">
             <div className="relative flex items-center justify-between px-4 pt-3 sm:px-5">
               <span className="text-xs font-bold tracking-wide text-white/90 sm:text-sm">
@@ -143,7 +143,6 @@ export function PromoSlider({
               </span>
             </div>
 
-            {/* صورة المنتج — تملأ العرض وتظهر كاملة */}
             <div className="relative mx-auto mt-2 w-full max-w-lg px-3 sm:max-w-2xl sm:px-6">
               <div className="relative aspect-[4/3] w-full sm:aspect-[16/10]">
                 {desktopImg ? (
@@ -169,7 +168,6 @@ export function PromoSlider({
               </div>
             </div>
 
-            {/* النصوص + السعر + الزر تحت الصورة */}
             <div className="px-5 pb-5 pt-3 text-center sm:px-8 sm:pb-7 sm:pt-4">
               <h2 className="text-lg font-bold leading-snug sm:text-2xl">
                 {slide.title}
@@ -180,7 +178,7 @@ export function PromoSlider({
                 </p>
               ) : null}
 
-              {price != null && (
+              {price != null && price > 0 && (
                 <div className="mt-3 flex flex-wrap items-baseline justify-center gap-2">
                   <span className="text-2xl font-bold text-white sm:text-3xl">
                     {formatEgp(price)}

@@ -17,6 +17,12 @@ export type CampaignRow = {
   status: CampaignStatus | string;
   starts_at: string | null;
   ends_at: string | null;
+  /** Admin-set offer price (optional) */
+  offer_price?: number | null;
+  /** Admin-set compare-at price (optional) */
+  offer_compare_price?: number | null;
+  /** Admin-set duration line under the CTA (optional) */
+  duration_label?: string | null;
   created_at?: string;
   updated_at?: string | null;
 };
@@ -86,6 +92,9 @@ export function sortCampaigns<
 }
 
 function endsLabelFromRow(row: CampaignRow, now = new Date()): string | null {
+  const manual = row.duration_label?.trim();
+  if (manual) return manual;
+
   if (!row.ends_at) return null;
   const e = new Date(row.ends_at);
   if (Number.isNaN(e.getTime()) || e <= now) return null;
@@ -99,6 +108,30 @@ export function toPublicCampaign(
   row: CampaignRow,
   product?: { price?: number | null; compare_at_price?: number | null } | null
 ): PublicCampaign {
+  // Priority: admin offer fields → linked product → none
+  const adminPrice =
+    row.offer_price != null && row.offer_price !== ("" as unknown)
+      ? Number(row.offer_price)
+      : null;
+  const adminCompare =
+    row.offer_compare_price != null && row.offer_compare_price !== ("" as unknown)
+      ? Number(row.offer_compare_price)
+      : null;
+
+  const price =
+    adminPrice != null && !Number.isNaN(adminPrice)
+      ? adminPrice
+      : product?.price != null
+        ? Number(product.price)
+        : null;
+
+  const compareAtPrice =
+    adminCompare != null && !Number.isNaN(adminCompare)
+      ? adminCompare
+      : product?.compare_at_price != null
+        ? Number(product.compare_at_price)
+        : null;
+
   return {
     id: row.id,
     title: (row.title || row.name || "عرض خاص").trim(),
@@ -108,9 +141,11 @@ export function toPublicCampaign(
     mobileImage: row.mobile_image_url,
     buttonText: (row.button_text || "اطلبها الآن").trim() || "اطلبها الآن",
     priority: Number(row.priority) || 0,
-    price: product?.price != null ? Number(product.price) : null,
+    price: price != null && !Number.isNaN(price) ? price : null,
     compareAtPrice:
-      product?.compare_at_price != null ? Number(product.compare_at_price) : null,
+      compareAtPrice != null && !Number.isNaN(compareAtPrice)
+        ? compareAtPrice
+        : null,
     endsLabel: endsLabelFromRow(row),
   };
 }
