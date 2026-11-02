@@ -1,9 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { HorizontalCategoryCarousel } from "@/components/categories/HorizontalCategoryCarousel";
+import "@/components/categories/HorizontalCategoryCarousel.css";
 
 export type ShopCategory = {
   id: string;
@@ -28,7 +29,7 @@ export function buildShopUrl(
   return q ? `/shop?${q}` : "/shop";
 }
 
-/** بطاقات التصنيفات الرئيسية — 5 أعمدة / 2 موبايل */
+/** شريط تصنيفات رئيسية أفقي — نفس مكوّن الرئيسية */
 export function ShopCategoryBar({
   categories,
 }: {
@@ -38,6 +39,15 @@ export function ShopCategoryBar({
   const active = sp.get("category") || "";
   const roots = categories.filter((c) => !c.parent_id);
   if (!roots.length) return null;
+
+  const items = roots.map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    image: c.image,
+    href: buildShopUrl(sp, { category: c.slug, subcategory: null }),
+    active: active === c.slug,
+  }));
 
   return (
     <section className="mb-5" aria-label="التصنيفات الرئيسية">
@@ -53,38 +63,7 @@ export function ShopCategoryBar({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5">
-        {roots.map((c) => {
-          const on = active === c.slug;
-          return (
-            <Link
-              key={c.id}
-              href={buildShopUrl(sp, { category: c.slug, subcategory: null })}
-              className={`group relative h-[120px] overflow-hidden rounded-[12px] border transition sm:h-[150px] sm:rounded-[14px] ${
-                on
-                  ? "border-[#3157D5] ring-2 ring-[#3157D5]/35"
-                  : "border-[#E5EAF1] hover:border-[#3157D5]"
-              }`}
-            >
-              {c.image ? (
-                <Image
-                  src={c.image}
-                  alt=""
-                  fill
-                  className="object-cover transition duration-300 group-hover:scale-[1.03]"
-                  sizes="(max-width:767px) 47vw, 20vw"
-                />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-[#1e3554] to-[#14243A]" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#14243A]/90 via-[#14243A]/30 to-transparent" />
-              <p className="absolute inset-x-0 bottom-0 p-3 text-[13px] font-bold text-white sm:text-[15px] line-clamp-2">
-                {c.name}
-              </p>
-            </Link>
-          );
-        })}
-      </div>
+      <HorizontalCategoryCarousel items={items} ariaLabel="تصنيفات المتجر" />
     </section>
   );
 }
