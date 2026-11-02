@@ -53,7 +53,7 @@
   }
 }
 
-/* Horizontal product shelf */
+/* Horizontal product shelf — layout only */
 .category-product-track {
   display: flex;
   flex-wrap: nowrap;
@@ -113,39 +113,15 @@
   height: 100%;
 }
 
-/* Product cards: noticeable stagger when section enters view */
-.mq-product-item {
-  opacity: 0;
-  transform: translate3d(0, 28px, 0) scale(0.94);
-  transition:
-    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: opacity, transform;
-}
-
-.mq-product-item--in {
-  opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
-}
-
 .muqat-home :focus-visible {
   outline: 2px solid #3157d5;
   outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mq-product-item {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-  }
-
   .muqat-home *,
   .muqat-home *::before,
   .muqat-home *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
   }
 }

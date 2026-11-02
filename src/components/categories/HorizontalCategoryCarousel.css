@@ -1,4 +1,4 @@
-/* Horizontal category strip + entrance animation */
+/* Horizontal category strip — layout only (entrance via Motion) */
 
 .category-carousel {
   position: relative;
@@ -37,24 +37,6 @@
 .category-card-wrap {
   flex: 0 0 auto;
   scroll-snap-align: start;
-}
-
-/* —— ظهور تدريجي ملحوظ للتصنيفات —— */
-.mq-cat-item {
-  opacity: 0;
-  transform: translate3d(0, 32px, 0) scale(0.88);
-  filter: blur(2px);
-  transition:
-    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.45s ease;
-  will-change: opacity, transform;
-}
-
-.mq-cat-item--in {
-  opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
-  filter: blur(0);
 }
 
 .category-card {
@@ -201,10 +183,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mq-cat-item {
-    opacity: 1 !important;
-    transform: none !important;
-    filter: none !important;
-    transition: none !important;
+  .category-card {
+    transition: none;
   }
 }

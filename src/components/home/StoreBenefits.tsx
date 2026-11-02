@@ -1,4 +1,8 @@
+"use client";
+
 import { Headphones, Truck } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { fadeInUp, staggerContainer, staggerItem } from "@/lib/animations/motion-variants";
 
 const BENEFITS = [
   {
@@ -14,13 +18,26 @@ const BENEFITS = [
 ] as const;
 
 export function StoreBenefits() {
+  const reduce = useReducedMotion();
+
   return (
-    <section className="home-section" aria-label="مميزات المتجر">
+    <motion.section
+      className="home-section"
+      aria-label="مميزات المتجر"
+      initial={reduce ? false : "hidden"}
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.2 }}
+      variants={staggerContainer}
+    >
       <div className="home-container">
-        <div className="grid min-h-[100px] grid-cols-2 overflow-hidden rounded-[14px] border border-[#E5EAF1] bg-white max-md:min-h-[88px] max-md:rounded-[12px]">
+        <motion.div
+          className="grid min-h-[100px] grid-cols-2 overflow-hidden rounded-[14px] border border-[#E5EAF1] bg-white max-md:min-h-[88px] max-md:rounded-[12px]"
+          variants={fadeInUp}
+        >
           {BENEFITS.map(({ icon: Icon, title, body }, i) => (
-            <div
+            <motion.div
               key={title}
+              variants={staggerItem}
               className={`flex items-center gap-3 px-4 py-3 sm:px-6 ${
                 i === 0 ? "border-l border-[#E5EAF1]" : ""
               }`}
@@ -34,10 +51,10 @@ export function StoreBenefits() {
                   {body}
                 </p>
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
-    </section>
+    </motion.section>
   );
 }

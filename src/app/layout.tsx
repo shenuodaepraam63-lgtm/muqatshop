@@ -9,6 +9,7 @@ import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
 import { CartOwnerSync } from "@/components/cart/CartOwnerSync";
 import { ThemeProvider } from "@/lib/theme";
 import { LocaleProvider } from "@/lib/locale";
+import { MotionProvider } from "@/components/animations/MotionProvider";
 
 const arabic = IBM_Plex_Sans_Arabic({
   subsets: ["arabic", "latin"],
@@ -47,7 +48,6 @@ export default function RootLayout({
         className={`${arabic.variable} ${inter.variable} font-sans antialiased`}
         style={
           {
-            // Compat for legacy components still referencing Cairo/Changa vars
             ["--font-cairo" as string]: "var(--font-arabic)",
             ["--font-changa" as string]: "var(--font-arabic)",
           } as React.CSSProperties
@@ -60,13 +60,15 @@ export default function RootLayout({
         />
         <ThemeProvider>
           <LocaleProvider>
-            <AuthSessionProvider>
-              <CartOwnerSync />
-              <MerchantRefCaptureGate />
-              <RoleGate>
-                <SiteChrome>{children}</SiteChrome>
-              </RoleGate>
-            </AuthSessionProvider>
+            <MotionProvider>
+              <AuthSessionProvider>
+                <CartOwnerSync />
+                <MerchantRefCaptureGate />
+                <RoleGate>
+                  <SiteChrome>{children}</SiteChrome>
+                </RoleGate>
+              </AuthSessionProvider>
+            </MotionProvider>
           </LocaleProvider>
         </ThemeProvider>
       </body>

@@ -3,7 +3,15 @@
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { MarketplaceProductCard } from "@/components/home/MarketplaceProductCard";
+import {
+  MOTION_DURATION,
+  MOTION_EASE,
+  MOTION_STAGGER,
+  MOTION_STAGGER_MAX,
+} from "@/lib/animations/motion-config";
+import { fadeInUp, staggerContainer } from "@/lib/animations/motion-variants";
 import type { Product } from "@/lib/supabase";
 
 export type ShelfSubcategory = {
@@ -24,10 +32,9 @@ export type CategoryShelfData = {
 export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   const [activeSub, setActiveSub] = useState<string | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
-  const sectionRef = useRef<HTMLElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
-  const [visible, setVisible] = useState(false);
+  const reduce = useReducedMotion();
 
   const filtered = useMemo(() => {
     if (!activeSub) return shelf.products;
@@ -62,27 +69,6 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
     trackRef.current?.scrollTo({ left: 0 });
   }, [activeSub]);
 
-  // When section enters viewport → animate children
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setVisible(true);
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setVisible(true);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
   if (!shelf.products.length) return null;
 
   const scroll = (dir: 1 | -1) => {
@@ -93,13 +79,19 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   };
 
   return (
-    <section
-      ref={sectionRef as never}
+    <motion.section
       className="home-section"
       aria-label={shelf.name}
+      initial={reduce ? false : "hidden"}
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.1, margin: "0px 0px -5% 0px" }}
+      variants={staggerContainer}
     >
       <div className="home-container">
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <motion.div
+          className="mb-3 flex items-center justify-between gap-3"
+          variants={fadeInUp}
+        >
           <h2 className="text-lg font-bold text-[#14243A] sm:text-xl">{shelf.name}</h2>
           <Link
             href={shelf.href}
@@ -107,13 +99,14 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
           >
             عرض الكل
           </Link>
-        </div>
+        </motion.div>
 
         {shelf.subcategories.length > 0 && (
-          <div
+          <motion.div
             className="mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar"
             role="tablist"
             aria-label={`تصنيفات ${shelf.name}`}
+            variants={fadeInUp}
           >
             <button
               type="button"
@@ -147,7 +140,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
                 </button>
               );
             })}
-          </div>
+          </motion.div>
         )}
 
         {filtered.length === 0 ? (
@@ -181,18 +174,27 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
 
             <div ref={trackRef} className="category-product-track" dir="rtl">
               {filtered.map((p, i) => (
-                <div
+                <motion.div
                   key={`${activeSub || "all"}-${p.id}`}
-                  className={`category-product-slot snap-start mq-product-item${visible ? " mq-product-item--in" : ""}`}
-                  style={{ transitionDelay: `${Math.min(i, 10) * 70}ms` }}
+                  className="category-product-slot snap-start"
+                  initial={reduce ? false : { opacity: 0, y: 18 }}
+                  whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.15 }}
+                  transition={{
+                    duration: MOTION_DURATION.medium,
+                    ease: MOTION_EASE.standard,
+                    delay: reduce
+                      ? 0
+                      : Math.min(i, MOTION_STAGGER_MAX) * MOTION_STAGGER.normal,
+                  }}
                 >
                   <MarketplaceProductCard product={p} />
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
         )}
       </div>
-    </section>
+    </motion.section>
   );
 }
