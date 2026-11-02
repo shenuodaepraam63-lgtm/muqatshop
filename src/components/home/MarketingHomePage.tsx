@@ -14,18 +14,20 @@ import {
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { HomeFooter } from "@/components/home/HomeFooter";
 import {
-  CategorySection,
   DealsSection,
   FaqSection,
-  FeaturedProductsSection,
   FinalCtaSection,
-  HomeHero,
   HowItWorksSection,
   JoinSection,
   PartnershipSection,
-  TrustSection,
   WhyUsSection,
 } from "@/components/home/HomeSections";
+import {
+  CategorySection,
+  FeaturedProductsSection,
+  HomeHero,
+  TrustSection,
+} from "@/components/home/HomeSectionsMotion";
 import Link from "next/link";
 
 const PRODUCT_COLS =
