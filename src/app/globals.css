@@ -48,9 +48,7 @@ html.dark {
 
 html {
   scroll-behavior: smooth;
-  /* Prevent horizontal bounce trapping vertical scroll on mobile */
   overflow-x: hidden;
-  overscroll-behavior-y: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -73,10 +71,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  /* Never lock the document to a fixed height on mobile */
   min-height: 100%;
   position: relative;
-  touch-action: manipulation;
 }
 
 ::selection {
@@ -153,12 +149,12 @@ body.admin-mode > main {
   scrollbar-width: none;
 }
 
-/* Horizontal strips: never steal vertical page scroll */
+/*
+ * Horizontal carousels: do NOT set touch-action: pan-x (blocks vertical page scroll).
+ * Default browser handling + -webkit-overflow-scrolling is enough.
+ */
 .category-carousel__track,
-.category-product-track,
-[class*="overflow-x-auto"] {
-  touch-action: pan-y pinch-zoom;
-  overscroll-behavior-x: contain;
+.category-product-track {
   -webkit-overflow-scrolling: touch;
 }
 
