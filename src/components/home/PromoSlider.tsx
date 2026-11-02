@@ -107,7 +107,6 @@ export function PromoSlider({
             const dx = e.changedTouches[0].clientX - touchX.current;
             touchX.current = null;
             if (Math.abs(dx) < 40) return;
-            // RTL: swipe right → previous visual, left → next
             go(dx > 0 ? -1 : 1);
           }}
         >
@@ -117,31 +116,33 @@ export function PromoSlider({
               TONES[slide.tone || "navy"]
             }`}
           >
-            {/* Desktop image */}
+            {/*
+              object-contain: الصورة كاملة داخل الإطار بدون قص.
+              الخلفية المتدرجة تظهر في الفراغات لو نسبة الصورة مختلفة عن الحاوية.
+            */}
             {desktopImg ? (
               <Image
                 src={desktopImg}
                 alt={slide.title}
                 fill
-                className="hidden sm:block object-cover"
+                className="hidden sm:block object-contain object-center"
                 sizes="(max-width:1024px) 92vw, 1200px"
                 priority={index === 0}
               />
             ) : null}
-            {/* Mobile image */}
             {mobileImg ? (
               <Image
                 src={mobileImg}
                 alt={slide.title}
                 fill
-                className="sm:hidden object-cover"
+                className="sm:hidden object-contain object-center"
                 sizes="94vw"
                 priority={index === 0}
               />
             ) : null}
 
-            {/* Readable overlay */}
-            <div className="absolute inset-0 bg-gradient-to-l from-black/55 via-black/25 to-transparent sm:from-black/45 sm:via-black/15" />
+            {/* تدرج خفيف على النص فقط — بدون تغطية الصورة كلها */}
+            <div className="pointer-events-none absolute inset-y-0 inset-inline-start-0 z-[1] w-[55%] max-w-md bg-gradient-to-l from-transparent via-black/25 to-black/50 sm:w-[45%]" />
 
             <div className="relative z-10 flex flex-col justify-center px-5 sm:px-10 md:px-14 max-w-xl text-white py-6">
               <p className="text-lg font-bold sm:text-2xl md:text-3xl leading-snug line-clamp-2 drop-shadow-sm">
