@@ -1,7 +1,6 @@
 import {
   supabase,
   isSupabaseConfigured,
-  productMainImage,
   type Category,
   type Product,
 } from "@/lib/supabase";
@@ -112,7 +111,7 @@ async function loadHomeData() {
         .eq("is_active", true)
         .is("parent_id", null)
         .order("sort_order", { ascending: true })
-        .limit(10),
+        .limit(24),
       supabase
         .from("products")
         .select(PRODUCT_COLS)
@@ -224,7 +223,6 @@ export default async function StoreHomePage() {
           autoplay={data.campaign.autoplay}
           intervalMs={data.campaign.intervalMs}
         />
-        <StoreBenefits />
 
         {data.categories.length > 0 && (
           <section className="home-section" aria-label="التصنيفات">
@@ -234,6 +232,8 @@ export default async function StoreHomePage() {
             </div>
           </section>
         )}
+
+        <StoreBenefits />
 
         {data.bestSellers.length > 0 && (
           <section className="home-section" aria-label="الأكثر مبيعًا">
