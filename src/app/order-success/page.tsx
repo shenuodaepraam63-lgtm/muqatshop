@@ -78,14 +78,6 @@ function SuccessContent() {
           متابعة التسوق
         </Link>
       </div>
-
-      {prepaid && !waUrl && (
-        <p className="mt-4 text-xs text-[#667085]">
-          أضف رقم واتساب المتجر في متغير البيئة{" "}
-          <code className="rounded bg-[#F6F8FB] px-1">NEXT_PUBLIC_WHATSAPP_NUMBER</code>{" "}
-          لتفعيل زر التواصل المباشر.
-        </p>
-      )}
     </div>
   );
 }
