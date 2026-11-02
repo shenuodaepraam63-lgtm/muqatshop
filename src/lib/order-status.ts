@@ -13,8 +13,25 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   returned: "مرتجع",
 };
 
-export function orderStatusLabel(status: string): string {
-  return ORDER_STATUS_LABELS[status] || status;
+export const ORDER_STATUS_LABELS_EN: Record<string, string> = {
+  new: "Order received",
+  confirmed: "Confirmed",
+  processing: "Processing",
+  preparing: "Preparing",
+  shipped: "Shipped",
+  out_for_delivery: "Out for delivery",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+  rejected: "Rejected",
+  returned: "Returned",
+};
+
+export function orderStatusLabel(
+  status: string,
+  locale: "ar" | "en" = "ar"
+): string {
+  const map = locale === "en" ? ORDER_STATUS_LABELS_EN : ORDER_STATUS_LABELS;
+  return map[status] || ORDER_STATUS_LABELS[status] || status;
 }
 
 export function orderStatusTone(status: string): string {
@@ -44,6 +61,18 @@ export const ORDER_TIMELINE: { key: string; label: string }[] = [
   { key: "shipped", label: "تم الشحن" },
   { key: "delivered", label: "تم التسليم" },
 ];
+
+export const ORDER_TIMELINE_EN: { key: string; label: string }[] = [
+  { key: "new", label: "Received" },
+  { key: "confirmed", label: "Confirmed" },
+  { key: "processing", label: "Processing" },
+  { key: "shipped", label: "Shipped" },
+  { key: "delivered", label: "Delivered" },
+];
+
+export function orderTimeline(locale: "ar" | "en" = "ar") {
+  return locale === "en" ? ORDER_TIMELINE_EN : ORDER_TIMELINE;
+}
 
 export function timelineIndex(status: string): number {
   const map: Record<string, number> = {

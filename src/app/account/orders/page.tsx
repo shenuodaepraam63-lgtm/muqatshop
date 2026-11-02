@@ -74,7 +74,7 @@ export default function AccountOrdersPage() {
           <option value="all">{t("orders.all")}</option>
           {statuses.map((s) => (
             <option key={s} value={s}>
-              {orderStatusLabel(s)}
+              {orderStatusLabel(s, locale)}
             </option>
           ))}
         </select>
@@ -87,17 +87,12 @@ export default function AccountOrdersPage() {
         </div>
       )}
 
-      {err && !loading && (
-        <p className="text-sm text-[#D64C4C]">{err}</p>
-      )}
+      {err && !loading && <p className="text-sm text-[#D64C4C]">{err}</p>}
 
       {!loading && filtered.length === 0 && (
         <div className="account-card border-dashed px-4 py-10 text-center">
           <p className="font-semibold text-[var(--text)]">{t("orders.empty")}</p>
-          <Link
-            href="/shop"
-            className="mt-4 inline-block text-sm font-bold text-[#3157D5]"
-          >
+          <Link href="/shop" className="mt-4 inline-block text-sm font-bold text-[#3157D5]">
             {t("common.shop")}
           </Link>
         </div>
@@ -119,7 +114,7 @@ export default function AccountOrdersPage() {
                     orderStatusTone(o.status)
                   }`}
                 >
-                  {orderStatusLabel(o.status)}
+                  {orderStatusLabel(o.status, locale)}
                 </span>
               </div>
               <p className="mt-2 text-xs text-[var(--text-muted)]">
