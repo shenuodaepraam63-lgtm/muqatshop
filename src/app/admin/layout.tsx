@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { AdminNotificationsBell } from "@/components/admin/AdminNotificationsBell";
 import {
   LogOut,
   Package,
@@ -119,14 +120,17 @@ export default function AdminLayout({
   const sidebar = (
     <>
       <div className="p-5 border-b border-[#e8e2d9]">
-        <Link
-          href="/admin"
-          className="inline-flex"
-          onClick={() => setMenuOpen(false)}
-          aria-label="Muqatshop"
-        >
-          <BrandLogo size="sm" />
-        </Link>
+        <div className="flex items-start justify-between gap-2">
+          <Link
+            href="/admin"
+            className="inline-flex"
+            onClick={() => setMenuOpen(false)}
+            aria-label="Muqatshop"
+          >
+            <BrandLogo size="sm" />
+          </Link>
+          <AdminNotificationsBell />
+        </div>
         <p className="text-xs text-muted mt-1 truncate">{userEmail}</p>
       </div>
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -224,7 +228,7 @@ export default function AdminLayout({
         <Link href="/admin" className="inline-flex">
           <BrandLogo size="sm" />
         </Link>
-        <div className="w-10" />
+        <AdminNotificationsBell />
       </div>
       {menuOpen && (
         <div
