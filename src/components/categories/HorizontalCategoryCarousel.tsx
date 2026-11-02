@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { ScrollReveal } from "@/components/ui/ScrollReveal";
+import "./HorizontalCategoryCarousel.css";
 
 export type HorizontalCategoryItem = {
   id: string;
@@ -52,6 +52,13 @@ export function HorizontalCategoryCarousel({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // Trigger enter animation after paint so CSS transition is visible
+    const id = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(id);
+  }, []);
 
   const updateArrows = useCallback(() => {
     const el = scrollerRef.current;
@@ -116,12 +123,10 @@ export function HorizontalCategoryCarousel({
 
       <div ref={scrollerRef} className="category-carousel__track" dir="rtl">
         {items.map((item, i) => (
-          <ScrollReveal
+          <div
             key={item.id}
-            index={i}
-            staggerMs={40}
-            rootRef={scrollerRef}
-            className="category-card-wrap"
+            className={`category-card-wrap mq-cat-item${mounted ? " mq-cat-item--in" : ""}`}
+            style={{ transitionDelay: `${i * 75}ms` }}
           >
             <Link
               href={item.href}
@@ -130,7 +135,7 @@ export function HorizontalCategoryCarousel({
               <CategoryImage src={item.image} name={item.name} />
               <span className="category-card__name">{item.name}</span>
             </Link>
-          </ScrollReveal>
+          </div>
         ))}
       </div>
     </div>

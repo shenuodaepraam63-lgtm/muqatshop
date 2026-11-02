@@ -4,7 +4,6 @@ import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MarketplaceProductCard } from "@/components/home/MarketplaceProductCard";
-import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import type { Product } from "@/lib/supabase";
 
 export type ShelfSubcategory = {
@@ -28,7 +27,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
-  const [sectionIn, setSectionIn] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   const filtered = useMemo(() => {
     if (!activeSub) return shelf.products;
@@ -63,23 +62,22 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
     trackRef.current?.scrollTo({ left: 0 });
   }, [activeSub]);
 
-  // Section enters vertical viewport → cascade
+  // When section enters viewport → animate children
   useEffect(() => {
     const el = sectionRef.current;
     if (!el) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      setSectionIn(true);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setVisible(true);
       return;
     }
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          setSectionIn(true);
+          setVisible(true);
           io.disconnect();
         }
       },
-      { threshold: 0.08, rootMargin: "0px 0px -4% 0px" }
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
     );
     io.observe(el);
     return () => io.disconnect();
@@ -97,7 +95,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   return (
     <section
       ref={sectionRef as never}
-      className={`home-section mq-section ${sectionIn ? "mq-section--in" : ""}`}
+      className="home-section"
       aria-label={shelf.name}
     >
       <div className="home-container">
@@ -183,15 +181,13 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
 
             <div ref={trackRef} className="category-product-track" dir="rtl">
               {filtered.map((p, i) => (
-                <ScrollReveal
+                <div
                   key={`${activeSub || "all"}-${p.id}`}
-                  className="category-product-slot snap-start"
-                  index={i}
-                  staggerMs={45}
-                  rootRef={trackRef}
+                  className={`category-product-slot snap-start mq-product-item${visible ? " mq-product-item--in" : ""}`}
+                  style={{ transitionDelay: `${Math.min(i, 10) * 70}ms` }}
                 >
                   <MarketplaceProductCard product={p} />
-                </ScrollReveal>
+                </div>
               ))}
             </div>
           </div>
