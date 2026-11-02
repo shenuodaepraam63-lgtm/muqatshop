@@ -109,24 +109,9 @@
 }
 
 .category-product-slot > article,
-.scroll-reveal > article {
+.category-product-slot > div > article {
   width: 100%;
   height: 100%;
-}
-
-/* Progressive reveal — Dream2000-like fade-up */
-.scroll-reveal {
-  opacity: 0;
-  transform: translate3d(0, 18px, 0);
-  transition:
-    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: opacity, transform;
-}
-
-.scroll-reveal.is-visible {
-  opacity: 1;
-  transform: translate3d(0, 0, 0);
 }
 
 .muqat-home :focus-visible {
@@ -135,12 +120,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .scroll-reveal {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-  }
-
   .muqat-home *,
   .muqat-home *::before,
   .muqat-home *::after {

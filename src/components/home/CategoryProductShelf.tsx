@@ -71,7 +71,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   };
 
   return (
-    <ScrollReveal as="section" className="home-section" index={0} threshold={0.06}>
+    <ScrollReveal as="section" className="home-section" index={0} amount={0.06}>
       <div className="home-container">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-[#14243A] sm:text-xl">{shelf.name}</h2>
@@ -153,18 +153,14 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
               </div>
             )}
 
-            <div
-              ref={trackRef}
-              className="category-product-track"
-              dir="rtl"
-            >
+            <div ref={trackRef} className="category-product-track" dir="rtl">
               {filtered.map((p, i) => (
                 <ScrollReveal
                   key={`${activeSub || "all"}-${p.id}`}
                   className="category-product-slot snap-start"
                   index={i}
-                  staggerMs={45}
-                  threshold={0.05}
+                  stagger={0.04}
+                  amount={0.05}
                 >
                   <MarketplaceProductCard product={p} />
                 </ScrollReveal>
