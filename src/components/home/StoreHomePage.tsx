@@ -19,6 +19,8 @@ import {
 import { RecentlyViewedSection } from "@/components/home/RecentlyViewedSection";
 import {
   isCampaignEligible,
+  productSlugFromHref,
+  sanitizeCampaignHref,
   sortCampaigns,
   toPublicCampaign,
   type CampaignRow,
@@ -67,9 +69,36 @@ async function loadCampaignSlides(): Promise<{
   );
 
   if (eligible.length > 0) {
+    const slugs = eligible
+      .map((r) => productSlugFromHref(sanitizeCampaignHref(r.link_url)))
+      .filter((s): s is string => Boolean(s));
+
+    const priceBySlug = new Map<
+      string,
+      { price: number; compare_at_price: number | null }
+    >();
+
+    if (slugs.length) {
+      const { data: prods } = await supabase
+        .from("products")
+        .select("slug,price,compare_at_price")
+        .in("slug", slugs)
+        .eq("is_active", true);
+      for (const p of prods || []) {
+        priceBySlug.set(p.slug, {
+          price: Number(p.price),
+          compare_at_price:
+            p.compare_at_price == null ? null : Number(p.compare_at_price),
+        });
+      }
+    }
+
     return {
       slides: eligible.map((r) => {
-        const p = toPublicCampaign(r);
+        const href = sanitizeCampaignHref(r.link_url);
+        const slug = productSlugFromHref(href);
+        const product = slug ? priceBySlug.get(slug) : null;
+        const p = toPublicCampaign(r, product);
         return {
           id: p.id,
           title: p.title,
@@ -79,6 +108,9 @@ async function loadCampaignSlides(): Promise<{
           mobileImage: p.mobileImage,
           buttonText: p.buttonText,
           tone: "navy" as const,
+          price: p.price,
+          compareAtPrice: p.compareAtPrice,
+          endsLabel: p.endsLabel,
         };
       }),
       autoplay: settings.autoplay !== false,
