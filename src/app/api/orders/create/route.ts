@@ -8,6 +8,7 @@ import {
 import { computeDiscount, type Coupon } from "@/lib/coupons";
 import type { ProductVariant } from "@/lib/supabase";
 import { isPrepaidRequiredProduct } from "@/lib/prepaid-products";
+import { notifyAdminNewOrder } from "@/lib/admin-notify";
 
 type OrderItemInput = {
   productId: string;
@@ -233,7 +234,6 @@ export async function POST(req: NextRequest) {
       baseSubtotal += unitBase * qty;
     }
 
-    // Server-side force prepaid if any earbuds in order (cannot trust client alone)
     const paymentMethod =
       hasPrepaidProduct || body.paymentMethod === "prepaid_whatsapp"
         ? "prepaid_whatsapp"
@@ -316,9 +316,7 @@ export async function POST(req: NextRequest) {
     const noteParts: string[] = [];
     if (body.notes?.trim()) noteParts.push(body.notes.trim());
     if (paymentMethod === "prepaid_whatsapp") {
-      noteParts.push(
-        "دفع مقدّم + تأكيد واتساب (سماعات إيربودز) — لا COD"
-      );
+      noteParts.push("دفع مقدّم + تأكيد واتساب (سماعات إيربودز) — لا COD");
     }
 
     const payload: Record<string, unknown> = {
@@ -455,11 +453,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const finalOrderNumber = order?.order_number || orderNumber;
+    const finalTotal = order?.total ?? total;
+    void notifyAdminNewOrder({
+      orderNumber: finalOrderNumber,
+      customerName: fullName,
+      phone,
+      total: finalTotal,
+      paymentMethod,
+    }).catch(() => null);
+
     return NextResponse.json({
       ok: true,
-      orderNumber: order?.order_number || orderNumber,
+      orderNumber: finalOrderNumber,
       orderId: order?.id,
-      total: order?.total ?? total,
+      total: finalTotal,
       status: order?.status || "new",
       shipping,
       discount,
