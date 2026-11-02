@@ -10,13 +10,13 @@
   gap: 12px;
   overflow-x: auto;
   overflow-y: hidden;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
+  /* Do NOT use touch-action: pan-x — it blocks vertical page scroll on mobile */
+  overscroll-behavior-x: auto;
   padding-bottom: 2px;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  touch-action: pan-x;
 }
 
 .category-carousel__track::-webkit-scrollbar {
@@ -100,7 +100,6 @@
   }
 }
 
-/* Spec: never crop or stretch category images */
 .category-card__image {
   width: 100% !important;
   height: 100% !important;

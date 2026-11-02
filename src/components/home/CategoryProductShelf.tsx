@@ -18,7 +18,6 @@ export type CategoryShelfData = {
   slug: string;
   href: string;
   subcategories: ShelfSubcategory[];
-  /** Products for this group (may span parent + children) */
   products: Product[];
 };
 
@@ -73,7 +72,6 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   return (
     <section className="home-section" aria-label={shelf.name}>
       <div className="home-container">
-        {/* Title row */}
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-[#14243A] sm:text-xl">{shelf.name}</h2>
           <Link
@@ -84,7 +82,6 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
           </Link>
         </div>
 
-        {/* Subcategory chips — horizontal scroll */}
         {shelf.subcategories.length > 0 && (
           <div
             className="mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar"
@@ -126,7 +123,6 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
           </div>
         )}
 
-        {/* Products horizontal rail — ~2 visible on mobile */}
         {filtered.length === 0 ? (
           <p className="rounded-xl border border-dashed border-[#E4E9F0] bg-white py-10 text-center text-sm text-[#718096]">
             لا توجد منتجات في هذا التصنيف حاليًا
@@ -158,7 +154,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
 
             <div
               ref={trackRef}
-              className="category-product-track flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory no-scrollbar sm:gap-3"
+              className="category-product-track flex gap-2.5 overflow-x-auto pb-2 snap-x snap-proximity no-scrollbar sm:gap-3"
               dir="rtl"
             >
               {filtered.map((p) => (
