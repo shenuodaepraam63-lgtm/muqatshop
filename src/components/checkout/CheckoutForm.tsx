@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useCartStore } from "@/lib/store";
@@ -21,6 +21,10 @@ import {
 } from "@/lib/customer-account";
 import { syncCustomerFromAuthUser } from "@/lib/auth-customer";
 import { ensureCanPurchaseAsync, purchaseLoginHref } from "@/lib/purchase-guard";
+import {
+  cartRequiresPrepaid,
+  buildWhatsAppOrderConfirmUrl,
+} from "@/lib/prepaid-products";
 
 import { CustomerInformation } from "./CustomerInformation";
 import {
@@ -49,6 +53,8 @@ export function CheckoutForm() {
   const subtotal = useCartStore((s) => s.totalPrice());
   const baseSubtotal = useCartStore((s) => s.totalBase());
   const submittingRef = useRef(false);
+
+  const requiresPrepaid = useMemo(() => cartRequiresPrepaid(items), [items]);
 
   const [selfMerchantId, setSelfMerchantId] = useState<string | null>(null);
   const [selfMerchantName, setSelfMerchantName] = useState<string | null>(null);
@@ -264,6 +270,8 @@ export function CheckoutForm() {
         return;
       }
 
+      const paymentMethod = requiresPrepaid ? "prepaid_whatsapp" : "cod";
+
       const payload = {
         fullName: fullName.trim(),
         phone: phone.trim(),
@@ -275,6 +283,7 @@ export function CheckoutForm() {
         apartment: addressForm.apartment.trim() || undefined,
         notes: addressForm.notes.trim() || undefined,
         couponCode: appliedCode,
+        paymentMethod,
         items: items.map((i) => ({
           productId: i.productId,
           quantity: i.quantity,
@@ -303,6 +312,8 @@ export function CheckoutForm() {
             error?: string;
             orderNumber?: string;
             duplicate?: boolean;
+            total?: number;
+            paymentMethod?: string;
           }
         | null;
 
@@ -316,7 +327,28 @@ export function CheckoutForm() {
       if (refMerchantId && !selfMerchantId) clearMerchantRef();
       notifyOrderWhatsApp(data.orderNumber);
       clearCart();
-      router.push(`/order-success?n=${encodeURIComponent(data.orderNumber)}`);
+
+      const qs = new URLSearchParams({
+        n: data.orderNumber,
+      });
+      if (requiresPrepaid || data.paymentMethod === "prepaid_whatsapp") {
+        qs.set("pay", "prepaid");
+      }
+      if (data.total != null) qs.set("t", String(data.total));
+
+      // Open WhatsApp for prepaid confirmation when possible
+      if (requiresPrepaid) {
+        const wa = buildWhatsAppOrderConfirmUrl({
+          orderNumber: data.orderNumber,
+          customerName: fullName.trim(),
+          total: data.total ?? total,
+        });
+        if (wa && typeof window !== "undefined") {
+          window.open(wa, "_blank", "noopener,noreferrer");
+        }
+      }
+
+      router.push(`/order-success?${qs.toString()}`);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
@@ -334,7 +366,11 @@ export function CheckoutForm() {
     void submit();
   };
 
-  const ctaLabel = selfMerchantId ? "إرسال طلب المسوق" : "تأكيد الطلب وإرساله";
+  const ctaLabel = selfMerchantId
+    ? "إرسال طلب المسوق"
+    : requiresPrepaid
+      ? "إرسال الطلب والتواصل على واتساب"
+      : "تأكيد الطلب وإرساله";
 
   if (!authReady) {
     return (
@@ -374,6 +410,16 @@ export function CheckoutForm() {
   return (
     <>
       <form onSubmit={onFormSubmit} className="space-y-4 pb-4">
+        {requiresPrepaid && (
+          <div className="rounded-[14px] border border-[#C8E9E4] bg-[#EFF8F6] px-4 py-3 text-sm text-[#0f5c52]">
+            <p className="font-bold">سماعات إيربودز — دفع مقدّم</p>
+            <p className="mt-1 text-xs leading-5 text-[#168B7D]">
+              سيتم تسجيل طلبك ثم التواصل عبر واتساب لتأكيد الطلب وإتمام الدفع قبل
+              الشحن. لا يتوفر الدفع عند الاستلام لهذه المنتجات.
+            </p>
+          </div>
+        )}
+
         <CustomerInformation
           fullName={fullName}
           phone={phone}
@@ -401,7 +447,7 @@ export function CheckoutForm() {
           shippingFee={shipping}
         />
 
-        <PaymentMethodSelector />
+        <PaymentMethodSelector requiresPrepaid={requiresPrepaid} />
 
         <CouponSection
           code={couponCode}
@@ -413,7 +459,6 @@ export function CheckoutForm() {
           onClear={clearCoupon}
         />
 
-        {/* Always-visible order summary on small screens */}
         <div className="lg:hidden">
           <OrderSummaryPanel
             items={items}
@@ -434,7 +479,6 @@ export function CheckoutForm() {
           </p>
         )}
 
-        {/* Primary CTA — visible on ALL breakpoints */}
         <div className="rounded-[14px] border border-[#E5EAF1] bg-white p-4">
           <div className="mb-3 flex items-center justify-between text-sm">
             <span className="text-[#667085]">الإجمالي</span>
@@ -450,7 +494,9 @@ export function CheckoutForm() {
             {loading ? "جاري إرسال الطلب..." : ctaLabel}
           </button>
           <p className="mt-2 text-center text-[11px] text-[#667085]">
-            بالضغط على الزر يتم إرسال طلبك للإدارة · الدفع عند الاستلام
+            {requiresPrepaid
+              ? "بعد الإرسال ستتواصل معنا على واتساب لتأكيد الطلب والدفع قبل الشحن"
+              : "بالضغط على الزر يتم إرسال طلبك للإدارة · الدفع عند الاستلام"}
           </p>
         </div>
       </form>
