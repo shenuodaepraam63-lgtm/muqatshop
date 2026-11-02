@@ -8,7 +8,7 @@ import { useLocale } from "@/lib/locale";
 import { supabase } from "@/lib/supabase";
 
 const emptyForm = {
-  label: "المنزل",
+  label: "",
   full_name: "",
   phone: "",
   phone_alt: "",
@@ -60,10 +60,10 @@ export default function AccountAddressesPage() {
           phone: idRes.identity.phone || "",
         }));
         await load(cid);
-      } else setErr("تعذر ربط حساب العميل");
+      } else setErr(t("addresses.linkFailed"));
       setLoading(false);
     })();
-  }, []);
+  }, [t]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -76,7 +76,7 @@ export default function AccountAddressesPage() {
     setMsg("");
     if (!customerId) return;
     if (!form.full_name.trim() || !form.phone.trim() || !form.governorate || !form.center) {
-      setErr("أكمل الاسم والهاتف والمحافظة والمركز");
+      setErr(t("addresses.required"));
       return;
     }
     setSaving(true);
@@ -116,7 +116,7 @@ export default function AccountAddressesPage() {
       setErr(error.message);
       return;
     }
-    setMsg(editingId ? "تم تحديث العنوان" : "تم إضافة العنوان");
+    setMsg(editingId ? t("addresses.updated") : t("addresses.added"));
     resetForm();
     await load(customerId);
   };
@@ -138,7 +138,7 @@ export default function AccountAddressesPage() {
   };
 
   const remove = async (id: string) => {
-    if (!customerId || !confirm("حذف هذا العنوان؟")) return;
+    if (!customerId || !confirm(t("addresses.deleteConfirm"))) return;
     const { error } = await supabase.from("customer_addresses").delete().eq("id", id);
     if (error) setErr(error.message);
     else await load(customerId);
@@ -182,9 +182,11 @@ export default function AccountAddressesPage() {
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-bold text-[var(--text)]">
-                  {row.label || "عنوان"}{" "}
+                  {row.label || t("addresses.unnamed")}{" "}
                   {row.is_default && (
-                    <span className="text-xs text-[#3157D5]">(افتراضي)</span>
+                    <span className="text-xs text-[#3157D5]">
+                      ({t("addresses.default")})
+                    </span>
                   )}
                 </p>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
@@ -201,7 +203,7 @@ export default function AccountAddressesPage() {
                     onClick={() => setDefault(row.id)}
                     className="text-xs font-semibold text-[#3157D5]"
                   >
-                    تعيين افتراضي
+                    {t("addresses.setDefault")}
                   </button>
                 )}
                 <button
@@ -209,14 +211,14 @@ export default function AccountAddressesPage() {
                   onClick={() => startEdit(row)}
                   className="text-xs font-semibold text-[var(--text)]"
                 >
-                  تعديل
+                  {t("addresses.edit")}
                 </button>
                 <button
                   type="button"
                   onClick={() => remove(row.id)}
                   className="text-xs font-semibold text-[#D64C4C]"
                 >
-                  حذف
+                  {t("addresses.delete")}
                 </button>
               </div>
             </div>
@@ -224,24 +226,24 @@ export default function AccountAddressesPage() {
         ))}
         {!loading && !rows.length && (
           <li className="account-card border-dashed px-4 py-8 text-center text-sm text-[var(--text-muted)]">
-            لا توجد عناوين محفوظة بعد
+            {t("addresses.empty")}
           </li>
         )}
       </ul>
 
       <form onSubmit={onSubmit} className="account-card space-y-3 p-5">
         <h3 className="text-sm font-bold text-[var(--text)]">
-          {editingId ? "تعديل عنوان" : "إضافة عنوان"}
+          {editingId ? t("addresses.editTitle") : t("addresses.addTitle")}
         </h3>
         <input
           className={field}
-          placeholder="تسمية (المنزل / العمل)"
+          placeholder={t("addresses.label")}
           value={form.label}
           onChange={(e) => setForm({ ...form, label: e.target.value })}
         />
         <input
           className={field}
-          placeholder="الاسم الكامل *"
+          placeholder={t("addresses.fullName")}
           required
           value={form.full_name}
           onChange={(e) => setForm({ ...form, full_name: e.target.value })}
@@ -249,14 +251,14 @@ export default function AccountAddressesPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <input
             className={field}
-            placeholder="الهاتف *"
+            placeholder={t("addresses.phone")}
             required
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
           />
           <input
             className={field}
-            placeholder="هاتف احتياطي"
+            placeholder={t("addresses.phoneAlt")}
             value={form.phone_alt}
             onChange={(e) => setForm({ ...form, phone_alt: e.target.value })}
           />
@@ -270,7 +272,7 @@ export default function AccountAddressesPage() {
               setForm({ ...form, governorate: e.target.value, center: "" })
             }
           >
-            <option value="">المحافظة *</option>
+            <option value="">{t("addresses.governorate")}</option>
             {GOVERNORATE_NAMES.map((g) => (
               <option key={g} value={g}>
                 {g}
@@ -285,7 +287,7 @@ export default function AccountAddressesPage() {
             disabled={!form.governorate}
           >
             <option value="">
-              {form.governorate ? "المركز *" : "اختر المحافظة أولاً"}
+              {form.governorate ? t("addresses.center") : t("addresses.centerFirst")}
             </option>
             {centers.map((c) => (
               <option key={c} value={c}>
@@ -296,20 +298,20 @@ export default function AccountAddressesPage() {
         </div>
         <input
           className={field}
-          placeholder="المنطقة"
+          placeholder={t("addresses.area")}
           value={form.area}
           onChange={(e) => setForm({ ...form, area: e.target.value })}
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <input
             className={field}
-            placeholder="الشارع"
+            placeholder={t("addresses.street")}
             value={form.street}
             onChange={(e) => setForm({ ...form, street: e.target.value })}
           />
           <input
             className={field}
-            placeholder="الشقة / المبنى"
+            placeholder={t("addresses.apartment")}
             value={form.apartment}
             onChange={(e) => setForm({ ...form, apartment: e.target.value })}
           />
@@ -320,7 +322,7 @@ export default function AccountAddressesPage() {
             checked={form.is_default}
             onChange={(e) => setForm({ ...form, is_default: e.target.checked })}
           />
-          تعيين كعنوان افتراضي
+          {t("addresses.asDefault")}
         </label>
         <div className="flex gap-2">
           <button
@@ -328,7 +330,11 @@ export default function AccountAddressesPage() {
             disabled={saving}
             className="rounded-lg bg-[#14243A] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-[#3157D5]"
           >
-            {saving ? "..." : editingId ? "حفظ التعديل" : "إضافة العنوان"}
+            {saving
+              ? "..."
+              : editingId
+                ? t("addresses.saveEdit")
+                : t("addresses.add")}
           </button>
           {editingId && (
             <button
@@ -336,7 +342,7 @@ export default function AccountAddressesPage() {
               onClick={resetForm}
               className="rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-muted)]"
             >
-              إلغاء
+              {t("addresses.cancel")}
             </button>
           )}
         </div>

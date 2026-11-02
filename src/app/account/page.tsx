@@ -64,11 +64,10 @@ export default function AccountOverviewPage() {
     }
   }, [locale]);
 
-  const welcomeTitle = (isReturning ? t("welcome.returnTitle") : t("welcome.newTitle")).replace(
-    "{name}",
-    firstName
-  );
-  const welcomeBody = isReturning ? t("welcome.returnBody") : t("welcome.newBody");
+  const welcomeTitle = t(isReturning ? "welcome.returnTitle" : "welcome.newTitle", {
+    name: firstName,
+  });
+  const welcomeBody = t(isReturning ? "welcome.returnBody" : "welcome.newBody");
 
   const active = orders.filter(
     (o) => !["delivered", "cancelled", "rejected"].includes(o.status)
@@ -94,14 +93,8 @@ export default function AccountOverviewPage() {
       </section>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard
-          label={t("overview.statsAll")}
-          value={loading ? "—" : String(orders.length)}
-        />
-        <StatCard
-          label={t("overview.statsActive")}
-          value={loading ? "—" : String(active.length)}
-        />
+        <StatCard label={t("overview.statsAll")} value={loading ? "—" : String(orders.length)} />
+        <StatCard label={t("overview.statsActive")} value={loading ? "—" : String(active.length)} />
         <StatCard
           label={t("overview.statsDelivered")}
           value={loading ? "—" : String(delivered.length)}
@@ -110,13 +103,8 @@ export default function AccountOverviewPage() {
 
       <section className="account-card p-5">
         <div className="mb-4 flex items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-[var(--text)]">
-            {t("overview.latest")}
-          </h3>
-          <Link
-            href="/account/orders"
-            className="text-xs font-semibold text-[#3157D5]"
-          >
+          <h3 className="text-sm font-bold text-[var(--text)]">{t("overview.latest")}</h3>
+          <Link href="/account/orders" className="text-xs font-semibold text-[#3157D5]">
             {t("overview.allOrders")}
           </Link>
         </div>
@@ -124,17 +112,13 @@ export default function AccountOverviewPage() {
           <div className="h-20 animate-pulse rounded-xl bg-[var(--surface-2)]" />
         ) : !latest ? (
           <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-8 text-center">
-            <p className="text-sm font-semibold text-[var(--text)]">
-              {t("overview.empty")}
-            </p>
-            <p className="mt-2 text-xs text-[var(--text-muted)]">
-              {t("overview.emptyHint")}
-            </p>
+            <p className="text-sm font-semibold text-[var(--text)]">{t("overview.empty")}</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">{t("overview.emptyHint")}</p>
             <Link
               href="/shop"
               className="mt-4 inline-flex rounded-lg bg-[#3157D5] px-4 py-2 text-xs font-bold text-white"
             >
-              {locale === "ar" ? "تسوق الآن" : "Shop now"}
+              {t("common.shop")}
             </Link>
           </div>
         ) : (
@@ -169,11 +153,7 @@ export default function AccountOverviewPage() {
         <QuickLink href="/account/addresses" icon={MapPin} title={t("nav.addresses")} />
         <QuickLink href="/account/profile" icon={User} title={t("nav.profile")} />
         <QuickLink href="/account/wishlist" icon={Heart} title={t("nav.wishlist")} />
-        <QuickLink
-          href="/account/notifications"
-          icon={Bell}
-          title={t("nav.notifications")}
-        />
+        <QuickLink href="/account/notifications" icon={Bell} title={t("nav.notifications")} />
         <QuickLink href="/account/support" icon={LifeBuoy} title={t("nav.support")} />
         <QuickLink href="/account/settings" icon={Settings} title={t("nav.settings")} />
       </div>
@@ -200,10 +180,7 @@ function QuickLink({
   title: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="account-card p-4 transition hover:border-[#C8D6FF]"
-    >
+    <Link href={href} className="account-card p-4 transition hover:border-[#C8D6FF]">
       <span className="inline-grid h-10 w-10 place-items-center rounded-lg bg-[#EEF3FF] text-[#3157D5] dark:bg-[#1a2744] dark:text-[#5B7CFA]">
         <Icon className="h-5 w-5" strokeWidth={1.75} />
       </span>

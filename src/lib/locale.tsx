@@ -16,7 +16,7 @@ type LocaleCtx = {
   locale: AppLocale;
   dir: "rtl" | "ltr";
   setLocale: (l: AppLocale) => void;
-  t: (key: string) => string;
+  t: (key: string, vars?: Record<string, string>) => string;
 };
 
 const LocaleContext = createContext<LocaleCtx | null>(null);
@@ -64,11 +64,41 @@ const MESSAGES: Record<AppLocale, Record<string, string>> = {
     "orders.empty": "لا توجد طلبات",
     "orders.loginRequired": "يجب تسجيل الدخول لعرض الطلبات",
     "addresses.title": "عناويني",
-    "addresses.subtitle": "إدارة عناوين التوصيل",
+    "addresses.subtitle": "احفظ عناوين التوصيل لاستخدامها لاحقًا",
+    "addresses.linkFailed": "تعذر ربط حساب العميل",
+    "addresses.required": "أكمل الاسم والهاتف والمحافظة والمركز",
+    "addresses.updated": "تم تحديث العنوان",
+    "addresses.added": "تم إضافة العنوان",
+    "addresses.deleteConfirm": "حذف هذا العنوان؟",
+    "addresses.default": "افتراضي",
+    "addresses.setDefault": "تعيين افتراضي",
+    "addresses.edit": "تعديل",
+    "addresses.delete": "حذف",
+    "addresses.empty": "لا توجد عناوين محفوظة بعد",
+    "addresses.editTitle": "تعديل عنوان",
+    "addresses.addTitle": "إضافة عنوان",
+    "addresses.label": "تسمية (المنزل / العمل)",
+    "addresses.fullName": "الاسم الكامل *",
+    "addresses.phone": "الهاتف *",
+    "addresses.phoneAlt": "هاتف احتياطي",
+    "addresses.governorate": "المحافظة *",
+    "addresses.center": "المركز *",
+    "addresses.centerFirst": "اختر المحافظة أولاً",
+    "addresses.area": "المنطقة",
+    "addresses.street": "الشارع",
+    "addresses.apartment": "الشقة / المبنى",
+    "addresses.asDefault": "تعيين كعنوان افتراضي",
+    "addresses.saveEdit": "حفظ التعديل",
+    "addresses.add": "إضافة العنوان",
+    "addresses.cancel": "إلغاء",
+    "addresses.unnamed": "عنوان",
     "profile.title": "بياناتي الشخصية",
-    "profile.subtitle": "الاسم ورقم الهاتف",
+    "profile.subtitle": "تحديث الاسم ورقم الهاتف المرتبطين بالحساب",
+    "profile.name": "الاسم",
+    "profile.phone": "الهاتف",
     "profile.save": "حفظ",
     "profile.saving": "جاري الحفظ...",
+    "profile.saved": "تم حفظ بياناتك",
     "wishlist.title": "المفضلة",
     "wishlist.empty": "لا توجد منتجات في المفضلة",
     "notifications.title": "الإشعارات",
@@ -78,6 +108,8 @@ const MESSAGES: Record<AppLocale, Record<string, string>> = {
     "notifications.view": "عرض",
     "support.title": "الدعم والمساعدة",
     "support.subtitle": "تواصل فوري عبر واتساب مع فريق Muqatshop",
+    "support.topic": "الموضوع",
+    "support.orderOptional": "رقم الطلب (اختياري)",
     "settings.title": "إعدادات الحساب",
     "settings.subtitle": "الأمان والوصول وإدارة الجلسة",
     "settings.account": "الحساب",
@@ -87,6 +119,7 @@ const MESSAGES: Record<AppLocale, Record<string, string>> = {
     "settings.logout": "تسجيل الخروج",
     "common.retry": "إعادة المحاولة",
     "common.shop": "تسوق الآن",
+    "common.cancel": "إلغاء",
   },
   en: {
     "nav.overview": "Overview",
@@ -129,11 +162,41 @@ const MESSAGES: Record<AppLocale, Record<string, string>> = {
     "orders.empty": "No orders",
     "orders.loginRequired": "Sign in to view your orders",
     "addresses.title": "Addresses",
-    "addresses.subtitle": "Manage delivery addresses",
+    "addresses.subtitle": "Save delivery addresses for later",
+    "addresses.linkFailed": "Could not link customer account",
+    "addresses.required": "Complete name, phone, governorate, and center",
+    "addresses.updated": "Address updated",
+    "addresses.added": "Address added",
+    "addresses.deleteConfirm": "Delete this address?",
+    "addresses.default": "Default",
+    "addresses.setDefault": "Set default",
+    "addresses.edit": "Edit",
+    "addresses.delete": "Delete",
+    "addresses.empty": "No saved addresses yet",
+    "addresses.editTitle": "Edit address",
+    "addresses.addTitle": "Add address",
+    "addresses.label": "Label (home / work)",
+    "addresses.fullName": "Full name *",
+    "addresses.phone": "Phone *",
+    "addresses.phoneAlt": "Alternate phone",
+    "addresses.governorate": "Governorate *",
+    "addresses.center": "Center *",
+    "addresses.centerFirst": "Select governorate first",
+    "addresses.area": "Area",
+    "addresses.street": "Street",
+    "addresses.apartment": "Apartment / building",
+    "addresses.asDefault": "Set as default address",
+    "addresses.saveEdit": "Save changes",
+    "addresses.add": "Add address",
+    "addresses.cancel": "Cancel",
+    "addresses.unnamed": "Address",
     "profile.title": "Profile",
-    "profile.subtitle": "Name and phone",
+    "profile.subtitle": "Update the name and phone on your account",
+    "profile.name": "Name",
+    "profile.phone": "Phone",
     "profile.save": "Save",
     "profile.saving": "Saving...",
+    "profile.saved": "Profile saved",
     "wishlist.title": "Wishlist",
     "wishlist.empty": "No saved products",
     "notifications.title": "Notifications",
@@ -143,6 +206,8 @@ const MESSAGES: Record<AppLocale, Record<string, string>> = {
     "notifications.view": "View",
     "support.title": "Support",
     "support.subtitle": "Chat with Muqatshop support on WhatsApp",
+    "support.topic": "Topic",
+    "support.orderOptional": "Order number (optional)",
     "settings.title": "Account settings",
     "settings.subtitle": "Security, access, and session",
     "settings.account": "Account",
@@ -152,8 +217,14 @@ const MESSAGES: Record<AppLocale, Record<string, string>> = {
     "settings.logout": "Sign out",
     "common.retry": "Retry",
     "common.shop": "Shop now",
+    "common.cancel": "Cancel",
   },
 };
+
+function formatMsg(template: string, vars?: Record<string, string>) {
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? `{${k}}`);
+}
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<AppLocale>("ar");
@@ -181,7 +252,8 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const setLocale = useCallback((l: AppLocale) => setLocaleState(l), []);
 
   const t = useCallback(
-    (key: string) => MESSAGES[locale][key] ?? MESSAGES.ar[key] ?? key,
+    (key: string, vars?: Record<string, string>) =>
+      formatMsg(MESSAGES[locale][key] ?? MESSAGES.ar[key] ?? key, vars),
     [locale]
   );
 

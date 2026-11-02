@@ -62,7 +62,7 @@ export default function AccountProfilePage() {
         .eq("id", customerId);
     }
     setSaving(false);
-    setMsg(t("profile.save") === "Save" ? "Saved" : "تم حفظ بياناتك");
+    setMsg(t("profile.saved"));
   }
 
   if (loading || !identity) {
@@ -88,7 +88,7 @@ export default function AccountProfilePage() {
         </div>
         <div>
           <label className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">
-            {t("profile.title") === "Profile" ? "Name" : "الاسم"}
+            {t("profile.name")}
           </label>
           <input
             className={field}
@@ -98,7 +98,7 @@ export default function AccountProfilePage() {
         </div>
         <div>
           <label className="mb-1 block text-xs font-semibold text-[var(--text-muted)]">
-            {t("profile.title") === "Profile" ? "Phone" : "الهاتف"}
+            {t("profile.phone")}
           </label>
           <input
             className={field}
