@@ -134,7 +134,7 @@ export function ShopView({
             ) : (
               <div className="product-grid">
                 {products.map((p, i) => (
-                  <ScrollReveal key={p.id} index={i} stagger={0.04} amount={0.1}>
+                  <ScrollReveal key={p.id} index={i % 8} staggerMs={40}>
                     <MarketplaceProductCard product={p} />
                   </ScrollReveal>
                 ))}

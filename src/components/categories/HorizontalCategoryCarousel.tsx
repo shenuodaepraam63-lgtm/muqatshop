@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ScrollReveal } from "@/components/ui/ScrollReveal";
 
 export type HorizontalCategoryItem = {
   id: string;
@@ -60,7 +61,6 @@ export function HorizontalCategoryCarousel({
       return;
     }
     const { scrollLeft, scrollWidth, clientWidth } = el;
-    // RTL: scrollLeft often negative in some browsers; use abs tolerance
     const max = scrollWidth - clientWidth;
     const left = Math.abs(scrollLeft);
     setCanPrev(left > 4);
@@ -84,8 +84,6 @@ export function HorizontalCategoryCarousel({
     const el = scrollerRef.current;
     if (!el) return;
     const amount = Math.min(280, el.clientWidth * 0.7) * dir;
-    // In RTL, scrolling "next" (visually left) depends on browser;
-    // negative delta moves toward start in typical RTL overflow.
     el.scrollBy({ left: -amount, behavior: "smooth" });
   };
 
@@ -117,15 +115,22 @@ export function HorizontalCategoryCarousel({
       ) : null}
 
       <div ref={scrollerRef} className="category-carousel__track" dir="rtl">
-        {items.map((item) => (
-          <Link
+        {items.map((item, i) => (
+          <ScrollReveal
             key={item.id}
-            href={item.href}
-            className={`category-card${item.active ? " is-active" : ""}`}
+            index={i}
+            staggerMs={40}
+            rootRef={scrollerRef}
+            className="category-card-wrap"
           >
-            <CategoryImage src={item.image} name={item.name} />
-            <span className="category-card__name">{item.name}</span>
-          </Link>
+            <Link
+              href={item.href}
+              className={`category-card${item.active ? " is-active" : ""}`}
+            >
+              <CategoryImage src={item.image} name={item.name} />
+              <span className="category-card__name">{item.name}</span>
+            </Link>
+          </ScrollReveal>
         ))}
       </div>
     </div>

@@ -12,7 +12,6 @@
   overflow-y: hidden;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
-  /* Do NOT use touch-action: pan-x — it blocks vertical page scroll on mobile */
   overscroll-behavior-x: auto;
   padding-bottom: 2px;
   scrollbar-width: none;
@@ -35,15 +34,18 @@
   }
 }
 
-.category-card {
+.category-card-wrap {
   flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.category-card {
   width: 108px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-decoration: none;
   color: #202b3c;
-  scroll-snap-align: start;
   transition: transform 0.18s ease, opacity 0.18s ease;
 }
 

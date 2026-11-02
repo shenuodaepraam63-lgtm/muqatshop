@@ -1,55 +1,86 @@
 "use client";
 
-import { type ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+} from "react";
 
 type RevealProps = {
   children: ReactNode;
   className?: string;
-  /** Stagger index for cascade effect */
   index?: number;
-  /** Base delay between siblings (seconds) */
-  stagger?: number;
-  /** Fraction of element visible before trigger (0–1) */
-  amount?: number;
+  /** delay step in ms */
+  staggerMs?: number;
+  /** Optional horizontal scroller as IntersectionObserver root */
+  rootRef?: React.RefObject<HTMLElement | null>;
   as?: "div" | "section" | "li" | "article";
 };
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-
 /**
- * Smooth fade-up on scroll using Motion (whileInView).
- * Once visible, stays visible. Respects prefers-reduced-motion.
+ * Fade-up when element enters the viewport (or a horizontal scroller root).
+ * Pure IO + CSS — reliable without depending on Motion package install timing.
  */
 export function ScrollReveal({
   children,
   className = "",
   index = 0,
-  stagger = 0.045,
-  amount = 0.12,
-  as = "div",
+  staggerMs = 50,
+  rootRef,
+  as: Tag = "div",
 }: RevealProps) {
-  const reduce = useReducedMotion();
-  const MotionTag = motion[as];
+  const ref = useRef<HTMLElement | null>(null);
+  const [visible, setVisible] = useState(false);
 
-  if (reduce) {
-    return <div className={className}>{children}</div>;
-  }
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setVisible(true);
+      return;
+    }
+
+    const root = rootRef?.current ?? null;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setVisible(true);
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      {
+        root,
+        threshold: 0.15,
+        rootMargin: root ? "0px" : "0px 0px -5% 0px",
+      }
+    );
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, [rootRef]);
+
+  const style: CSSProperties = {
+    transitionDelay: visible ? `${Math.min(index, 12) * staggerMs}ms` : "0ms",
+  };
 
   return (
-    <MotionTag
-      className={className}
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount, margin: "0px 0px -6% 0px" }}
-      transition={{
-        duration: 0.5,
-        delay: Math.min(index, 14) * stagger,
-        ease: EASE,
-      }}
+    <Tag
+      ref={ref as never}
+      className={`mq-reveal ${visible ? "mq-reveal--in" : ""} ${className}`}
+      style={style}
     >
       {children}
-    </MotionTag>
+    </Tag>
   );
 }
 
@@ -61,7 +92,7 @@ export function ScrollRevealSection({
   className?: string;
 }) {
   return (
-    <ScrollReveal as="section" className={className} index={0} stagger={0} amount={0.08}>
+    <ScrollReveal as="section" className={className} index={0} staggerMs={0}>
       {children}
     </ScrollReveal>
   );

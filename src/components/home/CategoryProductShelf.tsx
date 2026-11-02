@@ -25,8 +25,10 @@ export type CategoryShelfData = {
 export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   const [activeSub, setActiveSub] = useState<string | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [sectionIn, setSectionIn] = useState(false);
 
   const filtered = useMemo(() => {
     if (!activeSub) return shelf.products;
@@ -61,6 +63,28 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
     trackRef.current?.scrollTo({ left: 0 });
   }, [activeSub]);
 
+  // Section enters vertical viewport → cascade
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setSectionIn(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setSectionIn(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.08, rootMargin: "0px 0px -4% 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   if (!shelf.products.length) return null;
 
   const scroll = (dir: 1 | -1) => {
@@ -71,7 +95,11 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   };
 
   return (
-    <ScrollReveal as="section" className="home-section" index={0} amount={0.06}>
+    <section
+      ref={sectionRef as never}
+      className={`home-section mq-section ${sectionIn ? "mq-section--in" : ""}`}
+      aria-label={shelf.name}
+    >
       <div className="home-container">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-[#14243A] sm:text-xl">{shelf.name}</h2>
@@ -159,8 +187,8 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
                   key={`${activeSub || "all"}-${p.id}`}
                   className="category-product-slot snap-start"
                   index={i}
-                  stagger={0.04}
-                  amount={0.05}
+                  staggerMs={45}
+                  rootRef={trackRef}
                 >
                   <MarketplaceProductCard product={p} />
                 </ScrollReveal>
@@ -169,6 +197,6 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
           </div>
         )}
       </div>
-    </ScrollReveal>
+    </section>
   );
 }
