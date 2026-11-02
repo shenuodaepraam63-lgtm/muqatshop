@@ -3,6 +3,7 @@ import {
   isSupabaseConfigured,
   type Category,
   type Product,
+  collectCategoryIdsWithDescendants,
 } from "@/lib/supabase";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -11,10 +12,11 @@ import { PromoSlider, type PromoSlide } from "@/components/home/PromoSlider";
 import { StoreBenefits } from "@/components/home/StoreBenefits";
 import { CategoryCards } from "@/components/home/CategoryCards";
 import { SectionHeader } from "@/components/home/SectionHeader";
-import { HorizontalProductRail } from "@/components/home/HorizontalProductRail";
-import { ProductGrid } from "@/components/home/ProductGrid";
+import {
+  CategoryProductShelf,
+  type CategoryShelfData,
+} from "@/components/home/CategoryProductShelf";
 import { RecentlyViewedSection } from "@/components/home/RecentlyViewedSection";
-import { isSaleActive } from "@/lib/utils";
 import {
   isCampaignEligible,
   sortCampaigns,
@@ -91,93 +93,79 @@ async function loadCampaignSlides(): Promise<{
   };
 }
 
+async function loadCategoryShelves(): Promise<{
+  roots: Category[];
+  shelves: CategoryShelfData[];
+}> {
+  if (!isSupabaseConfigured) return { roots: [], shelves: [] };
+
+  const [{ data: allCats }, { data: activeProducts }] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id,name,slug,image,sort_order,group_id,parent_id")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("products")
+      .select(PRODUCT_COLS)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(200),
+  ]);
+
+  const cats = (allCats as Category[]) || [];
+  const products = ((activeProducts as Product[]) || []).filter(available);
+  const roots = cats.filter((c) => !c.parent_id).slice(0, 10);
+
+  const shelves: CategoryShelfData[] = [];
+
+  for (const root of roots) {
+    const treeIds = new Set(
+      collectCategoryIdsWithDescendants(
+        root.id,
+        cats.map((c) => ({ id: c.id, parent_id: c.parent_id }))
+      )
+    );
+    const groupProducts = products
+      .filter((p) => p.category_id && treeIds.has(p.category_id))
+      .slice(0, 16);
+
+    if (!groupProducts.length) continue;
+
+    const subs = cats
+      .filter((c) => c.parent_id === root.id)
+      .map((c) => ({ id: c.id, name: c.name, slug: c.slug }));
+
+    shelves.push({
+      id: root.id,
+      name: root.name,
+      slug: root.slug,
+      href: `/categories/${encodeURIComponent(root.slug)}`,
+      subcategories: subs,
+      products: groupProducts,
+    });
+  }
+
+  return { roots: roots.slice(0, 24), shelves };
+}
+
 async function loadHomeData() {
   if (!isSupabaseConfigured) {
     return {
-      categories: [] as Category[],
-      bestSellers: [] as Product[],
-      offers: [] as Product[],
-      recommended: [] as Product[],
-      categoryProducts: [] as Product[],
+      roots: [] as Category[],
+      shelves: [] as CategoryShelfData[],
       campaign: { slides: defaultSlides(), autoplay: true, intervalMs: 5000 },
     };
   }
 
-  const [categoriesResult, featuredResult, offersResult, activeResult, campaign] =
-    await Promise.all([
-      supabase
-        .from("categories")
-        .select("id,name,slug,image,sort_order,group_id,parent_id")
-        .eq("is_active", true)
-        .is("parent_id", null)
-        .order("sort_order", { ascending: true })
-        .limit(24),
-      supabase
-        .from("products")
-        .select(PRODUCT_COLS)
-        .eq("is_active", true)
-        .eq("is_featured", true)
-        .order("created_at", { ascending: false })
-        .limit(24),
-      supabase
-        .from("products")
-        .select(PRODUCT_COLS)
-        .eq("is_active", true)
-        .not("compare_at_price", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(40),
-      supabase
-        .from("products")
-        .select(PRODUCT_COLS)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(48),
-      loadCampaignSlides(),
-    ]);
-
-  const categories = (categoriesResult.data as Category[]) || [];
-  const featured = ((featuredResult.data as Product[]) || []).filter(available);
-  const offers = ((offersResult.data as Product[]) || [])
-    .filter(
-      (p) =>
-        available(p) && isSaleActive(p.price, p.compare_at_price, p.sale_ends_at)
-    )
-    .slice(0, 12);
-  const active = ((activeResult.data as Product[]) || []).filter(available);
-
-  const bestSellers = (featured.length ? featured : active).slice(0, 12);
-
-  const used = new Set(bestSellers.map((p) => p.id));
-  const recommended: Product[] = active.filter((p) => !used.has(p.id)).slice(0, 8);
-  if (recommended.length < 8) {
-    for (const p of active) {
-      if (recommended.length >= 8) break;
-      if (!recommended.some((x) => x.id === p.id)) recommended.push(p);
-    }
-  }
-
-  const catIds = categories.slice(0, 3).map((c) => c.id);
-  let categoryProducts: Product[] = [];
-  if (catIds.length) {
-    const { data } = await supabase
-      .from("products")
-      .select(PRODUCT_COLS)
-      .eq("is_active", true)
-      .in("category_id", catIds)
-      .order("created_at", { ascending: false })
-      .limit(24);
-    categoryProducts = ((data || []) as Product[])
-      .filter((p) => available(p))
-      .filter((p) => !used.has(p.id))
-      .slice(0, 8);
-  }
+  const [campaign, shelfData] = await Promise.all([
+    loadCampaignSlides(),
+    loadCategoryShelves(),
+  ]);
 
   return {
-    categories,
-    bestSellers,
-    offers,
-    recommended,
-    categoryProducts,
+    roots: shelfData.roots,
+    shelves: shelfData.shelves,
     campaign,
   };
 }
@@ -224,53 +212,27 @@ export default async function StoreHomePage() {
           intervalMs={data.campaign.intervalMs}
         />
 
-        {data.categories.length > 0 && (
+        {data.roots.length > 0 && (
           <section className="home-section" aria-label="التصنيفات">
             <div className="home-container">
               <SectionHeader title="التصنيفات" href="/categories" />
-              <CategoryCards categories={data.categories} />
+              <CategoryCards categories={data.roots} />
             </div>
           </section>
         )}
 
         <StoreBenefits />
 
-        {data.bestSellers.length > 0 && (
-          <section className="home-section" aria-label="الأكثر مبيعًا">
-            <div className="home-container">
-              <SectionHeader
-                title="الأكثر مبيعًا"
-                description="منتجات مميزة ونشطة من المتجر"
-                href="/shop"
-              />
-              <HorizontalProductRail products={data.bestSellers} />
-            </div>
-          </section>
-        )}
+        {data.shelves.map((shelf) => (
+          <CategoryProductShelf key={shelf.id} shelf={shelf} />
+        ))}
 
-        {data.offers.length > 0 && (
-          <section className="home-section" aria-label="العروض">
+        {data.shelves.length === 0 && (
+          <section className="home-section">
             <div className="home-container">
-              <SectionHeader title="العروض" description="خصومات سارية فقط" href="/shop" />
-              <ProductGrid products={data.offers} />
-            </div>
-          </section>
-        )}
-
-        {data.recommended.length > 0 && (
-          <section className="home-section" aria-label="مقترحة لك">
-            <div className="home-container">
-              <SectionHeader title="مقترحة لك" href="/shop" />
-              <HorizontalProductRail products={data.recommended} />
-            </div>
-          </section>
-        )}
-
-        {data.categoryProducts.length > 0 && (
-          <section className="home-section" aria-label="منتجات التصنيفات">
-            <div className="home-container">
-              <SectionHeader title="من التصنيفات" href="/categories" />
-              <ProductGrid products={data.categoryProducts} />
+              <p className="rounded-2xl border border-dashed border-[#E4E9F0] bg-white py-12 text-center text-sm text-[#718096]">
+                لا توجد منتجات مرتبطة بالتصنيفات بعد. أضف منتجات من لوحة التحكم.
+              </p>
             </div>
           </section>
         )}
