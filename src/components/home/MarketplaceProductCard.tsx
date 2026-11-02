@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Heart, ShoppingBag, Check } from "lucide-react";
+import { Heart, ShoppingBag, Check, Star } from "lucide-react";
 import { useCartStore } from "@/lib/store";
 import { useWishlistStore } from "@/lib/wishlist";
 import { formatPrice, isSaleActive, salePercent } from "@/lib/utils";
@@ -12,6 +12,24 @@ import type { Product } from "@/lib/supabase";
 function inStock(product: Product): boolean {
   if (product.variants?.length) return product.variants.some((v) => Number(v.stock) > 0);
   return Number(product.stock) > 0;
+}
+
+function Stars({ count = 0 }: { count?: number }) {
+  const n = Math.max(0, Math.min(5, Math.round(count)));
+  return (
+    <div className="flex items-center gap-0.5" aria-label={n ? `تقييم ${n} من 5` : "بدون تقييمات"}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star
+          key={i}
+          className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${
+            i < n ? "fill-[#F5B301] text-[#F5B301]" : "fill-transparent text-[#D0D5DD]"
+          }`}
+          strokeWidth={1.6}
+        />
+      ))}
+      <span className="ms-1 text-[10px] text-[#98A2B3]">({n > 0 ? n : 0})</span>
+    </div>
+  );
 }
 
 export function MarketplaceProductCard({
@@ -36,8 +54,11 @@ export function MarketplaceProductCard({
   const compare = product.compare_at_price == null ? null : Number(product.compare_at_price);
   const activeSale = isSaleActive(price, compare, product.sale_ends_at);
   const percent = activeSale && compare ? salePercent(price, compare) : 0;
+  const saved = activeSale && compare != null ? Math.max(0, compare - price) : 0;
   const hasVariants = Boolean(product.variants?.length);
   const available = inStock(product);
+  // No ratings table yet — show honest empty state (0)
+  const rating = 0;
 
   const onAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -72,13 +93,14 @@ export function MarketplaceProductCard({
 
   return (
     <article
-      className={`group flex h-full min-w-0 flex-col overflow-hidden rounded-[12px] border border-[#E5EAF1] bg-white transition-[border-color] duration-[180ms] hover:border-[#3157D5] max-md:rounded-[10px] ${
+      className={`group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[#EEF1F6] bg-white shadow-[0_2px_12px_rgba(20,36,58,0.06)] transition hover:shadow-[0_8px_24px_rgba(20,36,58,0.1)] ${
         compact ? "w-[168px] shrink-0 sm:w-[200px]" : ""
       }`}
     >
+      {/* Media — package style */}
       <Link
         href={`/products/${encodeURIComponent(product.slug)}`}
-        className="relative block aspect-square overflow-hidden bg-[#F6F8FB]"
+        className="relative block aspect-square overflow-hidden bg-gradient-to-b from-[#FAFBFD] to-[#F3F5F9]"
         aria-label={product.name}
       >
         {image && !imgErr ? (
@@ -87,23 +109,30 @@ export function MarketplaceProductCard({
             alt={product.name}
             fill
             sizes="(max-width:767px) 50vw, (max-width:1023px) 33vw, 20vw"
-            className="object-contain p-2"
+            className="object-contain p-3 sm:p-4"
             onError={() => setImgErr(true)}
           />
         ) : (
-          <div className="absolute inset-0 grid place-items-center text-[#718096]">
+          <div className="absolute inset-0 grid place-items-center text-[#98A2B3]">
             <ShoppingBag className="h-9 w-9" strokeWidth={1.3} />
           </div>
         )}
 
-        {activeSale && percent > 0 && (
-          <span className="absolute right-2 top-2 rounded-md bg-[#D64C4C] px-2 py-0.5 text-[11px] font-bold text-white">
-            خصم {percent}%
+        {/* Savings badge — مثل وفر XX جنيه */}
+        {activeSale && saved > 0 && (
+          <span className="absolute right-2 top-2 z-[1] max-w-[70%] truncate rounded-full bg-[#E11D48] px-2 py-0.5 text-[10px] font-bold text-white shadow-sm sm:text-[11px]">
+            وفر {formatPrice(saved)}
           </span>
         )}
 
+        {!activeSale && percent <= 0 && product.is_featured ? (
+          <span className="absolute right-2 top-2 z-[1] rounded-full bg-[#3157D5] px-2 py-0.5 text-[10px] font-bold text-white">
+            مميز
+          </span>
+        ) : null}
+
         {!available && (
-          <span className="absolute inset-x-2 bottom-2 rounded-md bg-[#14243A]/85 px-2 py-1 text-center text-[11px] font-semibold text-white">
+          <span className="absolute inset-x-2 bottom-2 z-[1] rounded-lg bg-[#14243A]/85 px-2 py-1 text-center text-[11px] font-semibold text-white">
             غير متوفر
           </span>
         )}
@@ -111,46 +140,67 @@ export function MarketplaceProductCard({
         <button
           type="button"
           onClick={onWish}
-          className="absolute left-2 top-2 z-10 grid h-9 w-9 place-items-center rounded-full bg-white/95 shadow-sm"
+          className="absolute left-2 top-2 z-10 grid h-9 w-9 place-items-center rounded-full bg-white shadow-[0_2px_8px_rgba(20,36,58,0.12)]"
           aria-label={wished ? "إزالة من المفضلة" : "إضافة للمفضلة"}
         >
           <Heart
-            className={`h-4 w-4 ${wished ? "fill-[#D64C4C] text-[#D64C4C]" : "text-[#14243A]"}`}
+            className={`h-4 w-4 ${wished ? "fill-[#E11D48] text-[#E11D48]" : "text-[#14243A]"}`}
           />
         </button>
       </Link>
 
-      <div className="flex flex-1 flex-col p-3 max-md:p-2">
-        <Link href={`/products/${encodeURIComponent(product.slug)}`} className="block">
-          <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-5 text-[#14243A]">
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-1.5 px-3 pb-3 pt-2.5 max-md:px-2.5 max-md:pb-2.5">
+        <Link href={`/products/${encodeURIComponent(product.slug)}`} className="block space-y-1">
+          <h3 className="line-clamp-2 min-h-[2.4rem] text-[13px] font-semibold leading-5 text-[#14243A] sm:text-sm">
             {product.name}
           </h3>
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-[19px] font-bold text-[#14243A] max-md:text-[17px]">
+
+          <Stars count={rating} />
+
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-0.5">
+            <span
+              className={`text-[17px] font-bold tabular-nums max-md:text-[15px] ${
+                activeSale ? "text-[#E11D48]" : "text-[#14243A]"
+              }`}
+            >
               {formatPrice(price)}
             </span>
             {activeSale && compare != null && (
-              <span className="text-[12px] text-[#718096] line-through max-md:text-[11px]">
+              <span className="text-[12px] tabular-nums text-[#98A2B3] line-through max-md:text-[11px]">
                 {formatPrice(compare)}
               </span>
             )}
           </div>
         </Link>
 
-        <div className="mt-auto pt-2">
+        <p
+          className={`flex items-center gap-1.5 text-[11px] font-medium ${
+            available ? "text-[#3157D5]" : "text-[#98A2B3]"
+          }`}
+        >
+          <span
+            className={`inline-block h-1.5 w-1.5 rounded-full ${
+              available ? "bg-[#3157D5]" : "bg-[#D0D5DD]"
+            }`}
+          />
+          {available ? "في المخزن" : "غير متوفر"}
+        </p>
+
+        <div className="mt-auto pt-1">
           <button
             type="button"
             disabled={!available}
             onClick={onAdd}
-            className={`flex h-9 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition max-md:h-[34px] ${
+            className={`flex h-10 w-full items-center justify-center gap-1.5 rounded-xl text-[13px] font-bold transition max-md:h-9 max-md:text-xs ${
               available
-                ? "bg-[#3157D5] text-white hover:bg-[#2447B8] md:opacity-0 md:group-hover:opacity-100"
-                : "cursor-not-allowed bg-[#E5EAF1] text-[#718096]"
+                ? "bg-[#22C55E] text-white hover:bg-[#16A34A] active:bg-[#15803D]"
+                : "cursor-not-allowed bg-[#E5EAF1] text-[#98A2B3]"
             }`}
           >
             {added ? (
               <>
-                <Check className="h-3.5 w-3.5" /> تمت الإضافة
+                <Check className="h-4 w-4" /> تمت الإضافة
               </>
             ) : hasVariants ? (
               "اختر الخيارات"

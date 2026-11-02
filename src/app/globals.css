@@ -48,6 +48,9 @@ html.dark {
 
 html {
   scroll-behavior: smooth;
+  /* Prevent horizontal bounce trapping vertical scroll on mobile */
+  overflow-x: hidden;
+  overscroll-behavior-y: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -69,6 +72,11 @@ body {
   font-family: var(--font-arabic), var(--font-inter), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  /* Never lock the document to a fixed height on mobile */
+  min-height: 100%;
+  position: relative;
+  touch-action: manipulation;
 }
 
 ::selection {
@@ -145,6 +153,15 @@ body.admin-mode > main {
   scrollbar-width: none;
 }
 
+/* Horizontal strips: never steal vertical page scroll */
+.category-carousel__track,
+.category-product-track,
+[class*="overflow-x-auto"] {
+  touch-action: pan-y pinch-zoom;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .bottom-nav-safe {
     padding-bottom: env(safe-area-inset-bottom);
@@ -164,7 +181,6 @@ body.admin-mode > main {
   box-shadow: var(--shadow-card);
 }
 
-/* —— أزرار موحّدة —— */
 @layer components {
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 bg-ink text-white font-semibold
@@ -195,7 +211,6 @@ body.admin-mode > main {
   }
 }
 
-/* —— بوابة المسوق —— */
 .marketer-shell {
   background-color: var(--page-bg);
   color: var(--text);
