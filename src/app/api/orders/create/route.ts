@@ -7,6 +7,7 @@ import {
 } from "@/lib/shipping";
 import { computeDiscount, type Coupon } from "@/lib/coupons";
 import type { ProductVariant } from "@/lib/supabase";
+import { isPrepaidRequiredProduct } from "@/lib/prepaid-products";
 
 type OrderItemInput = {
   productId: string;
@@ -30,6 +31,7 @@ type CreateOrderBody = {
   apartment?: string;
   notes?: string;
   couponCode?: string | null;
+  paymentMethod?: string | null;
   items: OrderItemInput[];
   merchantId?: string | null;
   refMerchantId?: string | null;
@@ -173,6 +175,7 @@ export async function POST(req: NextRequest) {
 
     let subtotal = 0;
     let baseSubtotal = 0;
+    let hasPrepaidProduct = false;
 
     for (const raw of items) {
       const productId = String(raw.productId || "");
@@ -181,6 +184,10 @@ export async function POST(req: NextRequest) {
 
       if (!product || product.is_active === false) {
         return bad(`منتج غير متاح: ${raw.name || productId}`);
+      }
+
+      if (isPrepaidRequiredProduct(String(product.name))) {
+        hasPrepaidProduct = true;
       }
 
       const variants = (product.variants || []) as ProductVariant[];
@@ -225,6 +232,12 @@ export async function POST(req: NextRequest) {
       subtotal += unitPrice * qty;
       baseSubtotal += unitBase * qty;
     }
+
+    // Server-side force prepaid if any earbuds in order (cannot trust client alone)
+    const paymentMethod =
+      hasPrepaidProduct || body.paymentMethod === "prepaid_whatsapp"
+        ? "prepaid_whatsapp"
+        : "cod";
 
     let discount = 0;
     let couponCode: string | null = null;
@@ -302,6 +315,11 @@ export async function POST(req: NextRequest) {
 
     const noteParts: string[] = [];
     if (body.notes?.trim()) noteParts.push(body.notes.trim());
+    if (paymentMethod === "prepaid_whatsapp") {
+      noteParts.push(
+        "دفع مقدّم + تأكيد واتساب (سماعات إيربودز) — لا COD"
+      );
+    }
 
     const payload: Record<string, unknown> = {
       order_number: orderNumber,
@@ -322,11 +340,11 @@ export async function POST(req: NextRequest) {
       total,
       status: "new",
       version: 1,
+      payment_method: paymentMethod,
     };
 
     if (customerId) payload.customer_id = customerId;
     if (email) payload.customer_email = email;
-    payload.payment_method = "cod";
 
     if (merchantId) {
       payload.merchant_id = merchantId;
@@ -421,7 +439,10 @@ export async function POST(req: NextRequest) {
           to_status: "new",
           actor_type: "customer",
           actor_id: user.id,
-          note: "تم إنشاء الطلب",
+          note:
+            paymentMethod === "prepaid_whatsapp"
+              ? "تم إنشاء الطلب — بانتظار دفع مقدّم وتأكيد واتساب"
+              : "تم إنشاء الطلب",
         });
         await admin.from("order_shipments").insert({
           order_id: order.id,
@@ -442,6 +463,7 @@ export async function POST(req: NextRequest) {
       status: order?.status || "new",
       shipping,
       discount,
+      paymentMethod,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "خطأ غير متوقع";
