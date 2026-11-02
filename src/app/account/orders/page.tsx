@@ -8,10 +8,12 @@ import {
   resolveCustomerId,
   type CustomerOrder,
 } from "@/lib/customer-account";
+import { useLocale } from "@/lib/locale";
 import { orderStatusLabel, orderStatusTone } from "@/lib/order-status";
 import { formatPrice } from "@/lib/utils";
 
 export default function AccountOrdersPage() {
+  const { t, locale } = useLocale();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -22,23 +24,18 @@ export default function AccountOrdersPage() {
     (async () => {
       const idRes = await loadAccountIdentity();
       if (!idRes.ok) {
-        setErr("يجب تسجيل الدخول لعرض الطلبات");
+        setErr(t("orders.loginRequired"));
         setLoading(false);
         return;
       }
 
       const customerId = await resolveCustomerId(idRes.identity);
-      // Always try loading orders — even if customer row link failed (email fallback)
       const res = await fetchCustomerOrders(customerId, idRes.identity.email);
       if (res.error) setErr(res.error);
-      else if (!customerId && res.orders.length === 0) {
-        // Soft notice only when both link + orders empty — not a hard block
-        setErr("");
-      }
       setOrders(res.orders);
       setLoading(false);
     })();
-  }, []);
+  }, [t]);
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
@@ -50,49 +47,58 @@ export default function AccountOrdersPage() {
     });
   }, [orders, q, status]);
 
+  const statuses = useMemo(() => {
+    const set = new Set(orders.map((o) => o.status));
+    return Array.from(set);
+  }, [orders]);
+
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-bold text-[#14243A]">طلباتي</h2>
-        <p className="mt-1 text-sm text-[#718096]">عرض طلباتك المرتبطة بحسابك فقط.</p>
+        <h2 className="text-lg font-bold text-[var(--text)]">{t("orders.title")}</h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">{t("orders.subtitle")}</p>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="account-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
         <input
-          className="w-full rounded-xl border border-[#E4E9F0] bg-white px-3 py-2.5 text-sm"
-          placeholder="بحث برقم الطلب"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          dir="ltr"
+          placeholder={t("orders.search")}
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[#3157D5]"
         />
         <select
-          className="rounded-xl border border-[#E4E9F0] bg-white px-3 py-2.5 text-sm sm:w-48"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
+          className="rounded-lg border border-[var(--border)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text)]"
         >
-          <option value="all">كل الحالات</option>
-          <option value="new">جديد</option>
-          <option value="confirmed">مؤكد</option>
-          <option value="shipped">تم الشحن</option>
-          <option value="delivered">تم التسليم</option>
-          <option value="cancelled">ملغي</option>
+          <option value="all">{t("orders.all")}</option>
+          {statuses.map((s) => (
+            <option key={s} value={s}>
+              {orderStatusLabel(s)}
+            </option>
+          ))}
         </select>
       </div>
 
-      {loading && <p className="text-sm text-[#718096]">جاري التحميل...</p>}
-      {err && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-[#D64C4C]">{err}</p>}
+      {loading && (
+        <div className="space-y-2">
+          <div className="h-20 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+          <div className="h-20 animate-pulse rounded-xl bg-[var(--surface-2)]" />
+        </div>
+      )}
 
-      {!loading && !filtered.length && (
-        <div className="rounded-2xl border border-dashed border-[#D6DDEA] bg-white px-4 py-10 text-center">
-          <p className="font-semibold text-[#14243A]">لا توجد طلبات بعد</p>
-          <p className="mt-2 text-sm leading-7 text-[#718096]">
-            عند إتمام طلب وأنت مسجّل الدخول، هيظهر هنا تلقائيًا مرتبطًا بحسابك.
-          </p>
+      {err && !loading && (
+        <p className="text-sm text-[#D64C4C]">{err}</p>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="account-card border-dashed px-4 py-10 text-center">
+          <p className="font-semibold text-[var(--text)]">{t("orders.empty")}</p>
           <Link
-            href="/account"
+            href="/shop"
             className="mt-4 inline-block text-sm font-bold text-[#3157D5]"
           >
-            العودة لنظرة عامة الحساب
+            {t("common.shop")}
           </Link>
         </div>
       )}
@@ -102,21 +108,25 @@ export default function AccountOrdersPage() {
           <li key={o.id}>
             <Link
               href={`/account/orders/${o.id}`}
-              className="block rounded-2xl border border-[#E4E9F0] bg-white p-4 shadow-sm transition hover:border-[#C8D6FF]"
+              className="account-card block p-4 transition hover:border-[#C8D6FF]"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-mono text-sm font-bold text-[#14243A]">{o.order_number}</p>
+                <p className="font-mono text-sm font-bold text-[var(--text)]">
+                  {o.order_number}
+                </p>
                 <span
-                  className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${orderStatusTone(o.status)}`}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                    orderStatusTone(o.status)
+                  }`}
                 >
                   {orderStatusLabel(o.status)}
                 </span>
               </div>
-              <p className="mt-2 text-xs text-[#718096]">
-                {new Date(o.created_at).toLocaleString("ar-EG")}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[#14243A]">
-                {formatPrice(Number(o.total))}
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                {new Date(o.created_at).toLocaleString(
+                  locale === "ar" ? "ar-EG" : "en-GB"
+                )}{" "}
+                · {formatPrice(Number(o.total))}
               </p>
             </Link>
           </li>

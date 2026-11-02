@@ -6,6 +6,7 @@ import { Bell } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { loadAccountIdentity } from "@/lib/account-identity";
 import { resolveCustomerId } from "@/lib/customer-account";
+import { useLocale } from "@/lib/locale";
 
 type Notif = {
   id: string;
@@ -17,6 +18,7 @@ type Notif = {
 };
 
 export default function AccountNotificationsPage() {
+  const { t, locale } = useLocale();
   const [items, setItems] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -27,7 +29,7 @@ export default function AccountNotificationsPage() {
     try {
       const idRes = await loadAccountIdentity();
       if (!idRes.ok) {
-        setErr("يجب تسجيل الدخول");
+        setErr(t("orders.loginRequired"));
         setItems([]);
         return;
       }
@@ -54,11 +56,11 @@ export default function AccountNotificationsPage() {
       }
       setItems((data || []) as Notif[]);
     } catch {
-      setErr("تعذر تحميل الإشعارات");
+      setErr(t("loading"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -80,30 +82,31 @@ export default function AccountNotificationsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-[#14243A]">الإشعارات</h2>
-          <p className="mt-1 text-sm text-[#718096]">تحديثات الطلبات المهمة</p>
+          <h2 className="text-lg font-bold text-[var(--text)]">
+            {t("notifications.title")}
+          </h2>
         </div>
         <button
           type="button"
           onClick={() => void load()}
           className="text-sm font-semibold text-[#3157D5]"
         >
-          تحديث
+          {t("notifications.refresh")}
         </button>
       </div>
 
-      {loading && <p className="text-sm text-[#718096]">جاري التحميل...</p>}
+      {loading && <p className="text-sm text-[var(--text-muted)]">{t("loading")}</p>}
       {err && <p className="text-sm text-[#D64C4C]">{err}</p>}
 
       {!loading && items.length === 0 && !err && (
-        <div className="rounded-2xl border border-dashed border-[#D6DDEA] bg-white px-4 py-12 text-center">
-          <Bell className="mx-auto mb-3 h-10 w-10 text-[#C8D0DC]" strokeWidth={1.5} />
-          <p className="font-semibold text-[#14243A]">لا توجد إشعارات</p>
+        <div className="account-card border-dashed px-4 py-12 text-center">
+          <Bell className="mx-auto mb-3 h-10 w-10 text-[var(--text-muted)]" strokeWidth={1.5} />
+          <p className="font-semibold text-[var(--text)]">{t("notifications.empty")}</p>
           <Link
             href="/account/orders"
             className="mt-4 inline-block text-sm font-bold text-[#3157D5]"
           >
-            متابعة الطلبات
+            {t("nav.orders")}
           </Link>
         </div>
       )}
@@ -112,20 +115,20 @@ export default function AccountNotificationsPage() {
         {items.map((n) => (
           <li
             key={n.id}
-            className={`rounded-2xl border px-4 py-3 ${
-              n.read_at
-                ? "border-[#E4E9F0] bg-white"
-                : "border-[#D9E4FF] bg-[#F5F8FF]"
+            className={`account-card px-4 py-3 ${
+              n.read_at ? "" : "border-[#D9E4FF] bg-[#F5F8FF] dark:bg-[#152238]"
             }`}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-bold text-[#14243A]">{n.title}</p>
+                <p className="text-sm font-bold text-[var(--text)]">{n.title}</p>
                 {n.body && (
-                  <p className="mt-1 text-sm text-[#526174]">{n.body}</p>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">{n.body}</p>
                 )}
-                <p className="mt-1 text-[11px] text-[#718096]">
-                  {new Date(n.created_at).toLocaleString("ar-EG")}
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                  {new Date(n.created_at).toLocaleString(
+                    locale === "ar" ? "ar-EG" : "en-GB"
+                  )}
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1">
@@ -134,16 +137,16 @@ export default function AccountNotificationsPage() {
                     href={`/account/orders/${n.order_id}`}
                     className="text-xs font-semibold text-[#3157D5]"
                   >
-                    عرض
+                    {t("notifications.view")}
                   </Link>
                 )}
                 {!n.read_at && (
                   <button
                     type="button"
                     onClick={() => void markRead(n.id)}
-                    className="text-[11px] text-[#718096] underline"
+                    className="text-[11px] text-[var(--text-muted)] underline"
                   >
-                    تعليم كمقروء
+                    {t("notifications.markRead")}
                   </button>
                 )}
               </div>
