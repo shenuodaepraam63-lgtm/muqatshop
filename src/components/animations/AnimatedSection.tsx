@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type HTMLMotionProps } from "motion/react";
+import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { fadeInUp, staggerContainer } from "@/lib/animations/motion-variants";
 
@@ -12,12 +12,10 @@ type Props = {
   amount?: number;
   as?: "section" | "div" | "article";
   id?: string;
-} & Omit<HTMLMotionProps<"section">, "children" | "initial" | "whileInView" | "viewport" | "variants">;
+};
 
 /**
  * Viewport entrance for page sections. Animates once by default.
- * Content stays in DOM — opacity only; never hides permanently if JS fails
- * (SSR renders at visible; client hydrates then may replay once).
  */
 export function AnimatedSection({
   children,
@@ -26,21 +24,50 @@ export function AnimatedSection({
   amount = 0.12,
   as = "section",
   id,
-  ...rest
 }: Props) {
-  const Component = as === "div" ? motion.div : as === "article" ? motion.article : motion.section;
+  const variants = stagger ? staggerContainer : fadeInUp;
+  const viewport = { once: true as const, amount, margin: "0px 0px -6% 0px" as const };
+
+  if (as === "div") {
+    return (
+      <motion.div
+        id={id}
+        className={className}
+        initial="hidden"
+        whileInView="visible"
+        viewport={viewport}
+        variants={variants}
+      >
+        {children}
+      </motion.div>
+    );
+  }
+
+  if (as === "article") {
+    return (
+      <motion.article
+        id={id}
+        className={className}
+        initial="hidden"
+        whileInView="visible"
+        viewport={viewport}
+        variants={variants}
+      >
+        {children}
+      </motion.article>
+    );
+  }
 
   return (
-    <Component
+    <motion.section
       id={id}
       className={className}
       initial="hidden"
       whileInView="visible"
-      viewport={{ once: true, amount, margin: "0px 0px -6% 0px" }}
-      variants={stagger ? staggerContainer : fadeInUp}
-      {...rest}
+      viewport={viewport}
+      variants={variants}
     >
       {children}
-    </Component>
+    </motion.section>
   );
 }

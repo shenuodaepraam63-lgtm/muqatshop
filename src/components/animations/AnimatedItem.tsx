@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type HTMLMotionProps } from "motion/react";
+import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { staggerItem } from "@/lib/animations/motion-variants";
 
@@ -8,20 +8,27 @@ type Props = {
   children: ReactNode;
   className?: string;
   as?: "div" | "li" | "article";
-} & Omit<HTMLMotionProps<"div">, "children" | "variants">;
+};
 
 /** Child of AnimatedSection with stagger — or standalone fade-up item */
-export function AnimatedItem({
-  children,
-  className,
-  as = "div",
-  ...rest
-}: Props) {
-  const Component = as === "li" ? motion.li : as === "article" ? motion.article : motion.div;
-
+export function AnimatedItem({ children, className, as = "div" }: Props) {
+  if (as === "li") {
+    return (
+      <motion.li className={className} variants={staggerItem}>
+        {children}
+      </motion.li>
+    );
+  }
+  if (as === "article") {
+    return (
+      <motion.article className={className} variants={staggerItem}>
+        {children}
+      </motion.article>
+    );
+  }
   return (
-    <Component className={className} variants={staggerItem} {...rest}>
+    <motion.div className={className} variants={staggerItem}>
       {children}
-    </Component>
+    </motion.div>
   );
 }
