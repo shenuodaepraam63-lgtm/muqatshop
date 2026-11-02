@@ -3,15 +3,8 @@
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
 import { MarketplaceProductCard } from "@/components/home/MarketplaceProductCard";
-import {
-  MOTION_DURATION,
-  MOTION_EASE,
-  MOTION_STAGGER,
-  MOTION_STAGGER_MAX,
-} from "@/lib/animations/motion-config";
-import { fadeInUp, staggerContainer } from "@/lib/animations/motion-variants";
+import { useInViewOnce } from "@/lib/animations/useInViewOnce";
 import type { Product } from "@/lib/supabase";
 
 export type ShelfSubcategory = {
@@ -34,7 +27,10 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
-  const reduce = useReducedMotion();
+  const [sectionRef, sectionIn] = useInViewOnce({
+    threshold: 0.15,
+    rootMargin: "0px 0px -10% 0px",
+  });
 
   const filtered = useMemo(() => {
     if (!activeSub) return shelf.products;
@@ -79,18 +75,15 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   };
 
   return (
-    <motion.section
+    <section
+      ref={sectionRef as React.RefObject<HTMLElement>}
       className="home-section"
       aria-label={shelf.name}
-      initial={reduce ? false : "hidden"}
-      whileInView="visible"
-      viewport={{ once: true, amount: 0.1, margin: "0px 0px -5% 0px" }}
-      variants={staggerContainer}
     >
       <div className="home-container">
-        <motion.div
-          className="mb-3 flex items-center justify-between gap-3"
-          variants={fadeInUp}
+        <div
+          className={`mb-3 flex items-center justify-between gap-3 mq-rise${sectionIn ? " is-in" : ""}`}
+          style={{ transitionDelay: sectionIn ? "0ms" : "0ms" }}
         >
           <h2 className="text-lg font-bold text-[#14243A] sm:text-xl">{shelf.name}</h2>
           <Link
@@ -99,14 +92,14 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
           >
             عرض الكل
           </Link>
-        </motion.div>
+        </div>
 
         {shelf.subcategories.length > 0 && (
-          <motion.div
-            className="mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar"
+          <div
+            className={`mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar mq-rise${sectionIn ? " is-in" : ""}`}
+            style={{ transitionDelay: sectionIn ? "60ms" : "0ms" }}
             role="tablist"
             aria-label={`تصنيفات ${shelf.name}`}
-            variants={fadeInUp}
           >
             <button
               type="button"
@@ -140,7 +133,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
                 </button>
               );
             })}
-          </motion.div>
+          </div>
         )}
 
         {filtered.length === 0 ? (
@@ -174,27 +167,22 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
 
             <div ref={trackRef} className="category-product-track" dir="rtl">
               {filtered.map((p, i) => (
-                <motion.div
+                <div
                   key={`${activeSub || "all"}-${p.id}`}
-                  className="category-product-slot snap-start"
-                  initial={reduce ? false : { opacity: 0, y: 18 }}
-                  whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.15 }}
-                  transition={{
-                    duration: MOTION_DURATION.medium,
-                    ease: MOTION_EASE.standard,
-                    delay: reduce
-                      ? 0
-                      : Math.min(i, MOTION_STAGGER_MAX) * MOTION_STAGGER.normal,
+                  className={`category-product-slot snap-start mq-rise${sectionIn ? " is-in" : ""}`}
+                  style={{
+                    transitionDelay: sectionIn
+                      ? `${Math.min(i, 8) * 55}ms`
+                      : "0ms",
                   }}
                 >
                   <MarketplaceProductCard product={p} />
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
         )}
       </div>
-    </motion.section>
+    </section>
   );
 }

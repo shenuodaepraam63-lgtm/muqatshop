@@ -113,15 +113,32 @@
   height: 100%;
 }
 
+/*
+ * Visible entrance animations — driven by .is-in class from IntersectionObserver.
+ * Intentionally strong (20px + 450ms) so motion is noticeable on mobile/desktop.
+ */
+.mq-rise {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition:
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mq-rise.is-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
 .muqat-home :focus-visible {
   outline: 2px solid #3157d5;
   outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .muqat-home *,
-  .muqat-home *::before,
-  .muqat-home *::after {
-    scroll-behavior: auto !important;
+  .mq-rise {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
 }

@@ -4,13 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
-import {
-  MOTION_EASE,
-  MOTION_DURATION,
-  MOTION_STAGGER,
-  MOTION_STAGGER_MAX,
-} from "@/lib/animations/motion-config";
+import { useInViewOnce } from "@/lib/animations/useInViewOnce";
 import "./HorizontalCategoryCarousel.css";
 
 export type HorizontalCategoryItem = {
@@ -59,7 +53,10 @@ export function HorizontalCategoryCarousel({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
-  const reduce = useReducedMotion();
+  const [wrapRef, inView] = useInViewOnce({
+    threshold: 0.2,
+    rootMargin: "0px 0px -8% 0px",
+  });
 
   const updateArrows = useCallback(() => {
     const el = scrollerRef.current;
@@ -98,7 +95,11 @@ export function HorizontalCategoryCarousel({
   if (!items.length) return null;
 
   return (
-    <div className="category-carousel" aria-label={ariaLabel}>
+    <div
+      ref={wrapRef as React.RefObject<HTMLDivElement>}
+      className="category-carousel"
+      aria-label={ariaLabel}
+    >
       {showArrows && (canPrev || canNext) ? (
         <div className="category-carousel__arrows max-md:hidden">
           <button
@@ -122,19 +123,13 @@ export function HorizontalCategoryCarousel({
         </div>
       ) : null}
 
-      {/* Scroll container is NOT transformed — only cards animate */}
       <div ref={scrollerRef} className="category-carousel__track" dir="rtl">
         {items.map((item, i) => (
-          <motion.div
+          <div
             key={item.id}
-            className="category-card-wrap"
-            initial={reduce ? false : { opacity: 0, y: 20 }}
-            whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.2 }}
-            transition={{
-              duration: MOTION_DURATION.medium,
-              ease: MOTION_EASE.standard,
-              delay: reduce ? 0 : Math.min(i, MOTION_STAGGER_MAX) * MOTION_STAGGER.normal,
+            className={`category-card-wrap mq-rise${inView ? " is-in" : ""}`}
+            style={{
+              transitionDelay: inView ? `${Math.min(i, 10) * 60}ms` : "0ms",
             }}
           >
             <Link
@@ -144,7 +139,7 @@ export function HorizontalCategoryCarousel({
               <CategoryImage src={item.image} name={item.name} />
               <span className="category-card__name">{item.name}</span>
             </Link>
-          </motion.div>
+          </div>
         ))}
       </div>
     </div>

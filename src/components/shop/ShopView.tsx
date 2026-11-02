@@ -13,7 +13,7 @@ import {
 import { ShopToolbar } from "@/components/shop/ShopToolbar";
 import { ActiveFilterChips, ShopFiltersPanel } from "@/components/shop/ShopFilters";
 import { ShopPagination } from "@/components/shop/ShopPagination";
-import { ScrollReveal } from "@/components/ui/ScrollReveal";
+import { useInViewOnce } from "@/lib/animations/useInViewOnce";
 import type { Product } from "@/lib/supabase";
 
 export function ShopView({
@@ -41,6 +41,7 @@ export function ShopView({
   const router = useRouter();
   const q = (sp.get("q") || "").trim();
   const isSearch = Boolean(q);
+  const [gridRef, gridIn] = useInViewOnce({ threshold: 0.08, rootMargin: "0px 0px -5% 0px" });
 
   const clearSearch = () => {
     const next = new URLSearchParams(sp.toString());
@@ -132,11 +133,22 @@ export function ShopView({
                 )}
               </div>
             ) : (
-              <div className="product-grid">
+              <div
+                ref={gridRef as React.RefObject<HTMLDivElement>}
+                className="product-grid"
+              >
                 {products.map((p, i) => (
-                  <ScrollReveal key={p.id} index={i % 8} staggerMs={40}>
+                  <div
+                    key={p.id}
+                    className={`mq-rise${gridIn ? " is-in" : ""}`}
+                    style={{
+                      transitionDelay: gridIn
+                        ? `${Math.min(i, 8) * 45}ms`
+                        : "0ms",
+                    }}
+                  >
                     <MarketplaceProductCard product={p} />
-                  </ScrollReveal>
+                  </div>
                 ))}
               </div>
             )}
