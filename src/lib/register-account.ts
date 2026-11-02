@@ -55,6 +55,24 @@ export function validateRegisterBase(
   return null;
 }
 
+function notifyAdminNewAccountClient(input: RegisterBaseInput) {
+  try {
+    void fetch("/api/admin/notify-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "new_account",
+        email: input.email.trim().toLowerCase(),
+        fullName: input.fullName.trim(),
+        accountType: input.accountType,
+        phone: normalizePhone(input.phone),
+      }),
+    });
+  } catch {
+    /* never block registration */
+  }
+}
+
 /** Create Supabase Auth user; profile row is created by DB trigger. Email link confirm — no OTP UI. */
 export async function registerWithSupabaseAuth(
   input: RegisterBaseInput,
@@ -125,6 +143,9 @@ export async function registerWithSupabaseAuth(
   if (session && user) {
     await ensurePartnershipRows(user.id, input.accountType, extras);
   }
+
+  // Admin alert (in-app + WhatsApp)
+  notifyAdminNewAccountClient(input);
 
   return { ok: true, needsEmailConfirm };
 }
