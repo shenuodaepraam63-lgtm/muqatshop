@@ -45,6 +45,13 @@ export default function RootLayout({
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body
         className={`${arabic.variable} ${inter.variable} font-sans antialiased`}
+        style={
+          {
+            // Compat for legacy components still referencing Cairo/Changa vars
+            ["--font-cairo" as string]: "var(--font-arabic)",
+            ["--font-changa" as string]: "var(--font-arabic)",
+          } as React.CSSProperties
+        }
       >
         <script
           dangerouslySetInnerHTML={{
