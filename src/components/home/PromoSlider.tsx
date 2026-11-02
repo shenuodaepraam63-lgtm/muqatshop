@@ -15,12 +15,10 @@ export type PromoSlide = {
   mobileImage?: string | null;
   buttonText?: string;
   tone?: "navy" | "blue" | "teal";
-};
-
-const TONES: Record<string, string> = {
-  navy: "from-[#14243A] via-[#1a2f4a] to-[#0f1c2e]",
-  blue: "from-[#3157D5] to-[#1e3a9a]",
-  teal: "from-[#18A999] to-[#0f7a6e]",
+  /** Optional prices when campaign is linked to a product */
+  price?: number | null;
+  compareAtPrice?: number | null;
+  endsLabel?: string | null;
 };
 
 function toSlide(c: PublicCampaign | PromoSlide): PromoSlide {
@@ -35,9 +33,20 @@ function toSlide(c: PublicCampaign | PromoSlide): PromoSlide {
     buttonText:
       "buttonText" in c && c.buttonText
         ? c.buttonText
-        : (c as PromoSlide).buttonText || "تصفح الآن",
+        : (c as PromoSlide).buttonText || "اطلبها الآن",
     tone: (c as PromoSlide).tone,
+    price: (c as PromoSlide).price ?? (c as PublicCampaign).price ?? null,
+    compareAtPrice:
+      (c as PromoSlide).compareAtPrice ??
+      (c as PublicCampaign).compareAtPrice ??
+      null,
+    endsLabel:
+      (c as PromoSlide).endsLabel ?? (c as PublicCampaign).endsLabel ?? null,
   };
+}
+
+function formatEgp(n: number) {
+  return `${Math.round(n).toLocaleString("ar-EG")} جنيه`;
 }
 
 export function PromoSlider({
@@ -91,12 +100,21 @@ export function PromoSlider({
   const slide = list[index];
   const desktopImg = slide.image;
   const mobileImg = slide.mobileImage || slide.image;
+  const price = slide.price != null ? Number(slide.price) : null;
+  const compare =
+    slide.compareAtPrice != null ? Number(slide.compareAtPrice) : null;
+  const onSale =
+    price != null && compare != null && compare > price;
 
   return (
-    <section className="home-section" aria-roledescription="carousel" aria-label="الحملات الإعلانية">
+    <section
+      className="home-section"
+      aria-roledescription="carousel"
+      aria-label="الحملات الإعلانية"
+    >
       <div className="home-container relative">
         <div
-          className="relative overflow-hidden rounded-[20px] max-md:rounded-[14px] shadow-[0_8px_30px_rgba(20,36,58,0.12)]"
+          className="relative"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
           onTouchStart={(e) => {
@@ -110,61 +128,90 @@ export function PromoSlider({
             go(dx > 0 ? -1 : 1);
           }}
         >
-          <Link
-            href={slide.href}
-            className={`relative flex h-[200px] sm:h-[320px] md:h-[400px] lg:h-[440px] items-stretch overflow-hidden bg-gradient-to-l ${
-              TONES[slide.tone || "navy"]
-            }`}
-          >
-            {/*
-              object-contain: الصورة كاملة داخل الإطار بدون قص.
-              الخلفية المتدرجة تظهر في الفراغات لو نسبة الصورة مختلفة عن الحاوية.
-            */}
-            {desktopImg ? (
-              <Image
-                src={desktopImg}
-                alt={slide.title}
-                fill
-                className="hidden sm:block object-contain object-center"
-                sizes="(max-width:1024px) 92vw, 1200px"
-                priority={index === 0}
-              />
-            ) : null}
-            {mobileImg ? (
-              <Image
-                src={mobileImg}
-                alt={slide.title}
-                fill
-                className="sm:hidden object-contain object-center"
-                sizes="94vw"
-                priority={index === 0}
-              />
-            ) : null}
+          {/*
+            كارت حملة نظيف:
+            - الصورة كاملة بدون قص (object-contain) في منطقة واسعة
+            - النصوص والسعر والزر تحت الصورة — مش فوقها
+          */}
+          <article className="overflow-hidden rounded-[20px] max-md:rounded-[16px] bg-[#14243A] text-white shadow-[0_8px_30px_rgba(20,36,58,0.14)]">
+            <div className="relative flex items-center justify-between px-4 pt-3 sm:px-5">
+              <span className="text-xs font-bold tracking-wide text-white/90 sm:text-sm">
+                Muqatshop
+              </span>
+              <span className="rounded-full bg-[#22c55e]/15 px-2.5 py-1 text-[10px] font-bold text-[#86efac] sm:text-[11px]">
+                عرض خاص
+              </span>
+            </div>
 
-            {/* تدرج خفيف على النص فقط — بدون تغطية الصورة كلها */}
-            <div className="pointer-events-none absolute inset-y-0 inset-inline-start-0 z-[1] w-[55%] max-w-md bg-gradient-to-l from-transparent via-black/25 to-black/50 sm:w-[45%]" />
+            {/* صورة المنتج — تملأ العرض وتظهر كاملة */}
+            <div className="relative mx-auto mt-2 w-full max-w-lg px-3 sm:max-w-2xl sm:px-6">
+              <div className="relative aspect-[4/3] w-full sm:aspect-[16/10]">
+                {desktopImg ? (
+                  <Image
+                    src={desktopImg}
+                    alt={slide.title}
+                    fill
+                    className="hidden object-contain object-center sm:block"
+                    sizes="(max-width:1024px) 92vw, 720px"
+                    priority={index === 0}
+                  />
+                ) : null}
+                {mobileImg ? (
+                  <Image
+                    src={mobileImg}
+                    alt={slide.title}
+                    fill
+                    className="object-contain object-center sm:hidden"
+                    sizes="94vw"
+                    priority={index === 0}
+                  />
+                ) : null}
+              </div>
+            </div>
 
-            <div className="relative z-10 flex flex-col justify-center px-5 sm:px-10 md:px-14 max-w-xl text-white py-6">
-              <p className="text-lg font-bold sm:text-2xl md:text-3xl leading-snug line-clamp-2 drop-shadow-sm">
+            {/* النصوص + السعر + الزر تحت الصورة */}
+            <div className="px-5 pb-5 pt-3 text-center sm:px-8 sm:pb-7 sm:pt-4">
+              <h2 className="text-lg font-bold leading-snug sm:text-2xl">
                 {slide.title}
-              </p>
+              </h2>
               {slide.subtitle ? (
-                <p className="mt-2 text-sm text-white/90 line-clamp-2 max-md:text-xs max-w-md">
+                <p className="mx-auto mt-1.5 max-w-md text-sm text-white/75 sm:text-base">
                   {slide.subtitle}
                 </p>
               ) : null}
-              <span className="mt-4 inline-flex w-fit items-center rounded-xl bg-[#22c55e] hover:bg-[#16a34a] px-5 py-2.5 text-sm font-bold text-white shadow-md transition max-md:mt-3 max-md:text-xs max-md:px-4 max-md:py-2">
-                {slide.buttonText || "تصفح الآن"}
-              </span>
+
+              {price != null && (
+                <div className="mt-3 flex flex-wrap items-baseline justify-center gap-2">
+                  <span className="text-2xl font-bold text-white sm:text-3xl">
+                    {formatEgp(price)}
+                  </span>
+                  {onSale && compare != null ? (
+                    <span className="text-base text-white/50 line-through sm:text-lg">
+                      {formatEgp(compare)}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+
+              <Link
+                href={slide.href}
+                className="mt-4 inline-flex w-full max-w-sm items-center justify-center rounded-xl bg-[#F5C518] px-6 py-3 text-sm font-bold text-[#14243A] shadow-md transition hover:bg-[#e6b800] sm:mt-5 sm:py-3.5 sm:text-base"
+              >
+                {slide.buttonText || "اطلبها الآن"}
+              </Link>
+
+              {slide.endsLabel ? (
+                <p className="mt-3 text-xs text-white/55">{slide.endsLabel}</p>
+              ) : null}
             </div>
-          </Link>
+          </article>
 
           {list.length > 1 && (
             <>
               <button
                 type="button"
                 onClick={() => go(-1)}
-                className="absolute right-3 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/95 text-[#14243A] shadow-md md:grid hover:bg-white transition"
+                className="absolute right-2 top-[28%] z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-white/95 text-[#14243A] shadow-md md:grid hover:bg-white"
                 aria-label="الشريحة السابقة"
               >
                 <ChevronRight className="h-5 w-5" />
@@ -172,7 +219,7 @@ export function PromoSlider({
               <button
                 type="button"
                 onClick={() => go(1)}
-                className="absolute left-3 top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/95 text-[#14243A] shadow-md md:grid hover:bg-white transition"
+                className="absolute left-2 top-[28%] z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-white/95 text-[#14243A] shadow-md md:grid hover:bg-white"
                 aria-label="الشريحة التالية"
               >
                 <ChevronLeft className="h-5 w-5" />
@@ -182,7 +229,11 @@ export function PromoSlider({
         </div>
 
         {list.length > 1 && (
-          <div className="mt-3 flex justify-center gap-2" role="tablist" aria-label="مؤشرات الحملات">
+          <div
+            className="mt-3 flex justify-center gap-2"
+            role="tablist"
+            aria-label="مؤشرات الحملات"
+          >
             {list.map((s, i) => (
               <button
                 key={s.id}
@@ -195,7 +246,9 @@ export function PromoSlider({
                   setPaused(true);
                 }}
                 className={`h-2 rounded-full transition-all ${
-                  i === index ? "w-7 bg-[#3157D5]" : "w-2 bg-[#C8D0DC] hover:bg-[#a8b2c0]"
+                  i === index
+                    ? "w-7 bg-[#3157D5]"
+                    : "w-2 bg-[#C8D0DC] hover:bg-[#a8b2c0]"
                 }`}
               />
             ))}

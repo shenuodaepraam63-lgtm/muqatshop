@@ -30,9 +30,10 @@ export type PublicCampaign = {
   mobileImage?: string | null;
   buttonText: string;
   priority: number;
+  price?: number | null;
+  compareAtPrice?: number | null;
+  endsLabel?: string | null;
 };
-
-const INTERNAL_PREFIXES = ["/", "/shop", "/categories", "/products", "/offers", "/more", "/track"];
 
 /** Only allow relative internal paths (no open redirect). */
 export function sanitizeCampaignHref(raw: string | null | undefined): string {
@@ -42,6 +43,17 @@ export function sanitizeCampaignHref(raw: string | null | undefined): string {
     return v;
   }
   return "/shop";
+}
+
+/** Extract product slug from /products/slug links */
+export function productSlugFromHref(href: string): string | null {
+  const m = href.match(/^\/products\/([^/?#]+)/);
+  if (!m?.[1]) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
 }
 
 export function isCampaignEligible(
@@ -61,9 +73,9 @@ export function isCampaignEligible(
   return true;
 }
 
-export function sortCampaigns<T extends { priority: number; created_at?: string; id: string }>(
-  rows: T[]
-): T[] {
+export function sortCampaigns<
+  T extends { priority: number; created_at?: string; id: string }
+>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {
     if (b.priority !== a.priority) return b.priority - a.priority;
     const ca = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -73,7 +85,20 @@ export function sortCampaigns<T extends { priority: number; created_at?: string;
   });
 }
 
-export function toPublicCampaign(row: CampaignRow): PublicCampaign {
+function endsLabelFromRow(row: CampaignRow, now = new Date()): string | null {
+  if (!row.ends_at) return null;
+  const e = new Date(row.ends_at);
+  if (Number.isNaN(e.getTime()) || e <= now) return null;
+  const days = Math.ceil((e.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (days <= 0) return null;
+  if (days === 1) return "ينتهي خلال يوم";
+  return `عرض لمدة ${days} يومًا`;
+}
+
+export function toPublicCampaign(
+  row: CampaignRow,
+  product?: { price?: number | null; compare_at_price?: number | null } | null
+): PublicCampaign {
   return {
     id: row.id,
     title: (row.title || row.name || "عرض خاص").trim(),
@@ -81,8 +106,12 @@ export function toPublicCampaign(row: CampaignRow): PublicCampaign {
     href: sanitizeCampaignHref(row.link_url),
     image: row.image_url,
     mobileImage: row.mobile_image_url,
-    buttonText: (row.button_text || "تصفح الآن").trim() || "تصفح الآن",
+    buttonText: (row.button_text || "اطلبها الآن").trim() || "اطلبها الآن",
     priority: Number(row.priority) || 0,
+    price: product?.price != null ? Number(product.price) : null,
+    compareAtPrice:
+      product?.compare_at_price != null ? Number(product.compare_at_price) : null,
+    endsLabel: endsLabelFromRow(row),
   };
 }
 
@@ -96,12 +125,13 @@ export function derivedCampaignLabel(row: CampaignRow, now = new Date()): string
   return row.status;
 }
 
-export const CAMPAIGN_STATUS_OPTIONS: { value: CampaignStatus; label: string }[] = [
-  { value: "draft", label: "مسودة" },
-  { value: "active", label: "نشط" },
-  { value: "paused", label: "متوقف" },
-  { value: "archived", label: "مؤرشف" },
-];
+export const CAMPAIGN_STATUS_OPTIONS: { value: CampaignStatus; label: string }[] =
+  [
+    { value: "draft", label: "مسودة" },
+    { value: "active", label: "نشط" },
+    { value: "paused", label: "متوقف" },
+    { value: "archived", label: "مؤرشف" },
+  ];
 
 export function validateCampaignDates(
   startsAt: string | null,
@@ -116,5 +146,3 @@ export function validateCampaignDates(
   if (e <= s) return "تاريخ النهاية يجب أن يكون بعد البداية";
   return null;
 }
-
-export { INTERNAL_PREFIXES };
