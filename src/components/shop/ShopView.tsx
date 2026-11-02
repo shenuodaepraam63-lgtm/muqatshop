@@ -13,6 +13,7 @@ import {
 import { ShopToolbar } from "@/components/shop/ShopToolbar";
 import { ActiveFilterChips, ShopFiltersPanel } from "@/components/shop/ShopFilters";
 import { ShopPagination } from "@/components/shop/ShopPagination";
+import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import type { Product } from "@/lib/supabase";
 
 export function ShopView({
@@ -132,8 +133,10 @@ export function ShopView({
               </div>
             ) : (
               <div className="product-grid">
-                {products.map((p) => (
-                  <MarketplaceProductCard key={p.id} product={p} />
+                {products.map((p, i) => (
+                  <ScrollReveal key={p.id} index={i} staggerMs={40} threshold={0.08}>
+                    <MarketplaceProductCard product={p} />
+                  </ScrollReveal>
                 ))}
               </div>
             )}

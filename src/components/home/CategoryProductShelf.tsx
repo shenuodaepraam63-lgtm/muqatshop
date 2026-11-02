@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MarketplaceProductCard } from "@/components/home/MarketplaceProductCard";
+import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import type { Product } from "@/lib/supabase";
 
 export type ShelfSubcategory = {
@@ -70,7 +71,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   };
 
   return (
-    <section className="home-section" aria-label={shelf.name}>
+    <ScrollReveal as="section" className="home-section" index={0} threshold={0.06}>
       <div className="home-container">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-[#14243A] sm:text-xl">{shelf.name}</h2>
@@ -154,18 +155,24 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
 
             <div
               ref={trackRef}
-              className="category-product-track flex gap-2.5 overflow-x-auto pb-2 snap-x snap-proximity no-scrollbar sm:gap-3"
+              className="category-product-track"
               dir="rtl"
             >
-              {filtered.map((p) => (
-                <div key={p.id} className="category-product-slot snap-start">
+              {filtered.map((p, i) => (
+                <ScrollReveal
+                  key={`${activeSub || "all"}-${p.id}`}
+                  className="category-product-slot snap-start"
+                  index={i}
+                  staggerMs={45}
+                  threshold={0.05}
+                >
                   <MarketplaceProductCard product={p} />
-                </div>
+                </ScrollReveal>
               ))}
             </div>
           </div>
         )}
       </div>
-    </section>
+    </ScrollReveal>
   );
 }
