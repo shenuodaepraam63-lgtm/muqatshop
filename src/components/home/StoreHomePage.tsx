@@ -16,6 +16,12 @@ import { HorizontalProductRail } from "@/components/home/HorizontalProductRail";
 import { ProductGrid } from "@/components/home/ProductGrid";
 import { RecentlyViewedSection } from "@/components/home/RecentlyViewedSection";
 import { isSaleActive } from "@/lib/utils";
+import {
+  isCampaignEligible,
+  sortCampaigns,
+  toPublicCampaign,
+  type CampaignRow,
+} from "@/lib/campaigns";
 
 function available(product: Product): boolean {
   if (product.variants?.length) return product.variants.some((v) => Number(v.stock) > 0);
@@ -25,6 +31,67 @@ function available(product: Product): boolean {
 const PRODUCT_COLS =
   "id,name,slug,price,compare_at_price,sale_ends_at,images,main_image_index,category_id,stock,variants,is_featured,is_active,created_at";
 
+async function loadCampaignSlides(): Promise<{
+  slides: PromoSlide[];
+  autoplay: boolean;
+  intervalMs: number;
+}> {
+  if (!isSupabaseConfigured) {
+    return { slides: defaultSlides(), autoplay: true, intervalMs: 5000 };
+  }
+
+  const [{ data: rows }, { data: settingsRow }] = await Promise.all([
+    supabase
+      .from("gallery_slides")
+      .select(
+        "id,name,title,subtitle,image_url,mobile_image_url,link_url,button_text,sort_order,priority,is_active,status,starts_at,ends_at,created_at,updated_at"
+      )
+      .order("priority", { ascending: false }),
+    supabase.from("site_settings").select("value").eq("key", "gallery").maybeSingle(),
+  ]);
+
+  const settings = (settingsRow?.value as {
+    enabled?: boolean;
+    autoplay?: boolean;
+    interval_ms?: number;
+  }) || {};
+
+  if (settings.enabled === false) {
+    return { slides: [], autoplay: false, intervalMs: 5000 };
+  }
+
+  const now = new Date();
+  const eligible = sortCampaigns(
+    ((rows as CampaignRow[]) || []).filter((r) => isCampaignEligible(r, now))
+  );
+
+  if (eligible.length > 0) {
+    return {
+      slides: eligible.map((r) => {
+        const p = toPublicCampaign(r);
+        return {
+          id: p.id,
+          title: p.title,
+          subtitle: p.subtitle,
+          href: p.href,
+          image: p.image,
+          mobileImage: p.mobileImage,
+          buttonText: p.buttonText,
+          tone: "navy" as const,
+        };
+      }),
+      autoplay: settings.autoplay !== false,
+      intervalMs: Number(settings.interval_ms) || 5000,
+    };
+  }
+
+  return {
+    slides: defaultSlides(),
+    autoplay: settings.autoplay !== false,
+    intervalMs: Number(settings.interval_ms) || 5000,
+  };
+}
+
 async function loadHomeData() {
   if (!isSupabaseConfigured) {
     return {
@@ -33,39 +100,41 @@ async function loadHomeData() {
       offers: [] as Product[],
       recommended: [] as Product[],
       categoryProducts: [] as Product[],
-      slides: defaultSlides(),
+      campaign: { slides: defaultSlides(), autoplay: true, intervalMs: 5000 },
     };
   }
 
-  const [categoriesResult, featuredResult, offersResult, activeResult] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id,name,slug,image,sort_order,group_id,parent_id")
-      .eq("is_active", true)
-      .is("parent_id", null)
-      .order("sort_order", { ascending: true })
-      .limit(10),
-    supabase
-      .from("products")
-      .select(PRODUCT_COLS)
-      .eq("is_active", true)
-      .eq("is_featured", true)
-      .order("created_at", { ascending: false })
-      .limit(24),
-    supabase
-      .from("products")
-      .select(PRODUCT_COLS)
-      .eq("is_active", true)
-      .not("compare_at_price", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(40),
-    supabase
-      .from("products")
-      .select(PRODUCT_COLS)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(48),
-  ]);
+  const [categoriesResult, featuredResult, offersResult, activeResult, campaign] =
+    await Promise.all([
+      supabase
+        .from("categories")
+        .select("id,name,slug,image,sort_order,group_id,parent_id")
+        .eq("is_active", true)
+        .is("parent_id", null)
+        .order("sort_order", { ascending: true })
+        .limit(10),
+      supabase
+        .from("products")
+        .select(PRODUCT_COLS)
+        .eq("is_active", true)
+        .eq("is_featured", true)
+        .order("created_at", { ascending: false })
+        .limit(24),
+      supabase
+        .from("products")
+        .select(PRODUCT_COLS)
+        .eq("is_active", true)
+        .not("compare_at_price", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(40),
+      supabase
+        .from("products")
+        .select(PRODUCT_COLS)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(48),
+      loadCampaignSlides(),
+    ]);
 
   const categories = (categoriesResult.data as Category[]) || [];
   const featured = ((featuredResult.data as Product[]) || []).filter(available);
@@ -80,9 +149,7 @@ async function loadHomeData() {
   const bestSellers = (featured.length ? featured : active).slice(0, 12);
 
   const used = new Set(bestSellers.map((p) => p.id));
-  const recommended: Product[] = active
-    .filter((p) => !used.has(p.id))
-    .slice(0, 8);
+  const recommended: Product[] = active.filter((p) => !used.has(p.id)).slice(0, 8);
   if (recommended.length < 8) {
     for (const p of active) {
       if (recommended.length >= 8) break;
@@ -106,30 +173,17 @@ async function loadHomeData() {
       .slice(0, 8);
   }
 
-  const slides: PromoSlide[] = defaultSlides(
-    categories[0]
-      ? {
-          title: categories[0].name,
-          href: `/categories/${encodeURIComponent(categories[0].slug)}`,
-          image: categories[0].image,
-        }
-      : undefined,
-    offers[0]
-      ? {
-          title: offers[0].name,
-          href: `/products/${encodeURIComponent(offers[0].slug)}`,
-          image: productMainImage(offers[0]),
-        }
-      : undefined
-  );
-
-  return { categories, bestSellers, offers, recommended, categoryProducts, slides };
+  return {
+    categories,
+    bestSellers,
+    offers,
+    recommended,
+    categoryProducts,
+    campaign,
+  };
 }
 
-function defaultSlides(
-  cat?: { title: string; href: string; image?: string | null },
-  offer?: { title: string; href: string; image?: string | null }
-): PromoSlide[] {
+function defaultSlides(): PromoSlide[] {
   return [
     {
       id: "shop",
@@ -137,43 +191,27 @@ function defaultSlides(
       subtitle: "تجربة تسوق واضحة — منتجات حقيقية وأسعار من المتجر.",
       href: "/shop",
       tone: "navy",
+      buttonText: "تسوق الآن",
     },
-    cat
-      ? {
-          id: "cat",
-          title: `استكشف تصنيف ${cat.title}`,
-          subtitle: "تصفح المنتجات حسب التصنيف المناسب لك.",
-          href: cat.href,
-          image: cat.image,
-          tone: "blue",
-        }
-      : {
-          id: "categories",
-          title: "تصفح التصنيفات",
-          subtitle: "اعثر على ما تبحث عنه بسرعة.",
-          href: "/categories",
-          tone: "blue",
-        },
-    offer
-      ? {
-          id: "offer",
-          title: `عرض: ${offer.title}`,
-          subtitle: "خصم ساري على المنتج — التفاصيل داخل صفحة المنتج.",
-          href: offer.href,
-          image: offer.image,
-          tone: "teal",
-        }
-      : {
-          id: "offers",
-          title: "اكتشف العروض السارية",
-          subtitle: "نعرض فقط المنتجات ذات الخصم الحقيقي.",
-          href: "/shop",
-          tone: "teal",
-        },
+    {
+      id: "categories",
+      title: "تصفح التصنيفات",
+      subtitle: "اعثر على ما تبحث عنه بسرعة.",
+      href: "/categories",
+      tone: "blue",
+      buttonText: "التصنيفات",
+    },
+    {
+      id: "offers",
+      title: "اكتشف العروض السارية",
+      subtitle: "نعرض فقط المنتجات ذات الخصم الحقيقي.",
+      href: "/shop",
+      tone: "teal",
+      buttonText: "العروض",
+    },
   ];
 }
 
-/** Current storefront homepage (unchanged). */
 export default async function StoreHomePage() {
   const data = await loadHomeData();
 
@@ -181,7 +219,11 @@ export default async function StoreHomePage() {
     <div className="muqat-home" dir="rtl">
       <Header />
       <main id="main-content" className="pb-20 md:pb-0">
-        <PromoSlider slides={data.slides} />
+        <PromoSlider
+          slides={data.campaign.slides}
+          autoplay={data.campaign.autoplay}
+          intervalMs={data.campaign.intervalMs}
+        />
         <StoreBenefits />
 
         {data.categories.length > 0 && (
