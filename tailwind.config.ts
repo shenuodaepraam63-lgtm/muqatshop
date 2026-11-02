@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,38 +10,53 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        page: "#FAF7F2",
+        page: "#F6F8FB",
         card: "#FFFFFF",
         surface: "#FFFFFF",
-        "surface-2": "#F3EEE6",
-        ink: "#0C0A09",
-        "ink-soft": "#44403C",
-        muted: "#78716C",
+        "surface-2": "#EEF1F6",
+        ink: "#14243A",
+        "ink-soft": "#202B3C",
+        muted: "#718096",
         sale: "#E11D48",
-        accent: "#1C1917",
-        brand: "#8B5E34",
-        "brand-dark": "#6B4423",
+        accent: "#14243A",
+        brand: "#3157D5",
+        "brand-dark": "#2447B8",
         gold: "#C4A574",
-        success: "#059669",
-        border: "#E7E0D6",
+        success: "#21865B",
+        border: "#E4E9F0",
+        navy: "#14243A",
+        blue: "#3157D5",
+        teal: "#18A999",
       },
       fontFamily: {
-        sans: ["var(--font-changa)", "system-ui", "sans-serif"],
-        display: ["var(--font-changa)", "system-ui", "sans-serif"],
+        sans: [
+          "var(--font-arabic)",
+          "var(--font-inter)",
+          "system-ui",
+          "sans-serif",
+        ],
+        display: [
+          "var(--font-arabic)",
+          "var(--font-inter)",
+          "system-ui",
+          "sans-serif",
+        ],
+        arabic: ["var(--font-arabic)", "system-ui", "sans-serif"],
+        inter: ["var(--font-inter)", "system-ui", "sans-serif"],
       },
       borderRadius: {
         media: "16px",
-        btn: "12px",
-        card: "18px",
+        btn: "8px",
+        card: "12px",
       },
       maxWidth: {
         page: "1800px",
       },
       boxShadow: {
         header:
-          "0 1px 0 rgba(12,10,9,0.04), 0 4px 16px rgba(12,10,9,0.05)",
-        card: "0 1px 2px rgba(12,10,9,0.04), 0 8px 24px rgba(12,10,9,0.06)",
-        soft: "0 2px 12px rgba(12,10,9,0.06)",
+          "0 1px 0 rgba(20,36,58,0.04), 0 4px 16px rgba(20,36,58,0.05)",
+        card: "0 1px 2px rgba(20,36,58,0.04), 0 8px 24px rgba(20,36,58,0.06)",
+        soft: "0 2px 12px rgba(20,36,58,0.06)",
       },
     },
   },

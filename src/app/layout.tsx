@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cairo, Changa, Inter } from "next/font/google";
+import { IBM_Plex_Sans_Arabic, Inter } from "next/font/google";
 import "./globals.css";
 import "./homepage.css";
 import { MerchantRefCaptureGate } from "@/components/layout/MerchantRefCaptureGate";
@@ -7,24 +7,19 @@ import { RoleGate } from "@/components/auth/RoleGate";
 import { SiteChrome } from "@/components/layout/SiteChrome";
 import { AuthSessionProvider } from "@/components/auth/AuthSessionProvider";
 import { CartOwnerSync } from "@/components/cart/CartOwnerSync";
+import { ThemeProvider } from "@/lib/theme";
+import { LocaleProvider } from "@/lib/locale";
 
-const changa = Changa({
+const arabic = IBM_Plex_Sans_Arabic({
   subsets: ["arabic", "latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-changa",
-  display: "swap",
-});
-
-const cairo = Cairo({
-  subsets: ["arabic", "latin"],
-  weight: ["400", "600", "700"],
-  variable: "--font-cairo",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-arabic",
   display: "swap",
 });
 
 const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "700"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-inter",
   display: "swap",
 });
@@ -43,17 +38,30 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ar" dir="rtl">
-      <body className={`${changa.variable} ${cairo.variable} ${inter.variable} font-sans antialiased`}>
-        <AuthSessionProvider>
-          <CartOwnerSync />
-          <MerchantRefCaptureGate />
-          <RoleGate>
-            <SiteChrome>{children}</SiteChrome>
-          </RoleGate>
-        </AuthSessionProvider>
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <body
+        className={`${arabic.variable} ${inter.variable} font-sans antialiased`}
+      >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('mq-theme');var d=document.documentElement;var dark=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);d.classList.toggle('dark',dark);d.style.colorScheme=dark?'dark':'light';var l=localStorage.getItem('mq-locale');if(l==='en'){d.lang='en';d.dir='ltr'}else{d.lang='ar';d.dir='rtl'}}catch(e){}})();`,
+          }}
+        />
+        <ThemeProvider>
+          <LocaleProvider>
+            <AuthSessionProvider>
+              <CartOwnerSync />
+              <MerchantRefCaptureGate />
+              <RoleGate>
+                <SiteChrome>{children}</SiteChrome>
+              </RoleGate>
+            </AuthSessionProvider>
+          </LocaleProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
