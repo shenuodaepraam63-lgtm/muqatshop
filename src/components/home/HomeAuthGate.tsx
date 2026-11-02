@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
+import { StorePageSkeleton } from "@/components/ui/StorePageSkeleton";
 
 type AuthState = "loading" | "authenticated" | "anonymous";
 
@@ -52,18 +53,7 @@ export function HomeAuthGate({
   }, []);
 
   if (state === "loading") {
-    return (
-      <div
-        className="flex min-h-[50vh] items-center justify-center bg-[#F6F8FB]"
-        role="status"
-        aria-live="polite"
-      >
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-9 w-9 animate-pulse rounded-full bg-[#D9E4FF]" />
-          <p className="text-sm text-[#718096]">جاري التحميل...</p>
-        </div>
-      </div>
-    );
+    return <StorePageSkeleton />;
   }
 
   return <>{state === "authenticated" ? store : marketing}</>;

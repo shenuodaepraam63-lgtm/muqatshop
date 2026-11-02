@@ -9,8 +9,8 @@ import {
   loadAccountIdentity,
   type AccountIdentity,
 } from "@/lib/account-identity";
+import { CartPageSkeleton, StorePageSkeleton } from "@/components/ui/StorePageSkeleton";
 
-/** Public storefront + auth pages — no login required. */
 const PUBLIC_PREFIXES = [
   "/shop",
   "/categories",
@@ -39,9 +39,9 @@ const PUBLIC_PREFIXES = [
   "/supplier",
   "/more",
   "/wishlist",
+  "/checkout",
 ];
 
-/** Customer account area — requires Supabase Auth (not legacy localStorage). */
 const CUSTOMER_ACCOUNT_PREFIXES = ["/account"];
 
 function isUnder(path: string, prefixes: string[]) {
@@ -52,7 +52,6 @@ function isPublicPath(path: string) {
   return path === "/" || isUnder(path, PUBLIC_PREFIXES);
 }
 
-/** Apply chrome role from server identity (never from user-chosen local role). */
 function applyChromeRole(identity: AccountIdentity | null, hasMerchantLocal: boolean) {
   if (hasMerchantLocal) {
     setSiteRole("merchant");
@@ -72,42 +71,47 @@ function applyChromeRole(identity: AccountIdentity | null, hasMerchantLocal: boo
 export function RoleGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const path = pathname || "/";
+  const publicPath = isPublicPath(path);
+
+  // Public storefront never blocks first paint — auth runs in background.
+  const [ready, setReady] = useState(publicPath);
 
   useEffect(() => {
     let cancelled = false;
+    const current = pathname || "/";
+    const isPublic = isPublicPath(current);
+
+    // Show content immediately on public routes
+    if (isPublic) setReady(true);
+    else setReady(false);
 
     (async () => {
-      const path = pathname || "/";
       const merchantLocal = getMerchantSession();
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        // Legacy marketer session is only a storefront chrome hint. It must
-        // never grant access to, or redirect away from, the customer account.
         applyChromeRole(null, Boolean(merchantLocal));
 
-        // Customer account requires Auth — never legacy muqat_customer_session.
-        if (isUnder(path, CUSTOMER_ACCOUNT_PREFIXES) && !path.startsWith("/account/pending")) {
-          router.replace(`/login?next=${encodeURIComponent(path)}`);
+        if (
+          isUnder(current, CUSTOMER_ACCOUNT_PREFIXES) &&
+          !current.startsWith("/account/pending")
+        ) {
+          router.replace(`/login?next=${encodeURIComponent(current)}`);
           return;
         }
 
         if (
-          path.startsWith("/merchant") &&
-          path !== "/merchant/login" &&
-          path !== "/merchant/register" &&
-          !path.startsWith("/merchant/login") &&
-          !path.startsWith("/merchant/register")
+          current.startsWith("/merchant") &&
+          current !== "/merchant/login" &&
+          current !== "/merchant/register" &&
+          !current.startsWith("/merchant/login") &&
+          !current.startsWith("/merchant/register")
         ) {
           router.replace("/login");
           return;
-        }
-
-        if (!isPublicPath(path) && path !== "/checkout") {
-          // Soft: allow unknown public-ish paths; checkout guards itself.
         }
 
         if (!cancelled) setReady(true);
@@ -119,8 +123,11 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
 
       if (!idRes.ok) {
         applyChromeRole(null, false);
-        if (isUnder(path, CUSTOMER_ACCOUNT_PREFIXES) && !path.startsWith("/account/pending")) {
-          router.replace(`/login?next=${encodeURIComponent(path)}`);
+        if (
+          isUnder(current, CUSTOMER_ACCOUNT_PREFIXES) &&
+          !current.startsWith("/account/pending")
+        ) {
+          router.replace(`/login?next=${encodeURIComponent(current)}`);
           return;
         }
         if (!cancelled) setReady(true);
@@ -135,11 +142,14 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Partnership accounts must not use customer shopping account as home when pending.
       if (identity.accountType === "affiliate") {
         const pending =
           identity.affiliateStatus && identity.affiliateStatus !== "approved";
-        if (pending && path.startsWith("/merchant") && !path.startsWith("/merchant/login")) {
+        if (
+          pending &&
+          current.startsWith("/merchant") &&
+          !current.startsWith("/merchant/login")
+        ) {
           router.replace("/account/pending?type=affiliate");
           return;
         }
@@ -147,18 +157,21 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
       if (identity.accountType === "supplier") {
         const pending =
           identity.supplierStatus && identity.supplierStatus !== "approved";
-        if (pending && !path.startsWith("/account/pending") && path.startsWith("/supplier")) {
+        if (
+          pending &&
+          !current.startsWith("/account/pending") &&
+          current.startsWith("/supplier")
+        ) {
           router.replace("/account/pending?type=supplier");
           return;
         }
       }
 
-      // Authenticated customer should not open marketer portal.
       if (
         identity.accountType === "customer" &&
-        path.startsWith("/merchant") &&
-        path !== "/merchant/login" &&
-        path !== "/merchant/register"
+        current.startsWith("/merchant") &&
+        current !== "/merchant/login" &&
+        current !== "/merchant/register"
       ) {
         router.replace("/account");
         return;
@@ -173,11 +186,8 @@ export function RoleGate({ children }: { children: React.ReactNode }) {
   }, [pathname, router]);
 
   if (!ready) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center text-sm text-[#718096] bg-[#F6F8FB]">
-        جاري التحميل...
-      </div>
-    );
+    if (path.startsWith("/cart")) return <CartPageSkeleton />;
+    return <StorePageSkeleton />;
   }
 
   return <>{children}</>;
