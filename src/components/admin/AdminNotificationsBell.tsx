@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -15,63 +15,109 @@ type Row = {
   meta?: { order_number?: string } | null;
 };
 
-export function AdminNotificationsBell() {
+class BellErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
+function AdminNotificationsBellInner() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Row[]>([]);
   const [unread, setUnread] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("admin_notifications")
-      .select("id,type,title,body,read_at,created_at,meta")
-      .order("created_at", { ascending: false })
-      .limit(30);
-    const rows = (data as Row[]) || [];
-    setItems(rows);
-    setUnread(rows.filter((r) => !r.read_at).length);
+    try {
+      const { data, error } = await supabase
+        .from("admin_notifications")
+        .select("id,type,title,body,read_at,created_at,meta")
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      if (error) {
+        setItems([]);
+        setUnread(0);
+        return;
+      }
+
+      const rows = Array.isArray(data) ? (data as Row[]) : [];
+      setItems(rows);
+      setUnread(rows.filter((r) => !r.read_at).length);
+    } catch {
+      setItems([]);
+      setUnread(0);
+    }
   }, []);
 
   useEffect(() => {
     void load();
 
-    // Browser push permission (optional)
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "default") {
-        void Notification.requestPermission();
+    try {
+      if (typeof window !== "undefined" && typeof Notification !== "undefined") {
+        if (Notification.permission === "default") {
+          void Notification.requestPermission().catch(() => undefined);
+        }
       }
+    } catch {
+      /* WebView / restricted browsers */
     }
 
-    const channel = supabase
-      .channel("admin-notifications-feed")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "admin_notifications" },
-        (payload) => {
-          const row = payload.new as Row;
-          setItems((prev) => [row, ...prev].slice(0, 30));
-          setUnread((n) => n + 1);
-
-          if (
-            typeof window !== "undefined" &&
-            "Notification" in window &&
-            Notification.permission === "granted"
-          ) {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(`admin-notifications-feed-${Math.random().toString(36).slice(2, 8)}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "admin_notifications" },
+          (payload) => {
             try {
-              new Notification(row.title, {
-                body: row.body || "",
-                tag: row.id,
-              });
+              const row = payload.new as Row;
+              if (!row?.id) return;
+              setItems((prev) => [row, ...prev].slice(0, 30));
+              setUnread((n) => n + 1);
+
+              try {
+                if (
+                  typeof Notification !== "undefined" &&
+                  Notification.permission === "granted"
+                ) {
+                  new Notification(row.title || "إشعار جديد", {
+                    body: row.body || "",
+                    tag: row.id,
+                  });
+                }
+              } catch {
+                /* ignore notification API failures */
+              }
             } catch {
-              /* ignore */
+              /* ignore payload handling */
             }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    } catch {
+      channel = null;
+    }
 
     return () => {
-      void supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          void supabase.removeChannel(channel);
+        } catch {
+          /* ignore */
+        }
+      }
     };
   }, [load]);
 
@@ -84,16 +130,23 @@ export function AdminNotificationsBell() {
   }, []);
 
   const markAllRead = async () => {
-    const ids = items.filter((i) => !i.read_at).map((i) => i.id);
-    if (!ids.length) return;
-    await supabase
-      .from("admin_notifications")
-      .update({ read_at: new Date().toISOString() })
-      .in("id", ids);
-    setItems((prev) =>
-      prev.map((i) => ({ ...i, read_at: i.read_at || new Date().toISOString() }))
-    );
-    setUnread(0);
+    try {
+      const ids = items.filter((i) => !i.read_at).map((i) => i.id);
+      if (!ids.length) return;
+      await supabase
+        .from("admin_notifications")
+        .update({ read_at: new Date().toISOString() })
+        .in("id", ids);
+      setItems((prev) =>
+        prev.map((i) => ({
+          ...i,
+          read_at: i.read_at || new Date().toISOString(),
+        }))
+      );
+      setUnread(0);
+    } catch {
+      /* ignore */
+    }
   };
 
   return (
@@ -147,7 +200,9 @@ export function AdminNotificationsBell() {
                 )}
                 <div className="mt-1 flex items-center justify-between gap-2">
                   <span className="text-[10px] text-muted">
-                    {new Date(n.created_at).toLocaleString("ar-EG")}
+                    {n.created_at
+                      ? new Date(n.created_at).toLocaleString("ar-EG")
+                      : ""}
                   </span>
                   {n.type === "new_order" && n.meta?.order_number && (
                     <Link
@@ -165,5 +220,13 @@ export function AdminNotificationsBell() {
         </div>
       )}
     </div>
+  );
+}
+
+export function AdminNotificationsBell() {
+  return (
+    <BellErrorBoundary>
+      <AdminNotificationsBellInner />
+    </BellErrorBoundary>
   );
 }
