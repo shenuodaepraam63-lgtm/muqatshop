@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:security-unit": "node --import tsx --test src/lib/admin-auth.test.ts"
+    "test:security-unit": "node --import tsx --test src/lib/admin-auth.test.ts src/lib/order-foundation.test.ts",
+    "test:security-integration": "node --import tsx --test src/lib/admin-auth.integration.test.ts",
+    "test:security": "npm run test:security-unit && npm run test:security-integration"
   },
   "dependencies": {
     "next": "^15.1.0",
@@ -29,6 +31,7 @@
     "postcss": "^8.4.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.1.0"
+    "eslint-config-next": "^15.1.0",
+    "tsx": "^4.19.0"
   }
 }
