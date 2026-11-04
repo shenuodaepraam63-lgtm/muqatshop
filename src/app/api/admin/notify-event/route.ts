@@ -32,6 +32,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
     }
 
+    // Optional shared secret: when NOTIFY_EVENT_SECRET is set, require matching header.
+    const expected = process.env.NOTIFY_EVENT_SECRET?.trim();
+    if (expected) {
+      const got = req.headers.get("x-notify-secret") || "";
+      if (got !== expected) {
+        return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+      }
+    }
+
     let body: {
       type?: string;
       email?: string;
