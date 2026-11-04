@@ -8,6 +8,23 @@ type Purpose =
   | "notice_delete"
   | "notice_password";
 
+const recent = new Map<string, number>();
+const WINDOW_MS = 60_000;
+const MAX_PER_WINDOW = 5;
+
+function rateLimit(key: string): boolean {
+  const now = Date.now();
+  const bucket = `${key}:${Math.floor(now / WINDOW_MS)}`;
+  const n = (recent.get(bucket) || 0) + 1;
+  recent.set(bucket, n);
+  if (recent.size > 2000) {
+    for (const k of recent.keys()) {
+      if (!k.endsWith(String(Math.floor(now / WINDOW_MS)))) recent.delete(k);
+    }
+  }
+  return n <= MAX_PER_WINDOW;
+}
+
 function buildEmail(opts: {
   purpose: Purpose;
   name: string;
@@ -87,18 +104,53 @@ function buildEmail(opts: {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
+
+    let body: {
+      email?: string;
+      code?: string;
+      name?: string;
+      purpose?: string;
+    };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ ok: false, error: "بيانات غير صالحة" }, { status: 400 });
+    }
+
     const email = String(body.email || "").trim().toLowerCase();
     const code = body.code != null ? String(body.code).trim() : "";
-    const name = String(body.name || "عميل").trim();
+    const name = String(body.name || "عميل").trim().slice(0, 120);
     const purpose = (body.purpose || "register") as Purpose;
 
-    if (!email) {
+    if (!email || !email.includes("@") || email.length > 200) {
       return NextResponse.json({ ok: false, error: "البريد مطلوب" }, { status: 400 });
     }
 
+    if (!rateLimit(`ip:${ip}`) || !rateLimit(`email:${email}`)) {
+      return NextResponse.json(
+        { ok: false, error: "محاولات كثيرة — حاول لاحقًا" },
+        { status: 429 }
+      );
+    }
+
+    const allowed: Purpose[] = [
+      "register",
+      "reset",
+      "delete",
+      "login",
+      "notice_delete",
+      "notice_password",
+    ];
+    if (!allowed.includes(purpose)) {
+      return NextResponse.json({ ok: false, error: "غرض غير مدعوم" }, { status: 400 });
+    }
+
     const needsCode = ["register", "reset", "delete", "login"].includes(purpose);
-    if (needsCode && !code) {
+    if (needsCode && (!code || code.length > 12)) {
       return NextResponse.json({ ok: false, error: "رمز التحقق مطلوب" }, { status: 400 });
     }
 
@@ -114,7 +166,11 @@ export async function POST(req: NextRequest) {
     }
 
     const from = process.env.RESEND_FROM || "Muqatshop <onboarding@resend.dev>";
-    const { subject, html } = buildEmail({ purpose, name, code: code || undefined });
+    const { subject, html } = buildEmail({
+      purpose,
+      name,
+      code: code || undefined,
+    });
 
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -128,7 +184,7 @@ export async function POST(req: NextRequest) {
     if (!r.ok) {
       const t = await r.text();
       return NextResponse.json(
-        { ok: false, error: "فشل إرسال البريد", detail: t },
+        { ok: false, error: "فشل إرسال البريد", detail: t.slice(0, 200) },
         { status: 502 }
       );
     }
