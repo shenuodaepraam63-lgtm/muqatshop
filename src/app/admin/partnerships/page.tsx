@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { adminMutate } from "@/lib/admin-mutate";
 import { supabase } from "@/lib/supabase";
 
 type ProfileSnippet = { full_name: string | null; phone: string | null };
@@ -106,16 +107,18 @@ export default function AdminPartnershipsPage() {
     setErr("");
     const patch: Record<string, unknown> = { status };
     if (status === "approved") patch.approved_at = new Date().toISOString();
-    const { error } = await supabase
-      .from("affiliate_profiles")
-      .update(patch)
-      .eq("user_id", userId);
-    if (error) {
-      setErr(error.message);
-      return;
+    try {
+      await adminMutate({
+        table: "affiliate_profiles",
+        op: "update",
+        match: { user_id: userId },
+        data: patch,
+      });
+      setMsg(`تم تحديث حالة المسوق إلى ${status}`);
+      void load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "فشل التحديث");
     }
-    setMsg(`تم تحديث حالة المسوق إلى ${status}`);
-    load();
   }
 
   async function setSupplierStatus(userId: string, status: string) {
@@ -123,16 +126,18 @@ export default function AdminPartnershipsPage() {
     setErr("");
     const patch: Record<string, unknown> = { status };
     if (status === "approved") patch.approved_at = new Date().toISOString();
-    const { error } = await supabase
-      .from("supplier_profiles")
-      .update(patch)
-      .eq("user_id", userId);
-    if (error) {
-      setErr(error.message);
-      return;
+    try {
+      await adminMutate({
+        table: "supplier_profiles",
+        op: "update",
+        match: { user_id: userId },
+        data: patch,
+      });
+      setMsg(`تم تحديث حالة التاجر إلى ${status}`);
+      void load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "فشل التحديث");
     }
-    setMsg(`تم تحديث حالة التاجر إلى ${status}`);
-    load();
   }
 
   return (
