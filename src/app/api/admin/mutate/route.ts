@@ -170,10 +170,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (op === "insert") {
-      let q = client.from(table).insert(data);
-      if (body.select) q = q.select(body.select) as typeof q;
-      else q = q.select("*") as typeof q;
-      const { data: row, error } = await q.maybeSingle();
+      const { data: row, error } = await client
+        .from(table)
+        .insert(data)
+        .select(body.select || "*")
+        .maybeSingle();
       if (error) {
         return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
       }
