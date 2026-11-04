@@ -60,44 +60,45 @@ export default function AdminOrderInvoicePage() {
     try {
       const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
-      if (token) {
-        const res = await fetch(`/api/orders/${order.id}/status`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status, expectedVersion: order.version }),
-        });
-        const body = await res.json().catch(() => null);
-        if (res.ok && body?.ok) {
-          setOrder({
-            ...order,
-            status: body.status || status,
-            updated_at: body.updatedAt || new Date().toISOString(),
-            version: body.version ?? order.version,
-          });
-          void loadShipments(order.id);
-          return;
-        }
-        if (body?.code === "VERSION_CONFLICT") {
-          alert(body.error || "تم تحديث الطلب من جهة أخرى");
-          const { data } = await supabase
-            .from("orders")
-            .select("*")
-            .eq("id", order.id)
-            .maybeSingle();
-          if (data) setOrder(data as OrderWithVersion);
-          return;
-        }
+      if (!token) {
+        alert("جلسة منتهية — سجّل الدخول مجددًا");
+        return;
       }
-      const { data } = await supabase
-        .from("orders")
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq("id", order.id)
-        .select()
-        .single();
-      if (data) setOrder(data as OrderWithVersion);
+
+      const res = await fetch(`/api/orders/${order.id}/status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status, expectedVersion: order.version }),
+      });
+      const body = await res.json().catch(() => null);
+
+      if (res.ok && body?.ok) {
+        setOrder({
+          ...order,
+          status: body.status || status,
+          updated_at: body.updatedAt || new Date().toISOString(),
+          version: body.version ?? order.version,
+        });
+        void loadShipments(order.id);
+        return;
+      }
+
+      if (body?.code === "VERSION_CONFLICT") {
+        alert(body.error || "تم تحديث الطلب من جهة أخرى");
+        const { data } = await supabase
+          .from("orders")
+          .select("*")
+          .eq("id", order.id)
+          .maybeSingle();
+        if (data) setOrder(data as OrderWithVersion);
+        return;
+      }
+
+      // No browser-client fallback write — status changes must pass requireAdmin API.
+      alert(body?.error || "تعذر تحديث الحالة عبر الخادم");
     } finally {
       setSaving(false);
     }
@@ -250,7 +251,7 @@ export default function AdminOrderInvoicePage() {
               ))}
             </select>
             <p className="mt-2 text-[11px] text-muted">
-              يُسجَّل في سجل الحالات + إشعار العميل · version{" "}
+              يُسجَّل عبر API محمي فقط · version{" "}
               {order.version != null ? order.version : "—"}
             </p>
           </section>
