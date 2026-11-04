@@ -2,10 +2,43 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServiceClient } from "@/lib/supabase-server";
 import { isAdminAuthSuccess, requireAdmin } from "@/lib/admin-auth";
 
-/**
- * Admin product list / create via service role AFTER requireAdmin.
- * Prepared so RLS on products can be tightened without breaking the panel.
- */
+const WRITE_KEYS = [
+  "name",
+  "slug",
+  "description",
+  "price",
+  "compare_at_price",
+  "sale_ends_at",
+  "category_id",
+  "product_type",
+  "brand",
+  "material",
+  "colors",
+  "sizes",
+  "variants",
+  "features",
+  "specs",
+  "weight",
+  "weight_value",
+  "dimensions",
+  "origin_country",
+  "care_instructions",
+  "detail_sections",
+  "images",
+  "main_image_index",
+  "stock",
+  "is_featured",
+  "is_active",
+] as const;
+
+function pickPayload(body: Record<string, unknown>) {
+  const payload: Record<string, unknown> = {};
+  for (const key of WRITE_KEYS) {
+    if (body[key] !== undefined) payload[key] = body[key];
+  }
+  return payload;
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (!isAdminAuthSuccess(auth)) return auth;
@@ -13,10 +46,10 @@ export async function GET(req: NextRequest) {
   try {
     const client = getSupabaseServiceClient();
     const { searchParams } = new URL(req.url);
-    const limit = Math.min(Number(searchParams.get("limit") || 100), 200);
+    const limit = Math.min(Number(searchParams.get("limit") || 200), 500);
     const { data, error } = await client
       .from("products")
-      .select("id, name, price, stock, is_active, created_at, updated_at")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(limit);
 
@@ -37,35 +70,27 @@ export async function POST(req: NextRequest) {
   if (!isAdminAuthSuccess(auth)) return auth;
 
   try {
-    const body = await req.json();
+    const body = (await req.json()) as Record<string, unknown>;
     const name = String(body.name || "").trim();
     const price = Number(body.price);
     if (!name || !Number.isFinite(price) || price < 0) {
-      return NextResponse.json({ ok: false, error: "اسم وسعر صالحان مطلوبان" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "اسم وسعر صالحان مطلوبان" },
+        { status: 400 }
+      );
     }
+
+    const payload = pickPayload(body);
+    payload.name = name;
+    payload.price = price;
+    if (payload.stock == null) payload.stock = 0;
+    if (payload.is_active == null) payload.is_active = true;
 
     const client = getSupabaseServiceClient();
-    const payload: Record<string, unknown> = {
-      name,
-      price,
-      stock: Number.isFinite(Number(body.stock)) ? Number(body.stock) : 0,
-      is_active: body.is_active !== false,
-    };
-    // Pass through only known safe optional fields
-    for (const key of [
-      "description",
-      "image_url",
-      "category_id",
-      "compare_at_price",
-      "slug",
-    ] as const) {
-      if (body[key] !== undefined) payload[key] = body[key];
-    }
-
     const { data, error } = await client
       .from("products")
       .insert(payload)
-      .select("id, name, price, stock, is_active")
+      .select("*")
       .maybeSingle();
 
     if (error) {

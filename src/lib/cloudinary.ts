@@ -1,19 +1,23 @@
+import { adminFetch } from "@/lib/admin-api";
+
 /**
- * Client-side helper: get signed params then upload file to Cloudinary.
+ * Client-side helper: get signed params (admin-auth) then upload file to Cloudinary.
  */
 export async function uploadToCloudinary(file: File): Promise<string> {
-  const signRes = await fetch("/api/cloudinary/sign", {
+  const signRes = await adminFetch("/api/cloudinary/sign", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ folder: "muqatshop/products" }),
   });
 
   if (!signRes.ok) {
     const err = await signRes.json().catch(() => ({}));
-    throw new Error(err.error || "Failed to get upload signature");
+    throw new Error(
+      (err as { error?: string }).error || "Failed to get upload signature"
+    );
   }
 
-  const { signature, timestamp, apiKey, cloudName, folder } = await signRes.json();
+  const { signature, timestamp, apiKey, cloudName, folder } =
+    await signRes.json();
 
   const formData = new FormData();
   formData.append("file", file);
@@ -29,7 +33,9 @@ export async function uploadToCloudinary(file: File): Promise<string> {
 
   if (!uploadRes.ok) {
     const err = await uploadRes.json().catch(() => ({}));
-    throw new Error(err.error?.message || "Upload failed");
+    throw new Error(
+      (err as { error?: { message?: string } }).error?.message || "Upload failed"
+    );
   }
 
   const data = await uploadRes.json();
