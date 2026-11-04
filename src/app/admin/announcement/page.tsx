@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { adminMutate } from "@/lib/admin-mutate";
 import { supabase } from "@/lib/supabase";
 import { Save } from "lucide-react";
 
@@ -55,35 +56,49 @@ export default function AdminAnnouncementPage() {
     setSaving(true);
     setMsg("");
     const now = new Date().toISOString();
-    const updates = [
-      supabase.from("site_settings").upsert({
-        key: "announcement",
-        value: { text, enabled },
-        updated_at: now,
-      }),
-      supabase.from("site_settings").upsert({
-        key: "return_policy",
-        value: { text: returnPolicy.trim() },
-        updated_at: now,
-      }),
-      supabase.from("site_settings").upsert({
-        key: "size_guide",
-        value: { text: sizeGuide.trim() },
-        updated_at: now,
-      }),
-      supabase.from("site_settings").upsert({
-        key: "shipping",
-        value: {
-          fee: Number(shipFee) || 80,
-          free_over: freeOver ? Number(freeOver) : null,
-        },
-        updated_at: now,
-      }),
-    ];
-    const results = await Promise.all(updates);
+    try {
+      await Promise.all([
+        adminMutate({
+          table: "site_settings",
+          op: "upsert",
+          data: { key: "announcement", value: { text, enabled }, updated_at: now },
+        }),
+        adminMutate({
+          table: "site_settings",
+          op: "upsert",
+          data: {
+            key: "return_policy",
+            value: { text: returnPolicy.trim() },
+            updated_at: now,
+          },
+        }),
+        adminMutate({
+          table: "site_settings",
+          op: "upsert",
+          data: {
+            key: "size_guide",
+            value: { text: sizeGuide.trim() },
+            updated_at: now,
+          },
+        }),
+        adminMutate({
+          table: "site_settings",
+          op: "upsert",
+          data: {
+            key: "shipping",
+            value: {
+              fee: Number(shipFee) || 80,
+              free_over: freeOver ? Number(freeOver) : null,
+            },
+            updated_at: now,
+          },
+        }),
+      ]);
+      setMsg("تم الحفظ");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل الحفظ");
+    }
     setSaving(false);
-    const err = results.find((r) => r.error)?.error;
-    setMsg(err ? err.message : "تم الحفظ");
   };
 
   if (loading) return <p className="text-sm text-muted">جاري التحميل...</p>;
