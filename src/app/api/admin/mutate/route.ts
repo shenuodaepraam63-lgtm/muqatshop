@@ -29,13 +29,12 @@ const TABLES = {
     keys: [
       "code",
       "discount_type",
-      "discount_value",
+      "value",
       "min_order",
       "max_uses",
-      "uses_count",
+      "used_count",
       "is_active",
-      "starts_at",
-      "ends_at",
+      "expires_at",
       "description",
     ],
   },
@@ -53,6 +52,16 @@ const TABLES = {
       "starts_at",
       "ends_at",
       "meta",
+      "offer_price",
+      "offer_compare_price",
+      "duration_label",
+      "product_id",
+      "mobile_image_url",
+      "button_text",
+      "priority",
+      "status",
+      "name",
+      "badge",
     ],
   },
   site_settings: {
@@ -74,6 +83,14 @@ const TABLES = {
   merchant_applications: {
     ops: ["update"] as const,
     keys: ["status", "notes", "reviewed_at", "admin_notes"],
+  },
+  affiliate_profiles: {
+    ops: ["update"] as const,
+    keys: ["status", "notes", "reviewed_at", "is_active", "admin_notes", "approved_at"],
+  },
+  supplier_profiles: {
+    ops: ["update"] as const,
+    keys: ["status", "notes", "reviewed_at", "is_active", "admin_notes", "approved_at"],
   },
 } as const;
 
