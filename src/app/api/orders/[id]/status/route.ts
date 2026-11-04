@@ -5,6 +5,20 @@ import {
   IMPORTANT_STATUS_NOTIFY,
   notificationCopy,
 } from "@/lib/order-status-labels";
+import { isAdminAuthSuccess, requireAdmin } from "@/lib/admin-auth";
+
+const ALLOWED_STATUS = new Set([
+  "new",
+  "confirmed",
+  "processing",
+  "preparing",
+  "shipped",
+  "out_for_delivery",
+  "delivered",
+  "cancelled",
+  "rejected",
+  "returned",
+]);
 
 export async function POST(
   req: NextRequest,
@@ -17,13 +31,9 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "معرّف مطلوب" }, { status: 400 });
     }
 
-    const authHeader = req.headers.get("authorization") || "";
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7).trim()
-      : "";
-    if (!token) {
-      return NextResponse.json({ ok: false, error: "غير مصرح" }, { status: 401 });
-    }
+    const auth = await requireAdmin(req);
+    if (!isAdminAuthSuccess(auth)) return auth;
+    const { user } = auth;
 
     let admin;
     try {
@@ -35,30 +45,6 @@ export async function POST(
       );
     }
 
-    const {
-      data: { user },
-      error: userErr,
-    } = await admin.auth.getUser(token);
-    if (userErr || !user?.id) {
-      return NextResponse.json({ ok: false, error: "جلسة غير صالحة" }, { status: 401 });
-    }
-
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const role = profile?.role ? String(profile.role) : "";
-    const isAdmin =
-      role === "admin" || role === "super_admin" || role === "staff";
-
-    // Soft gate remains for legacy admin sessions without profiles.role
-    // Log when role missing so it can be tightened in production ops
-    if (!isAdmin) {
-      track("order.status.soft_admin", { userId: user.id, orderId }, "warn");
-    }
-
     let body: { status?: string; note?: string; expectedVersion?: number };
     try {
       body = await req.json();
@@ -67,15 +53,13 @@ export async function POST(
     }
 
     const nextStatus = String(body.status || "").trim();
-    if (!nextStatus) {
-      return NextResponse.json({ ok: false, error: "الحالة مطلوبة" }, { status: 400 });
+    if (!nextStatus || !ALLOWED_STATUS.has(nextStatus)) {
+      return NextResponse.json({ ok: false, error: "حالة غير صالحة" }, { status: 400 });
     }
 
     const { data: current, error: fetchErr } = await admin
       .from("orders")
-      .select(
-        "id, status, version, order_number, customer_id, customer_email"
-      )
+      .select("id, status, version, order_number, customer_id, customer_email")
       .eq("id", orderId)
       .maybeSingle();
 
@@ -103,20 +87,18 @@ export async function POST(
     if (fromStatus === nextStatus) {
       return NextResponse.json({
         ok: true,
-        unchanged: true,
-        status: nextStatus,
+        status: fromStatus,
         version: currentVersion,
+        unchanged: true,
       });
     }
 
-    const newVersion = currentVersion + 1;
     const now = new Date().toISOString();
-
     const { data: updated, error: updErr } = await admin
       .from("orders")
       .update({
         status: nextStatus,
-        version: newVersion,
+        version: currentVersion + 1,
         updated_at: now,
       })
       .eq("id", orderId)
@@ -172,7 +154,6 @@ export async function POST(
       });
     }
 
-    // Customer notification for important events (never fails the order update)
     if (IMPORTANT_STATUS_NOTIFY.has(nextStatus)) {
       try {
         const copy = notificationCopy(
@@ -197,6 +178,7 @@ export async function POST(
       fromStatus,
       toStatus: nextStatus,
       ms: Date.now() - started,
+      adminSource: auth.source,
     });
 
     return NextResponse.json({
