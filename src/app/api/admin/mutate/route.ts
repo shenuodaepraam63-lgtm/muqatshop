@@ -96,15 +96,37 @@ const TABLES = {
 
 type TableName = keyof typeof TABLES;
 
+/** Never accept these columns from client JSON, even if table allowlist expands. */
+const BLOCKED_KEYS = new Set([
+  "account_type",
+  "role",
+  "is_platform_admin",
+  "auth_user_id",
+  "password",
+  "service_role",
+]);
+
 function pick(
   keys: readonly string[],
   body: Record<string, unknown>
-): Record<string, unknown> {
+): { ok: true; data: Record<string, unknown> } | { ok: false; error: string } {
+  for (const k of Object.keys(body)) {
+    if (BLOCKED_KEYS.has(k)) {
+      return { ok: false, error: `حقل محظور: ${k}` };
+    }
+    if (!keys.includes(k)) {
+      return { ok: false, error: `حقل غير مسموح: ${k}` };
+    }
+  }
   const out: Record<string, unknown> = {};
   for (const k of keys) {
     if (body[k] !== undefined) out[k] = body[k];
   }
-  return out;
+  return { ok: true, data: out };
+}
+
+function validId(id: unknown): id is string {
+  return typeof id === "string" && id.length >= 8 && id.length <= 80;
 }
 
 export async function POST(req: NextRequest) {
@@ -137,7 +159,15 @@ export async function POST(req: NextRequest) {
 
   try {
     const client = getSupabaseServiceClient();
-    const data = pick(cfg.keys, body.data || {});
+    const picked = pick(cfg.keys, body.data || {});
+    if (!picked.ok) {
+      return NextResponse.json({ ok: false, error: picked.error }, { status: 400 });
+    }
+    const data = picked.data;
+
+    if (body.id != null && !validId(body.id)) {
+      return NextResponse.json({ ok: false, error: "معرّف غير صالح" }, { status: 400 });
+    }
 
     if (op === "insert") {
       let q = client.from(table).insert(data);
