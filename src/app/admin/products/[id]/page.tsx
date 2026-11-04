@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { supabase, type Product } from "@/lib/supabase";
+import type { Product } from "@/lib/supabase";
 import { ProductForm } from "@/components/admin/ProductForm";
+import { adminJson } from "@/lib/admin-api";
 
 export default function EditProductPage() {
   const params = useParams();
@@ -14,30 +15,30 @@ export default function EditProductPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data, error: err } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (err || !data) {
-        setError("المنتج غير موجود");
-      } else {
+      try {
+        const data = await adminJson<{ ok: boolean; product: Product }>(
+          `/api/admin/products/${id}`
+        );
+        const row = data.product;
         setProduct({
-          ...data,
-          price: Number(data.price),
+          ...row,
+          price: Number(row.price),
           compare_at_price:
-            data.compare_at_price != null ? Number(data.compare_at_price) : null,
-          images: data.images || [],
-          colors: data.colors || [],
-          sizes: data.sizes || [],
-          variants: data.variants || [],
-          main_image_index: data.main_image_index || 0,
-          stock: data.stock ?? 0,
+            row.compare_at_price != null ? Number(row.compare_at_price) : null,
+          images: row.images || [],
+          colors: row.colors || [],
+          sizes: row.sizes || [],
+          variants: row.variants || [],
+          main_image_index: row.main_image_index || 0,
+          stock: row.stock ?? 0,
         } as Product);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "المنتج غير موجود");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    load();
+    void load();
   }, [id]);
 
   if (loading) return <div className="text-muted py-12">جاري التحميل...</div>;
@@ -74,8 +75,8 @@ export default function EditProductPage() {
           dimensions: product.dimensions,
           origin_country: product.origin_country,
           care_instructions: product.care_instructions,
+          detail_sections: product.detail_sections,
           sale_ends_at: product.sale_ends_at,
-          detail_sections: (product as Product).detail_sections || [],
         }}
       />
     </div>
