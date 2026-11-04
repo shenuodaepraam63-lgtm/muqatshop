@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { adminMutate } from "@/lib/admin-mutate";
 import { supabase } from "@/lib/supabase";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -50,29 +51,37 @@ export default function AdminCouponsPage() {
       expires_at: expires ? new Date(expires).toISOString() : null,
       is_active: true,
     };
-    const { error } = await supabase.from("coupons").insert(payload);
-    if (error) {
-      setMsg(error.message);
-      return;
+    try {
+      await adminMutate({ table: "coupons", op: "insert", data: payload as Record<string, unknown> });
+      setCode("");
+      setValue("10");
+      setMinOrder("");
+      setMaxUses("");
+      setExpires("");
+      setMsg("تم إضافة الكوبون");
+      void load();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل الإضافة");
     }
-    setCode("");
-    setValue("10");
-    setMinOrder("");
-    setMaxUses("");
-    setExpires("");
-    setMsg("تم إضافة الكوبون");
-    load();
   };
 
   const toggle = async (id: string, is_active: boolean) => {
-    await supabase.from("coupons").update({ is_active: !is_active }).eq("id", id);
-    load();
+    try {
+      await adminMutate({ table: "coupons", op: "update", id, data: { is_active: !is_active } });
+      void load();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل التحديث");
+    }
   };
 
   const remove = async (id: string) => {
     if (!confirm("حذف الكوبون؟")) return;
-    await supabase.from("coupons").delete().eq("id", id);
-    load();
+    try {
+      await adminMutate({ table: "coupons", op: "delete", id });
+      void load();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل الحذف");
+    }
   };
 
   const field = "border border-[#e8e2d9] rounded-xl px-3 py-2 text-sm w-full";
