@@ -30,7 +30,6 @@ export async function getOrCreateSession(opts: {
     return { sessionId: open.id as string, created: false };
   }
 
-  // close stale open sessions
   await admin
     .from("analytics_sessions")
     .update({ ended_at: new Date().toISOString() })
@@ -52,22 +51,12 @@ export async function getOrCreateSession(opts: {
     throw new Error(error?.message || "SESSION_CREATE_FAILED");
   }
 
-  await admin.rpc("" as never).catch(() => undefined);
-  await admin
-    .from("analytics_visitors")
-    .update({
-      last_seen_at: new Date().toISOString(),
-      total_sessions: undefined as never,
-    })
-    .eq("id", opts.visitorId)
-    .then(() => undefined);
-
-  // increment total_sessions safely
   const { data: vis } = await admin
     .from("analytics_visitors")
     .select("total_sessions")
     .eq("id", opts.visitorId)
     .maybeSingle();
+
   await admin
     .from("analytics_visitors")
     .update({
