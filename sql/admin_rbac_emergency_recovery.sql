@@ -1,0 +1,22 @@
+-- EMERGENCY RECOVERY ONLY — service_role / dashboard SQL editor
+-- Not part of application runtime. Use when bootstrap_completed but last Super Admin lost.
+-- DO NOT run from client. DO NOT expose as HTTP endpoint.
+
+-- Preferred first-time path (atomic):
+-- SELECT public.admin_bootstrap_super_admin(
+--   'USER_UUID'::uuid,
+--   'ops@example.com',
+--   'First Super Admin',
+--   'ops bootstrap'
+-- );
+
+-- If bootstrap already completed, admin_bootstrap_super_admin returns BOOTSTRAP_ALREADY_COMPLETED.
+-- Recovery (do not clear bootstrap_completed_at unless intentional):
+-- INSERT INTO public.admin_staff (user_id, email, display_name, status)
+-- VALUES ('USER_UUID', 'ops@example.com', 'Emergency Ops', 'active')
+-- ON CONFLICT (user_id) DO UPDATE SET status = 'active', updated_at = now();
+-- INSERT INTO public.admin_staff_roles (staff_id, role_id)
+-- SELECT s.id, r.id FROM public.admin_staff s
+-- CROSS JOIN public.admin_roles r
+-- WHERE s.user_id = 'USER_UUID' AND r.code = 'super_admin'
+-- ON CONFLICT DO NOTHING;
