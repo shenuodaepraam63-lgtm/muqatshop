@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { adminJson } from "@/lib/admin-api";
 import { hashPassword, makeMerchantCode } from "@/lib/merchant";
 
 type AppRow = {
@@ -36,74 +37,44 @@ export default function AdminmApplicationsPage() {
     if (!confirm(`الموافقة على ${app.name} كتاجر؟`)) return;
     setBusy(app.id);
     setMsg("");
-
-    const { data: existingM } = await supabase
-      .from("merchants")
-      .select("id")
-      .eq("email", app.email.toLowerCase())
-      .maybeSingle();
-
-    if (existingM) {
-      await supabase.from("merchant_applications").update({ status: "approved", reviewed_at: new Date().toISOString() }).eq("id", app.id);
-      setMsg("البريد مسجّل كتاجر بالفعل — تم تحديث الطلب لموافق");
-      setBusy(null);
-      load();
-      return;
+    try {
+      const tempPass = `Mq${Math.random().toString(36).slice(2, 8)}!`;
+      const password_hash = await hashPassword(tempPass);
+      const code = makeMerchantCode(app.id);
+      await adminJson("/api/admin/merchant-ops", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "approve_application",
+          applicationId: app.id,
+          name: app.name,
+          email: app.email,
+          phone: app.phone,
+          passwordHash: password_hash,
+          code,
+          tempPassNote: `تمت الموافقة على طلبك. كود التاجر: ${code}. سجّل الدخول من /merchant/login ببريدك. كلمة المرور المؤقتة: ${tempPass} — غيّرها بعد الدخول إن أمكن عبر الدعم.`,
+        }),
+      });
+      setMsg(`تمت الموافقة. كلمة المرور المؤقتة: ${tempPass}`);
+      void load();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل الموافقة");
     }
-
-    // كلمة مرور مؤقتة — التاجر يغيّرها لاحقًا أو يستخدم إعادة تعيين
-    const tempPass = `Mq${Math.random().toString(36).slice(2, 8)}!`;
-    const password_hash = await hashPassword(tempPass);
-
-    const { data: merchant, error } = await supabase
-      .from("merchants")
-      .insert({
-        name: app.name,
-        email: app.email.toLowerCase(),
-        phone: app.phone,
-        password_hash,
-        is_active: true,
-      })
-      .select("id")
-      .single();
-
-    if (error || !merchant) {
-      setMsg(error?.message || "فشل إنشاء حساب التاجر");
-      setBusy(null);
-      return;
-    }
-
-    const code = makeMerchantCode(merchant.id);
-    await supabase.from("merchants").update({ code }).eq("id", merchant.id);
-    await supabase.from("merchant_wallets").insert({
-      merchant_id: merchant.id,
-      balance: 0,
-      pending: 0,
-    });
-    await supabase.from("merchant_messages").insert({
-      merchant_id: merchant.id,
-      body: `تمت الموافقة على طلبك. كود التاجر: ${code}. سجّل الدخول من /merchant/login ببريدك. كلمة المرور المؤقتة: ${tempPass} — غيّرها بعد الدخول إن أمكن عبر الدعم.`,
-    });
-
-    await supabase
-      .from("merchant_applications")
-      .update({ status: "approved", reviewed_at: new Date().toISOString() })
-      .eq("id", app.id);
-
-    setMsg(`تمت الموافقة. كلمة المرور المؤقتة: ${tempPass} (أُرسلت أيضًا في رسائل التاجر)`);
     setBusy(null);
-    load();
   };
 
   const reject = async (id: string) => {
     if (!confirm("رفض الطلب؟")) return;
     setBusy(id);
-    await supabase
-      .from("merchant_applications")
-      .update({ status: "rejected", reviewed_at: new Date().toISOString() })
-      .eq("id", id);
+    try {
+      await adminJson("/api/admin/merchant-ops", {
+        method: "POST",
+        body: JSON.stringify({ action: "reject_application", applicationId: id }),
+      });
+      void load();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل الرفض");
+    }
     setBusy(null);
-    load();
   };
 
   return (
