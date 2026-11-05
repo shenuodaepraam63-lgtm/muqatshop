@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { adminJson } from "@/lib/admin-api";
 import { formatPrice } from "@/lib/utils";
 
 type Row = {
@@ -31,54 +32,28 @@ export default function AdminmWithdrawalsPage() {
 
   const complete = async (row: Row) => {
     if (!confirm("تأكيد إتمام التحويل للتاجر؟")) return;
-    await supabase
-      .from("merchant_withdrawals")
-      .update({ status: "completed", completed_at: new Date().toISOString() })
-      .eq("id", row.id);
-
-    await supabase.from("merchant_messages").insert({
-      merchant_id: row.merchant_id,
-      body: `تم تحويل مبلغ ${row.amount} ج.م بنجاح على الرقم ${row.phone}. شكرًا لك.`,
-    });
-
-    await supabase.from("wallet_transactions").insert({
-      merchant_id: row.merchant_id,
-      type: "withdraw_done",
-      amount: 0,
-      note: `تم إتمام سحب ${row.amount} ج.م`,
-    });
-
-    load();
+    try {
+      await adminJson("/api/admin/merchant-ops", {
+        method: "POST",
+        body: JSON.stringify({ action: "complete_withdrawal", withdrawalId: row.id }),
+      });
+      void load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "فشل إتمام السحب");
+    }
   };
 
   const reject = async (row: Row) => {
     if (!confirm("رفض السحب وإرجاع المبلغ للمحفظة؟")) return;
-    const { data: w } = await supabase
-      .from("merchant_wallets")
-      .select("balance")
-      .eq("merchant_id", row.merchant_id)
-      .maybeSingle();
-    if (w) {
-      await supabase
-        .from("merchant_wallets")
-        .update({
-          balance: Number(w.balance) + Number(row.amount),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("merchant_id", row.merchant_id);
+    try {
+      await adminJson("/api/admin/merchant-ops", {
+        method: "POST",
+        body: JSON.stringify({ action: "reject_withdrawal", withdrawalId: row.id }),
+      });
+      void load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "فشل رفض السحب");
     }
-    await supabase.from("merchant_withdrawals").update({ status: "rejected" }).eq("id", row.id);
-    await supabase.from("merchant_messages").insert({
-      merchant_id: row.merchant_id,
-      body: `تم رفض طلب السحب بمبلغ ${row.amount} ج.م وإرجاع الرصيد لمحفظتك.`,
-    });
-    await supabase.from("wallet_transactions").insert({
-      merchant_id: row.merchant_id,
-      type: "withdraw_reject",
-      amount: Number(row.amount),
-      note: "رفض سحب — إرجاع الرصيد",
-    });
-    load();
   };
 
   return (
