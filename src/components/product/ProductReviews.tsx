@@ -43,24 +43,42 @@ export function ProductReviews({ productId }: { productId: string }) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+    if (!productId) {
+      setMsg("منتج غير صالح");
+      return;
+    }
+    const r = Math.min(5, Math.max(1, Number(rating) || 5));
     setSending(true);
     setMsg("");
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess.session?.user) {
+      setSending(false);
+      setMsg("يجب تسجيل الدخول لإضافة تقييم");
+      return;
+    }
+    const userId = sess.session.user.id;
+    // Reviews require moderation by default; never trust client is_approved=true as authority.
     const { error } = await supabase.from("product_reviews").insert({
       product_id: productId,
-      customer_name: name.trim(),
-      rating,
-      comment: comment.trim() || null,
-      is_approved: true,
+      customer_name: name.trim().slice(0, 80),
+      rating: r,
+      comment: (comment.trim() || null)?.slice(0, 2000) || null,
+      is_approved: false,
+      user_id: userId,
     });
     setSending(false);
     if (error) {
-      setMsg(error.message);
+      setMsg(
+        error.message.includes("user_id")
+          ? "تعذر حفظ التقييم — تحقق من إعدادات التقييمات"
+          : error.message
+      );
       return;
     }
     setName("");
     setComment("");
     setRating(5);
-    setMsg("شكرًا لتقييمك!");
+    setMsg("تم إرسال تقييمك وهو قيد المراجعة");
     load();
   };
 
