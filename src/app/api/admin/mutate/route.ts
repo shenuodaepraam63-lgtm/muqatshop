@@ -92,6 +92,14 @@ const TABLES = {
     ops: ["update"] as const,
     keys: ["status", "notes", "reviewed_at", "is_active", "admin_notes", "approved_at"],
   },
+  merchants: {
+    ops: ["update"] as const,
+    keys: ["is_active", "code", "name", "phone", "notes"],
+  },
+  merchant_messages: {
+    ops: ["insert"] as const,
+    keys: ["merchant_id", "body"],
+  },
 } as const;
 
 type TableName = keyof typeof TABLES;
