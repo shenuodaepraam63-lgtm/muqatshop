@@ -10,6 +10,7 @@ import { CartOwnerSync } from "@/components/cart/CartOwnerSync";
 import { ThemeProvider } from "@/lib/theme";
 import { LocaleProvider } from "@/lib/locale";
 import { MotionProvider } from "@/components/animations/MotionProvider";
+import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
 
 const arabic = IBM_Plex_Sans_Arabic({
   subsets: ["arabic", "latin"],
@@ -62,6 +63,7 @@ export default function RootLayout({
           <LocaleProvider>
             <MotionProvider>
               <AuthSessionProvider>
+                <AnalyticsTracker />
                 <CartOwnerSync />
                 <MerchantRefCaptureGate />
                 <RoleGate>

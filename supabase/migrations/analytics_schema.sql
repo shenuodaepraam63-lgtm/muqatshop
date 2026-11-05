@@ -1,0 +1,4 @@
+-- Applied on production 2026-11-05 — reference copy
+-- Tables: analytics_visitors, analytics_sessions, analytics_events,
+-- analytics_visitor_accounts, analytics_daily_summary
+-- RLS enabled; no anon/authenticated policies; service_role only.
