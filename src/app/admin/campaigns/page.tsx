@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { adminMutate } from "@/lib/admin-mutate";
 import { supabase } from "@/lib/supabase";
 import {
   CAMPAIGN_STATUS_OPTIONS,
@@ -78,13 +79,13 @@ export default function AdminCampaignsPage() {
       is_active: status === "active",
       updated_at: new Date().toISOString(),
     };
-    const { error } = await supabase.from("gallery_slides").update(patch).eq("id", id);
-    if (error) {
-      setMsg(error.message);
-      return;
+    try {
+      await adminMutate({ table: "gallery_slides", op: "update", id, data: patch });
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+      setMsg("تم تحديث الحالة");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل التحديث");
     }
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-    setMsg("تم تحديث الحالة");
   };
 
   const duplicate = async (r: CampaignRow) => {
@@ -100,21 +101,23 @@ export default function AdminCampaignsPage() {
       priority: Number(r.priority) || 0,
     };
     delete (payload as { id?: string }).id;
-    const { error } = await supabase.from("gallery_slides").insert(payload);
-    if (error) setMsg(error.message);
-    else {
+    try {
+      await adminMutate({ table: "gallery_slides", op: "insert", data: payload as Record<string, unknown> });
       setMsg("تم نسخ الحملة كمسودة");
-      load();
+      void load();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل النسخ");
     }
   };
 
   const remove = async (id: string) => {
     if (!confirm("حذف هذه الحملة نهائيًا؟")) return;
-    const { error } = await supabase.from("gallery_slides").delete().eq("id", id);
-    if (error) setMsg(error.message);
-    else {
+    try {
+      await adminMutate({ table: "gallery_slides", op: "delete", id });
       setRows((prev) => prev.filter((r) => r.id !== id));
       setMsg("تم الحذف");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل الحذف");
     }
   };
 
