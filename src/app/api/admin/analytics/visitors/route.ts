@@ -19,56 +19,69 @@ export async function GET(request: Request) {
     : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const toIso = to ? new Date(to).toISOString() : new Date().toISOString();
 
-  const [{ count: visitorsTotal }, { data: sessions }, { data: pageEvents }, { data: productEvents }, { data: newVisitors }] =
-    await Promise.all([
-      admin
-        .from("analytics_visitors")
-        .select("id", { count: "exact", head: true })
-        .gte("last_seen_at", fromIso)
-        .lte("last_seen_at", toIso),
-      admin
-        .from("analytics_sessions")
-        .select("id, active_seconds")
-        .gte("started_at", fromIso)
-        .lte("started_at", toIso),
-      admin
-        .from("analytics_events")
-        .select("id", { count: "exact", head: true })
-        .eq("event_type", "page_view")
-        .gte("occurred_at", fromIso)
-        .lte("occurred_at", toIso),
-      admin
-        .from("analytics_events")
-        .select("id", { count: "exact", head: true })
-        .eq("event_type", "product_view")
-        .gte("occurred_at", fromIso)
-        .lte("occurred_at", toIso),
-      admin
-        .from("analytics_visitors")
-        .select("id", { count: "exact", head: true })
-        .gte("first_seen_at", fromIso)
-        .lte("first_seen_at", toIso),
-    ]);
+  const [
+    visitorsRes,
+    sessionsRes,
+    pageViewsRes,
+    productViewsRes,
+    newVisitorsRes,
+    convertedRes,
+  ] = await Promise.all([
+    admin
+      .from("analytics_visitors")
+      .select("id", { count: "exact", head: true })
+      .gte("last_seen_at", fromIso)
+      .lte("last_seen_at", toIso),
+    admin
+      .from("analytics_sessions")
+      .select("id, active_seconds")
+      .gte("started_at", fromIso)
+      .lte("started_at", toIso),
+    admin
+      .from("analytics_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "page_view")
+      .gte("occurred_at", fromIso)
+      .lte("occurred_at", toIso),
+    admin
+      .from("analytics_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "product_view")
+      .gte("occurred_at", fromIso)
+      .lte("occurred_at", toIso),
+    admin
+      .from("analytics_visitors")
+      .select("id", { count: "exact", head: true })
+      .gte("first_seen_at", fromIso)
+      .lte("first_seen_at", toIso),
+    admin
+      .from("analytics_visitors")
+      .select("id", { count: "exact", head: true })
+      .not("converted_at", "is", null)
+      .gte("converted_at", fromIso)
+      .lte("converted_at", toIso),
+  ]);
 
-  const sessionsList = sessions || [];
-  const activeSeconds = sessionsList.reduce(
-    (s, r) => s + Number(r.active_seconds || 0),
-    0
-  );
+  const sessionsList = (sessionsRes.data || []) as Array<{
+    id: string;
+    active_seconds: number | null;
+  }>;
+
+  let activeSeconds = 0;
+  for (const row of sessionsList) {
+    activeSeconds += Number(row.active_seconds || 0);
+  }
+
   const sessionsCount = sessionsList.length;
   const avgSession =
     sessionsCount > 0 ? Math.round(activeSeconds / sessionsCount) : 0;
 
-  const { count: converted } = await admin
-    .from("analytics_visitors")
-    .select("id", { count: "exact", head: true })
-    .not("converted_at", "is", null)
-    .gte("converted_at", fromIso)
-    .lte("converted_at", toIso);
-
-  const uniqueInPeriod = visitorsTotal || 0;
-  const newCount = newVisitors || 0;
+  const uniqueInPeriod = Number(visitorsRes.count || 0);
+  const newCount = Number(newVisitorsRes.count || 0);
   const returning = Math.max(0, uniqueInPeriod - newCount);
+  const pageViews = Number(pageViewsRes.count || 0);
+  const productViews = Number(productViewsRes.count || 0);
+  const converted = Number(convertedRes.count || 0);
 
   return NextResponse.json(
     {
@@ -80,14 +93,14 @@ export async function GET(request: Request) {
         new_visitors: newCount,
         returning_visitors: returning,
         sessions: sessionsCount,
-        page_views: pageEvents || 0,
-        product_views: productEvents || 0,
+        page_views: pageViews,
+        product_views: productViews,
         active_seconds: activeSeconds,
         avg_session_seconds: avgSession,
-        converted_visitors: converted || 0,
+        converted_visitors: converted,
         conversion_rate:
           uniqueInPeriod > 0
-            ? Math.round(((converted || 0) / uniqueInPeriod) * 1000) / 10
+            ? Math.round((converted / uniqueInPeriod) * 1000) / 10
             : 0,
       },
     },
