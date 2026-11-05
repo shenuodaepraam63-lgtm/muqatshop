@@ -1,5 +1,6 @@
 "use client";
 
+import { adminMutate } from "@/lib/admin-mutate";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -22,14 +23,16 @@ export default function AdminmMessagesPage() {
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!merchantId || !body.trim()) return;
-    const { error } = await supabase.from("merchant_messages").insert({
-      merchant_id: merchantId,
-      body: body.trim(),
-    });
-    if (error) setMsg(error.message);
-    else {
+    try {
+      await adminMutate({
+        table: "merchant_messages",
+        op: "insert",
+        data: { merchant_id: merchantId, body: body.trim() },
+      });
       setMsg("تم الإرسال");
       setBody("");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "فشل الإرسال");
     }
   };
 
