@@ -3,6 +3,7 @@
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import { adminMutate } from "@/lib/admin-mutate";
 import { supabase } from "@/lib/supabase";
 
 type Row = {
@@ -133,10 +134,16 @@ function AdminNotificationsBellInner() {
     try {
       const ids = items.filter((i) => !i.read_at).map((i) => i.id);
       if (!ids.length) return;
-      await supabase
-        .from("admin_notifications")
-        .update({ read_at: new Date().toISOString() })
-        .in("id", ids);
+      await Promise.all(
+        ids.map((id) =>
+          adminMutate({
+            table: "admin_notifications",
+            op: "update",
+            id,
+            data: { read_at: new Date().toISOString() },
+          })
+        )
+      );
       setItems((prev) =>
         prev.map((i) => ({
           ...i,
