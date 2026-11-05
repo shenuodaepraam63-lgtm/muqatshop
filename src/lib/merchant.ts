@@ -102,180 +102,49 @@ export async function getMerchantSettings(): Promise<MerchantSettings> {
 }
 
 export async function releaseMaturedProfits(merchantId?: string) {
-  let q = supabase
-    .from("orders")
-    .select("id, merchant_id, merchant_profit, hold_until, order_number")
-    .eq("status", "delivered")
-    .eq("profit_released", false)
-    .not("merchant_id", "is", null)
-    .not("hold_until", "is", null)
-    .lte("hold_until", new Date().toISOString());
-
-  if (merchantId) q = q.eq("merchant_id", merchantId);
-
-  const { data: orders } = await q;
-  if (!orders?.length) return 0;
-
-  let released = 0;
-  for (const o of orders) {
-    const profit = Number(o.merchant_profit) || 0;
-    if (profit <= 0 || !o.merchant_id) {
-      await supabase.from("orders").update({ profit_released: true }).eq("id", o.id);
-      continue;
+  /**
+   * Wallet credits must not be written from the browser under open RLS.
+   * Admin UI should call /api/admin/merchant-ops with action release_matured_profits.
+   * Merchant dashboard only triggers the same admin-protected path when a session token exists.
+   */
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token) {
+      console.warn("releaseMaturedProfits: no auth token — skipped (server-only)");
+      return 0;
     }
-
-    const { data: wallet } = await supabase
-      .from("merchant_wallets")
-      .select("balance, pending")
-      .eq("merchant_id", o.merchant_id)
-      .maybeSingle();
-
-    if (!wallet) continue;
-
-    const pending = Math.max(0, Number(wallet.pending) - profit);
-    const balance = Number(wallet.balance) + profit;
-
-    await supabase
-      .from("merchant_wallets")
-      .update({ balance, pending, updated_at: new Date().toISOString() })
-      .eq("merchant_id", o.merchant_id);
-
-    await supabase.from("wallet_transactions").insert({
-      merchant_id: o.merchant_id,
-      type: "release",
-      amount: profit,
-      order_id: o.id,
-      note: "تحرير عمولة بعد انتهاء فترة الانتظار",
+    const res = await fetch("/api/admin/merchant-ops", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        action: "release_matured_profits",
+        merchantId: merchantId || undefined,
+      }),
     });
-
-    await supabase.from("orders").update({ profit_released: true }).eq("id", o.id);
-
-    await notifyMerchant(
-      o.merchant_id,
-      `تم تحرير عمولة ${profit} ج.م من الطلب ${o.order_number || o.id.slice(0, 8)} إلى رصيدك المتاح.`
-    );
-
-    released += 1;
+    const json = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      released?: number;
+    };
+    if (!res.ok || !json.ok) return 0;
+    return Number(json.released) || 0;
+  } catch {
+    return 0;
   }
-  return released;
 }
 
 export async function onOrderDelivered(orderId: string) {
-  const settings = await getMerchantSettings();
-  const { data: order } = await supabase
-    .from("orders")
-    .select("*")
-    .eq("id", orderId)
-    .maybeSingle();
-
-  if (!order) return;
-
-  if (!order.merchant_id || Number(order.merchant_profit) <= 0) {
-    await supabase.from("orders").update({ status: "delivered" }).eq("id", orderId);
-    return;
-  }
-
-  const holdUntil = new Date();
-  holdUntil.setDate(holdUntil.getDate() + settings.hold_days);
-
-  await supabase
-    .from("orders")
-    .update({
-      status: "delivered",
-      hold_until: holdUntil.toISOString(),
-      profit_released: false,
-    })
-    .eq("id", orderId);
-
-  const profit = Number(order.merchant_profit) || 0;
-  const { data: wallet } = await supabase
-    .from("merchant_wallets")
-    .select("pending")
-    .eq("merchant_id", order.merchant_id)
-    .maybeSingle();
-
-  if (wallet) {
-    await supabase
-      .from("merchant_wallets")
-      .update({
-        pending: Number(wallet.pending) + profit,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("merchant_id", order.merchant_id);
-
-    await supabase.from("wallet_transactions").insert({
-      merchant_id: order.merchant_id,
-      type: "hold",
-      amount: profit,
-      order_id: orderId,
-      note: `عمولة معلّقة ${settings.hold_days} يوم بعد التسليم`,
-    });
-  }
-
-  await notifyMerchant(
-    order.merchant_id,
-    `الطلب ${order.order_number}: تم التسليم. ربحك ${profit} ج.م معلّق لمدة ${settings.hold_days} يوم ثم يُضاف للمحفظة إن لم يحدث استرجاع.`
-  );
+  // Status transitions with wallet effects must run on the server (admin status API / merchant-ops).
+  console.warn("onOrderDelivered: client path disabled — use admin order status API");
+  void orderId;
 }
 
 export async function onOrderCancelled(orderId: string) {
-  const { data: order } = await supabase
-    .from("orders")
-    .select("*")
-    .eq("id", orderId)
-    .maybeSingle();
-
-  if (!order) return;
-
-  if (!order.merchant_id || Number(order.merchant_profit) <= 0) {
-    await supabase.from("orders").update({ status: "cancelled" }).eq("id", orderId);
-    return;
-  }
-
-  const profit = Number(order.merchant_profit) || 0;
-  const { data: wallet } = await supabase
-    .from("merchant_wallets")
-    .select("balance, pending")
-    .eq("merchant_id", order.merchant_id)
-    .maybeSingle();
-
-  if (wallet) {
-    if (order.profit_released) {
-      await supabase
-        .from("merchant_wallets")
-        .update({
-          balance: Math.max(0, Number(wallet.balance) - profit),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("merchant_id", order.merchant_id);
-    } else if (order.hold_until) {
-      await supabase
-        .from("merchant_wallets")
-        .update({
-          pending: Math.max(0, Number(wallet.pending) - profit),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("merchant_id", order.merchant_id);
-    }
-
-    await supabase.from("wallet_transactions").insert({
-      merchant_id: order.merchant_id,
-      type: "clawback",
-      amount: -profit,
-      order_id: orderId,
-      note: "استرجاع عمولة بسبب إلغاء/مرتجع",
-    });
-  }
-
-  await supabase
-    .from("orders")
-    .update({ status: "cancelled", profit_released: true })
-    .eq("id", orderId);
-
-  await notifyMerchant(
-    order.merchant_id,
-    `الطلب ${order.order_number}: تم الإلغاء. تم خصم/إلغاء عمولة ${profit} ج.م إن وُجدت.`
-  );
+  console.warn("onOrderCancelled: client path disabled — use admin order status API");
+  void orderId;
 }
 
 export async function setMerchantOrderStatus(
@@ -283,27 +152,28 @@ export async function setMerchantOrderStatus(
   status: string,
   prevStatus?: string
 ) {
-  if (status === "delivered" && prevStatus !== "delivered") {
-    await onOrderDelivered(orderId);
-    return;
-  }
-  if (status === "cancelled" && prevStatus !== "cancelled") {
-    await onOrderCancelled(orderId);
-    return;
-  }
-
-  const { data: order } = await supabase
-    .from("orders")
-    .select("merchant_id, order_number")
-    .eq("id", orderId)
-    .maybeSingle();
-
-  await supabase.from("orders").update({ status }).eq("id", orderId);
-
-  if (order?.merchant_id) {
-    await notifyMerchant(
-      order.merchant_id,
-      `الطلب ${order.order_number}: الحالة الآن «${STATUS_AR[status] || status}».`
-    );
+  void prevStatus;
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token) {
+      console.warn("setMerchantOrderStatus: no auth token");
+      return;
+    }
+    // Prefer protected order status route
+    const res = await fetch(`/api/orders/${orderId}/status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      console.warn("setMerchantOrderStatus failed", j);
+    }
+  } catch (e) {
+    console.warn("setMerchantOrderStatus error", e);
   }
 }
