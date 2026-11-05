@@ -202,6 +202,54 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    if (action === "release_matured_profits") {
+      const merchantId = body.merchantId ? String(body.merchantId) : null;
+      let q = admin
+        .from("orders")
+        .select("id, merchant_id, merchant_profit, hold_until, order_number")
+        .eq("status", "delivered")
+        .eq("profit_released", false)
+        .not("merchant_id", "is", null)
+        .not("hold_until", "is", null)
+        .lte("hold_until", new Date().toISOString());
+      if (merchantId) q = q.eq("merchant_id", merchantId);
+      const { data: orders } = await q;
+      let released = 0;
+      for (const o of orders || []) {
+        const profit = Number(o.merchant_profit) || 0;
+        if (profit <= 0 || !o.merchant_id) {
+          await admin.from("orders").update({ profit_released: true }).eq("id", o.id);
+          continue;
+        }
+        const { data: wallet } = await admin
+          .from("merchant_wallets")
+          .select("balance, pending")
+          .eq("merchant_id", o.merchant_id)
+          .maybeSingle();
+        if (!wallet) continue;
+        const pending = Math.max(0, Number(wallet.pending) - profit);
+        const balance = Number(wallet.balance) + profit;
+        await admin
+          .from("merchant_wallets")
+          .update({ balance, pending, updated_at: new Date().toISOString() })
+          .eq("merchant_id", o.merchant_id);
+        await admin.from("wallet_transactions").insert({
+          merchant_id: o.merchant_id,
+          type: "release",
+          amount: profit,
+          order_id: o.id,
+          note: "تحرير عمولة بعد انتهاء فترة الانتظار",
+        });
+        await admin.from("orders").update({ profit_released: true }).eq("id", o.id);
+        await admin.from("merchant_messages").insert({
+          merchant_id: o.merchant_id,
+          body: `تم تحرير عمولة ${profit} ج.م من الطلب ${o.order_number || String(o.id).slice(0, 8)} إلى رصيدك المتاح.`,
+        });
+        released += 1;
+      }
+      return NextResponse.json({ ok: true, released });
+    }
+
     return bad("عملية غير معروفة");
   } catch (e) {
     return NextResponse.json(
