@@ -148,55 +148,68 @@ async function loadCategoryShelves(): Promise<{
 }> {
   if (!isSupabaseConfigured) return { roots: [], shelves: [] };
 
-  const [{ data: allCats }, { data: activeProducts }] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id,name,slug,image,sort_order,group_id,parent_id")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true }),
-    supabase
+  const { data: allCats, error: categoriesError } = await supabase
+    .from("categories")
+    .select("id,name,slug,image,sort_order,group_id,parent_id")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (categoriesError) {
+    console.error("Failed to load homepage categories:", categoriesError);
+    return { roots: [], shelves: [] };
+  }
+
+  const cats = (allCats as Category[]) || [];
+  const allProducts: Product[] = [];
+  const pageSize = 500;
+
+  // Supabase applies a per-request row limit. Read in pages so categories
+  // beyond the first page are not silently omitted from the homepage.
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
       .from("products")
       .select(PRODUCT_COLS)
       .eq("is_active", true)
       .order("created_at", { ascending: false })
-      .limit(200),
-  ]);
+      .range(from, from + pageSize - 1);
 
-  const cats = (allCats as Category[]) || [];
-  const products = ((activeProducts as Product[]) || []).filter(available);
-  const roots = cats.filter((c) => !c.parent_id).slice(0, 10);
-  const shelves: CategoryShelfData[] = [];
+    if (error) {
+      console.error("Failed to load homepage products:", error);
+      break;
+    }
 
-  for (const root of roots) {
-    const treeIds = new Set(
-      collectCategoryIdsWithDescendants(
-        root.id,
-        cats.map((c) => ({ id: c.id, parent_id: c.parent_id }))
-      )
-    );
-    const groupProducts = products
-      .filter((p) => p.category_id && treeIds.has(p.category_id))
-      .slice(0, 16);
-
-    if (!groupProducts.length) continue;
-
-    const subs = cats
-      .filter((c) => c.parent_id === root.id)
-      .map((c) => ({ id: c.id, name: c.name, slug: c.slug }));
-
-    shelves.push({
-      id: root.id,
-      name: root.name,
-      slug: root.slug,
-      href: `/categories/${encodeURIComponent(root.slug)}`,
-      subcategories: subs,
-      products: groupProducts,
-    });
+    const page = (data as Product[]) || [];
+    allProducts.push(...page);
+    if (page.length < pageSize) break;
   }
 
-  return { roots: roots.slice(0, 24), shelves };
-}
+  const products = allProducts.filter(available);
+  const productsByCategory = new Map<string, Product[]>();
 
+  for (const product of products) {
+    if (!product.category_id) continue;
+    const current = productsByCategory.get(product.category_id) || [];
+    current.push(product);
+    productsByCategory.set(product.category_id, current);
+  }
+
+  // Show every active category that has at least one in-stock product,
+  // including subcategories, rather than limiting the homepage to 10 roots.
+  const categoriesWithProducts = cats.filter((category) =>
+    productsByCategory.has(category.id)
+  );
+
+  const shelves: CategoryShelfData[] = categoriesWithProducts.map((category) => ({
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    href: `/categories/${encodeURIComponent(category.slug)}`,
+    subcategories: [],
+    products: (productsByCategory.get(category.id) || []).slice(0, 16),
+  }));
+
+  return { roots: categoriesWithProducts, shelves };
+}
 async function loadHomeData() {
   if (!isSupabaseConfigured) {
     return {
