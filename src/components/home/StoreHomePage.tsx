@@ -54,7 +54,6 @@ async function loadCampaignSlides(): Promise<{
     .order("priority", { ascending: false });
 
   if (primary.error) {
-    // Columns may not exist until SQL migration — fallback without offer fields
     const fallback = await supabase
       .from("gallery_slides")
       .select(
@@ -82,9 +81,8 @@ async function loadCampaignSlides(): Promise<{
     return { slides: [], autoplay: false, intervalMs: 5000 };
   }
 
-  const now = new Date();
   const eligible = sortCampaigns(
-    (rows || []).filter((r) => isCampaignEligible(r, now))
+    (rows || []).filter((r) => isCampaignEligible(r, new Date()))
   );
 
   if (eligible.length > 0) {
@@ -167,7 +165,6 @@ async function loadCategoryShelves(): Promise<{
   const cats = (allCats as Category[]) || [];
   const products = ((activeProducts as Product[]) || []).filter(available);
   const roots = cats.filter((c) => !c.parent_id).slice(0, 10);
-
   const shelves: CategoryShelfData[] = [];
 
   for (const root of roots) {
@@ -257,6 +254,24 @@ export default async function StoreHomePage() {
     <div className="muqat-home" dir="rtl">
       <Header />
       <main id="main-content" className="pb-20 md:pb-0">
+        <section className="store-welcome">
+          <div className="home-container flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="store-eyebrow">MUQATSHOP · اختياراتك تبدأ من هنا</p>
+              <h1>تسوّق براحة، واختار اللي يناسبك</h1>
+              <p>اكتشف المنتجات والعروض والتصنيفات في تجربة واحدة سهلة.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a href="/shop?offers=true" className="store-welcome-link store-welcome-link-primary">
+                اكتشف العروض
+              </a>
+              <a href="/shop" className="store-welcome-link">
+                تصفح كل المنتجات
+              </a>
+            </div>
+          </div>
+        </section>
+
         <PromoSlider
           slides={data.campaign.slides}
           autoplay={data.campaign.autoplay}
@@ -264,9 +279,9 @@ export default async function StoreHomePage() {
         />
 
         {data.roots.length > 0 && (
-          <section className="home-section" aria-label="التصنيفات">
+          <section className="home-section store-category-section" aria-label="التصنيفات">
             <div className="home-container">
-              <SectionHeader title="التصنيفات" href="/categories" />
+              <SectionHeader title="تسوّق حسب التصنيف" href="/categories" />
               <CategoryCards categories={data.roots} />
             </div>
           </section>
@@ -274,14 +289,16 @@ export default async function StoreHomePage() {
 
         <StoreBenefits />
 
-        {data.shelves.map((shelf) => (
-          <CategoryProductShelf key={shelf.id} shelf={shelf} />
-        ))}
-
-        {data.shelves.length === 0 && (
+        {data.shelves.length > 0 ? (
+          <div className="store-shelves">
+            {data.shelves.map((shelf) => (
+              <CategoryProductShelf key={shelf.id} shelf={shelf} />
+            ))}
+          </div>
+        ) : (
           <section className="home-section">
             <div className="home-container">
-              <p className="rounded-2xl border border-dashed border-[#E4E9F0] bg-white py-12 text-center text-sm text-[#718096]">
+              <p className="rounded-2xl border border-dashed border-[#d8dfeb] bg-white py-12 text-center text-sm text-[#718096]">
                 لا توجد منتجات مرتبطة بالتصنيفات بعد. أضف منتجات من لوحة التحكم.
               </p>
             </div>
@@ -289,8 +306,6 @@ export default async function StoreHomePage() {
         )}
 
         <RecentlyViewedSection />
-
-        <StoreBenefits />
       </main>
       <Footer />
       <BottomNav />
