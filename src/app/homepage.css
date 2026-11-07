@@ -53,15 +53,16 @@
   }
 }
 
+/* Unified horizontal product rail — same for phones, laptops, every category */
 .category-product-track {
   display: flex;
   flex-wrap: nowrap;
-  gap: 10px;
+  gap: 12px;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
-  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+  padding: 4px 2px 8px;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -72,38 +73,34 @@
 
 .category-product-slot {
   flex: 0 0 auto;
-  width: 46vw;
-  max-width: 180px;
-  min-width: 148px;
+  width: 168px;
   scroll-snap-align: start;
 }
 
 @media (min-width: 480px) {
   .category-product-slot {
-    width: 30vw;
-    max-width: 200px;
+    width: 180px;
   }
 }
 
 @media (min-width: 768px) {
+  .category-product-track {
+    gap: 14px;
+  }
   .category-product-slot {
-    width: 22vw;
-    max-width: 220px;
-    min-width: 170px;
+    width: 200px;
   }
 }
 
 @media (min-width: 1024px) {
   .category-product-slot {
-    width: 18vw;
-    max-width: 230px;
+    width: 220px;
   }
 }
 
 @media (min-width: 1280px) {
   .category-product-slot {
-    width: 15vw;
-    max-width: 240px;
+    width: 232px;
   }
 }
 
@@ -138,7 +135,6 @@
   }
 }
 
-/* Marketplace shell — clean white electronics feel */
 .muqat-home--marketplace {
   background: #ffffff;
 }
@@ -147,7 +143,6 @@
   margin-block: clamp(1.6rem, 2.8vw, 2.6rem);
 }
 
-/* Top promo bar (Dream2000-like urgency strip) */
 .top-promo-bar {
   background: linear-gradient(90deg, #e85d04 0%, #f48c06 45%, #e85d04 100%);
 }
@@ -174,7 +169,6 @@
   }
 }
 
-/* Marquee */
 .home-marquee {
   overflow: hidden;
   background: #14243a;
@@ -215,7 +209,6 @@
   }
 }
 
-/* Product card image zoom on hover */
 .mq-product-media img {
   transition: transform 0.5s ease;
 }
@@ -234,57 +227,6 @@
   margin-top: 1.25rem;
 }
 
-.store-welcome {
-  padding-block: clamp(1.5rem, 3.5vw, 2.75rem) 0.25rem;
-}
-.store-welcome h1 {
-  margin-top: 0.55rem;
-  color: #14243a;
-  font-size: clamp(1.35rem, 2.5vw, 2rem);
-  font-weight: 850;
-  letter-spacing: -0.035em;
-  line-height: 1.35;
-}
-.store-welcome p:not(.store-eyebrow) {
-  margin-top: 0.45rem;
-  color: #718096;
-  font-size: 0.9rem;
-  line-height: 1.8;
-}
-.store-eyebrow {
-  color: #3157d5;
-  font-size: 0.68rem;
-  font-weight: 850;
-  letter-spacing: 0.11em;
-}
-.store-welcome-link {
-  display: inline-flex;
-  min-height: 42px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #dce3ef;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.86);
-  padding: 0.65rem 1rem;
-  color: #263b5b;
-  font-size: 0.78rem;
-  font-weight: 800;
-  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-}
-.store-welcome-link:hover {
-  transform: translateY(-1px);
-  border-color: #aebff3;
-  box-shadow: 0 8px 22px rgba(20, 36, 58, 0.07);
-}
-.store-welcome-link-primary {
-  border-color: #22c55e;
-  background: #22c55e;
-  color: white;
-}
-.store-welcome-link-primary:hover {
-  border-color: #16a34a;
-  background: #16a34a;
-}
 .muqat-home .home-section {
   scroll-margin-top: 1.5rem;
 }
