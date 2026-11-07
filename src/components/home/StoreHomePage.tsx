@@ -3,7 +3,6 @@ import {
   isSupabaseConfigured,
   type Category,
   type Product,
-  collectCategoryIdsWithDescendants,
 } from "@/lib/supabase";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -17,6 +16,8 @@ import {
   type CategoryShelfData,
 } from "@/components/home/CategoryProductShelf";
 import { RecentlyViewedSection } from "@/components/home/RecentlyViewedSection";
+import { TopPromoBar } from "@/components/home/TopPromoBar";
+import { HomeMarquee } from "@/components/home/HomeMarquee";
 import {
   isCampaignEligible,
   productSlugFromHref,
@@ -163,8 +164,6 @@ async function loadCategoryShelves(): Promise<{
   const allProducts: Product[] = [];
   const pageSize = 500;
 
-  // Supabase applies a per-request row limit. Read in pages so categories
-  // beyond the first page are not silently omitted from the homepage.
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("products")
@@ -193,8 +192,6 @@ async function loadCategoryShelves(): Promise<{
     productsByCategory.set(product.category_id, current);
   }
 
-  // Show every active category that has at least one in-stock product,
-  // including subcategories, rather than limiting the homepage to 10 roots.
   const categoriesWithProducts = cats.filter((category) =>
     productsByCategory.has(category.id)
   );
@@ -210,6 +207,7 @@ async function loadCategoryShelves(): Promise<{
 
   return { roots: categoriesWithProducts, shelves };
 }
+
 async function loadHomeData() {
   if (!isSupabaseConfigured) {
     return {
@@ -245,7 +243,7 @@ function defaultSlides(): PromoSlide[] {
       id: "categories",
       title: "تصفح التصنيفات",
       subtitle: "اعثر على ما تبحث عنه بسرعة.",
-      href: "/categories",
+      href: "/shop",
       tone: "blue",
       buttonText: "التصنيفات",
     },
@@ -253,7 +251,7 @@ function defaultSlides(): PromoSlide[] {
       id: "offers",
       title: "اكتشف العروض السارية",
       subtitle: "نعرض فقط المنتجات ذات الخصم الحقيقي.",
-      href: "/shop",
+      href: "/shop?offers=true",
       tone: "teal",
       buttonText: "العروض",
     },
@@ -264,37 +262,22 @@ export default async function StoreHomePage() {
   const data = await loadHomeData();
 
   return (
-    <div className="muqat-home" dir="rtl">
+    <div className="muqat-home muqat-home--marketplace" dir="rtl">
+      <TopPromoBar />
       <Header />
       <main id="main-content" className="pb-20 md:pb-0">
-        <section className="store-welcome">
-          <div className="home-container flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="store-eyebrow">MUQATSHOP · اختياراتك تبدأ من هنا</p>
-              <h1>تسوّق براحة، واختار اللي يناسبك</h1>
-              <p>اكتشف المنتجات والعروض والتصنيفات في تجربة واحدة سهلة.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <a href="/shop?offers=true" className="store-welcome-link store-welcome-link-primary">
-                اكتشف العروض
-              </a>
-              <a href="/shop" className="store-welcome-link">
-                تصفح كل المنتجات
-              </a>
-            </div>
-          </div>
-        </section>
-
         <PromoSlider
           slides={data.campaign.slides}
           autoplay={data.campaign.autoplay}
           intervalMs={data.campaign.intervalMs}
         />
 
+        <HomeMarquee />
+
         {data.roots.length > 0 && (
           <section className="home-section store-category-section" aria-label="التصنيفات">
             <div className="home-container">
-              <SectionHeader title="تسوّق حسب التصنيف" href="/categories" />
+              <SectionHeader title="تسوّق حسب التصنيف" href="/shop" />
               <CategoryCards categories={data.roots} />
             </div>
           </section>
