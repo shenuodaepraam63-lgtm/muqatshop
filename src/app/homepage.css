@@ -76,16 +76,7 @@
   scroll-snap-align: start;
 }
 
-@media (min-width: 480px) {
-  .category-product-slot {
-    width: 180px;
-  }
-}
-
 @media (min-width: 768px) {
-  .category-product-track {
-    gap: 14px;
-  }
   .category-product-slot {
     width: 200px;
   }
@@ -94,12 +85,6 @@
 @media (min-width: 1024px) {
   .category-product-slot {
     width: 220px;
-  }
-}
-
-@media (min-width: 1280px) {
-  .category-product-slot {
-    width: 232px;
   }
 }
 
@@ -122,13 +107,12 @@
   transform: translate3d(0, 0, 0);
 }
 
-/* Product cards: stronger rise from bottom (Dream2000-like) */
 .mq-product-rise {
   opacity: 0;
-  transform: translate3d(0, 36px, 0);
+  transform: translate3d(0, 40px, 0);
   transition:
-    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: opacity, transform;
 }
 
@@ -137,12 +121,11 @@
   transform: translate3d(0, 0, 0);
 }
 
-/* Skeleton = same card shell before product appears */
 .product-card-skeleton {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid #eef1f6;
   background: #fff;
   min-height: 100%;
@@ -151,7 +134,7 @@
 .product-card-skeleton__media {
   position: relative;
   aspect-ratio: 1 / 1;
-  background: linear-gradient(180deg, #f4f8fc 0%, #e8f1f8 100%);
+  background: linear-gradient(180deg, #eef6fb 0%, #e3eef6 100%);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -181,12 +164,7 @@
 .product-card-skeleton__line {
   height: 10px;
   border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    #eef2f7 0%,
-    #f7f9fc 50%,
-    #eef2f7 100%
-  );
+  background: linear-gradient(90deg, #eef2f7 0%, #f7f9fc 50%, #eef2f7 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.35s ease-in-out infinite;
 }
@@ -195,33 +173,24 @@
   width: 92%;
   height: 12px;
 }
-
 .product-card-skeleton__line--title-short {
   width: 64%;
   height: 12px;
 }
-
 .product-card-skeleton__line--price {
   width: 48%;
   height: 14px;
   margin-top: 2px;
 }
-
 .product-card-skeleton__line--stock {
   width: 36%;
   height: 8px;
 }
-
 .product-card-skeleton__btn {
   margin-top: 6px;
   height: 36px;
   border-radius: 8px;
-  background: linear-gradient(
-    90deg,
-    #e8f5e9 0%,
-    #f1faf2 50%,
-    #e8f5e9 100%
-  );
+  background: linear-gradient(90deg, #e8f5e9 0%, #f1faf2 50%, #e8f5e9 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.35s ease-in-out infinite;
 }
@@ -233,6 +202,92 @@
   100% {
     background-position: -100% 0;
   }
+}
+
+/* —— Dream2000-like paged product shelf —— */
+.product-shelf-dream__stage {
+  border-radius: 16px;
+  background: linear-gradient(180deg, #eef7fc 0%, #f7fbfe 55%, #ffffff 100%);
+  padding: 14px 10px 12px;
+}
+
+@media (min-width: 768px) {
+  .product-shelf-dream__stage {
+    padding: 18px 16px 14px;
+  }
+}
+
+.product-shelf-dream__grid {
+  display: grid;
+  gap: 10px;
+  align-items: stretch;
+  min-height: 280px;
+}
+
+@media (min-width: 640px) {
+  .product-shelf-dream__grid {
+    gap: 12px;
+    min-height: 320px;
+  }
+}
+
+.product-shelf-dream__cell {
+  min-width: 0;
+}
+
+.product-shelf-dream__cell > article,
+.product-shelf-dream__cell > .product-card-skeleton,
+.product-shelf-dream__cell > div {
+  width: 100%;
+  height: 100%;
+}
+
+.product-shelf-dream__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 12px;
+  padding-bottom: 2px;
+}
+
+.product-shelf-dream__arrow {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid #dce3ef;
+  background: #fff;
+  color: #14243a;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 4px rgba(20, 36, 58, 0.06);
+}
+
+.product-shelf-dream__arrow:active {
+  background: #f6f8fb;
+}
+
+.product-shelf-dream__dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 140px;
+  overflow: hidden;
+}
+
+.product-shelf-dream__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  background: #c5d0dc;
+  transition: width 0.25s ease, background 0.25s ease;
+}
+
+.product-shelf-dream__dot.is-active {
+  width: 22px;
+  background: #14243a;
 }
 
 .muqat-home :focus-visible {
@@ -320,9 +375,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-marquee__track {
-    animation: none;
-  }
+  .home-marquee__track,
   .top-promo-bar__pulse {
     animation: none;
   }
