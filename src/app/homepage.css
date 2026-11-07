@@ -53,7 +53,6 @@
   }
 }
 
-/* Unified horizontal product rail — same for phones, laptops, every category */
 .category-product-track {
   display: flex;
   flex-wrap: nowrap;
@@ -104,7 +103,8 @@
   }
 }
 
-.category-product-slot > article {
+.category-product-slot > article,
+.category-product-slot > .product-card-skeleton {
   width: 100%;
   height: 100%;
 }
@@ -122,16 +122,135 @@
   transform: translate3d(0, 0, 0);
 }
 
+/* Product cards: stronger rise from bottom (Dream2000-like) */
+.mq-product-rise {
+  opacity: 0;
+  transform: translate3d(0, 36px, 0);
+  transition:
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.mq-product-rise.is-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Skeleton = same card shell before product appears */
+.product-card-skeleton {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid #eef1f6;
+  background: #fff;
+  min-height: 100%;
+}
+
+.product-card-skeleton__media {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: linear-gradient(180deg, #f4f8fc 0%, #e8f1f8 100%);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.product-card-skeleton__shape {
+  width: 58%;
+  height: 58%;
+  border-radius: 18px;
+  background: linear-gradient(
+    110deg,
+    rgba(200, 220, 235, 0.35) 0%,
+    rgba(230, 240, 248, 0.85) 40%,
+    rgba(200, 220, 235, 0.4) 80%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+.product-card-skeleton__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+.product-card-skeleton__line {
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    #eef2f7 0%,
+    #f7f9fc 50%,
+    #eef2f7 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+.product-card-skeleton__line--title {
+  width: 92%;
+  height: 12px;
+}
+
+.product-card-skeleton__line--title-short {
+  width: 64%;
+  height: 12px;
+}
+
+.product-card-skeleton__line--price {
+  width: 48%;
+  height: 14px;
+  margin-top: 2px;
+}
+
+.product-card-skeleton__line--stock {
+  width: 36%;
+  height: 8px;
+}
+
+.product-card-skeleton__btn {
+  margin-top: 6px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    #e8f5e9 0%,
+    #f1faf2 50%,
+    #e8f5e9 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 .muqat-home :focus-visible {
   outline: 2px solid #3157d5;
   outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mq-rise {
+  .mq-rise,
+  .mq-product-rise {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
+  }
+  .product-card-skeleton__shape,
+  .product-card-skeleton__line,
+  .product-card-skeleton__btn {
+    animation: none !important;
   }
 }
 
