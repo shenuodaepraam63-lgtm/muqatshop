@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MarketplaceProductCard } from "@/components/home/MarketplaceProductCard";
-import { useInViewOnce } from "@/lib/animations/useInViewOnce";
+import { ProductCardSkeleton } from "@/components/home/ProductCardSkeleton";
 import type { Product } from "@/lib/supabase";
 
 export type ShelfSubcategory = {
@@ -22,15 +22,28 @@ export type CategoryShelfData = {
   products: Product[];
 };
 
+function usePerPage() {
+  const [n, setN] = useState(2);
+  useEffect(() => {
+    const apply = () => {
+      const w = window.innerWidth;
+      if (w >= 1024) setN(4);
+      else if (w >= 640) setN(3);
+      else setN(2);
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, []);
+  return n;
+}
+
 export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   const [activeSub, setActiveSub] = useState<string | null>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [canPrev, setCanPrev] = useState(false);
-  const [canNext, setCanNext] = useState(false);
-  const [sectionRef, sectionIn] = useInViewOnce({
-    threshold: 0.08,
-    rootMargin: "0px 0px -6% 0px",
-  });
+  const perPage = usePerPage();
+  const [page, setPage] = useState(0);
+  /** phase: skeleton shell → products rising */
+  const [phase, setPhase] = useState<"skeleton" | "cards">("skeleton");
 
   const filtered = useMemo(() => {
     if (!activeSub) return shelf.products;
@@ -39,51 +52,43 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
     return shelf.products.filter((p) => p.category_id === sub.id);
   }, [shelf, activeSub]);
 
-  const updateArrows = useCallback(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    const left = Math.abs(el.scrollLeft);
-    setCanPrev(left > 6);
-    setCanNext(max - left > 6);
-  }, []);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageItems = filtered.slice(safePage * perPage, safePage * perPage + perPage);
+
+  // On page / filter / perPage change: show skeleton structure first, then cards
+  useEffect(() => {
+    setPhase("skeleton");
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const delay = reduce ? 0 : 280;
+    const t = window.setTimeout(() => setPhase("cards"), delay);
+    return () => window.clearTimeout(t);
+  }, [safePage, activeSub, perPage, shelf.id]);
 
   useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    updateArrows();
-    el.addEventListener("scroll", updateArrows, { passive: true });
-    const ro = new ResizeObserver(updateArrows);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener("scroll", updateArrows);
-      ro.disconnect();
-    };
-  }, [updateArrows, filtered.length, activeSub]);
+    setPage(0);
+  }, [activeSub, perPage]);
 
-  useEffect(() => {
-    trackRef.current?.scrollTo({ left: 0 });
-  }, [activeSub]);
+  const go = useCallback(
+    (dir: -1 | 1) => {
+      setPage((p) => {
+        const next = p + dir;
+        if (next < 0) return pageCount - 1;
+        if (next >= pageCount) return 0;
+        return next;
+      });
+    },
+    [pageCount]
+  );
 
   if (!shelf.products.length) return null;
 
-  const scroll = (dir: 1 | -1) => {
-    const el = trackRef.current;
-    if (!el) return;
-    const step = Math.min(el.clientWidth * 0.85, 360);
-    el.scrollBy({ left: -dir * step, behavior: "smooth" });
-  };
-
   return (
-    <section
-      ref={sectionRef as React.RefObject<HTMLElement>}
-      className="home-section"
-      aria-label={shelf.name}
-    >
+    <section className="home-section product-shelf-dream" aria-label={shelf.name}>
       <div className="home-container">
-        <div
-          className={`mb-3 flex items-center justify-between gap-3 mq-rise${sectionIn ? " is-in" : ""}`}
-        >
+        <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-[#14243A] sm:text-xl">{shelf.name}</h2>
           <Link
             href={shelf.href}
@@ -95,8 +100,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
 
         {shelf.subcategories.length > 0 && (
           <div
-            className={`mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar mq-rise${sectionIn ? " is-in" : ""}`}
-            style={{ transitionDelay: sectionIn ? "50ms" : "0ms" }}
+            className="mb-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar"
             role="tablist"
             aria-label={`تصنيفات ${shelf.name}`}
           >
@@ -108,7 +112,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
               className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] font-semibold transition sm:text-[13px] ${
                 !activeSub
                   ? "border-[#3157D5] bg-[#3157D5] text-white"
-                  : "border-[#E4E9F0] bg-white text-[#526174] hover:border-[#3157D5]"
+                  : "border-[#E4E9F0] bg-white text-[#526174]"
               }`}
             >
               الكل
@@ -125,7 +129,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
                   className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[12px] font-semibold transition sm:text-[13px] ${
                     on
                       ? "border-[#3157D5] bg-[#3157D5] text-white"
-                      : "border-[#E4E9F0] bg-white text-[#526174] hover:border-[#3157D5]"
+                      : "border-[#E4E9F0] bg-white text-[#526174]"
                   }`}
                 >
                   {s.name}
@@ -140,44 +144,65 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
             لا توجد منتجات في هذا التصنيف حاليًا
           </p>
         ) : (
-          <div className="relative">
-            {(canPrev || canNext) && (
-              <div className="pointer-events-none absolute inset-y-0 inset-x-0 z-10 hidden items-center justify-between md:flex">
+          <div className="product-shelf-dream__stage">
+            {/* Grid: always same slots so skeleton = same structure as products */}
+            <div
+              className="product-shelf-dream__grid"
+              style={{
+                gridTemplateColumns: `repeat(${perPage}, minmax(0, 1fr))`,
+              }}
+            >
+              {phase === "skeleton"
+                ? Array.from({ length: perPage }).map((_, i) => (
+                    <div key={`sk-${safePage}-${i}`} className="product-shelf-dream__cell">
+                      <ProductCardSkeleton />
+                    </div>
+                  ))
+                : pageItems.map((p, i) => (
+                    <div
+                      key={`${p.id}-${safePage}`}
+                      className="product-shelf-dream__cell mq-product-rise is-in"
+                      style={{ transitionDelay: `${i * 90}ms` }}
+                    >
+                      <MarketplaceProductCard product={p} riseDelayMs={0} />
+                    </div>
+                  ))}
+            </div>
+
+            {/* Controls under the stage — like Dream2000 video */}
+            {pageCount > 1 && (
+              <div className="product-shelf-dream__controls" dir="ltr">
                 <button
                   type="button"
-                  disabled={!canPrev}
-                  onClick={() => scroll(-1)}
-                  className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full border border-[#E4E9F0] bg-white text-[#14243A] shadow-md disabled:opacity-30"
+                  className="product-shelf-dream__arrow"
                   aria-label="السابق"
+                  onClick={() => go(-1)}
                 >
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
+                <div className="product-shelf-dream__dots" role="tablist" aria-label="صفحات المنتجات">
+                  {Array.from({ length: pageCount }).map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      role="tab"
+                      aria-selected={i === safePage}
+                      aria-label={`صفحة ${i + 1}`}
+                      className={`product-shelf-dream__dot${i === safePage ? " is-active" : ""}`}
+                      onClick={() => setPage(i)}
+                    />
+                  ))}
+                </div>
                 <button
                   type="button"
-                  disabled={!canNext}
-                  onClick={() => scroll(1)}
-                  className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full border border-[#E4E9F0] bg-white text-[#14243A] shadow-md disabled:opacity-30"
+                  className="product-shelf-dream__arrow"
                   aria-label="التالي"
+                  onClick={() => go(1)}
                 >
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             )}
-
-            <div ref={trackRef} className="category-product-track" dir="rtl">
-              {filtered.map((p, i) => (
-                <div
-                  key={`${activeSub || "all"}-${p.id}`}
-                  className="category-product-slot snap-start"
-                >
-                  {/* Card shows skeleton until its image loads, then whole product rises */}
-                  <MarketplaceProductCard
-                    product={p}
-                    riseDelayMs={Math.min(i, 8) * 55}
-                  />
-                </div>
-              ))}
-            </div>
           </div>
         )}
       </div>
