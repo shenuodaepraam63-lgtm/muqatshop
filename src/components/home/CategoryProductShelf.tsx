@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MarketplaceProductCard } from "@/components/home/MarketplaceProductCard";
+import { ProductCardSkeleton } from "@/components/home/ProductCardSkeleton";
 import { useInViewOnce } from "@/lib/animations/useInViewOnce";
 import type { Product } from "@/lib/supabase";
 
@@ -27,9 +28,11 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  /** After skeleton holds, cards rise from bottom */
+  const [revealed, setRevealed] = useState(false);
   const [sectionRef, sectionIn] = useInViewOnce({
-    threshold: 0.15,
-    rootMargin: "0px 0px -10% 0px",
+    threshold: 0.12,
+    rootMargin: "0px 0px -8% 0px",
   });
 
   const filtered = useMemo(() => {
@@ -38,6 +41,17 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
     if (!sub) return shelf.products;
     return shelf.products.filter((p) => p.category_id === sub.id);
   }, [shelf, activeSub]);
+
+  // Skeleton structure first → then rise cards when section enters view
+  useEffect(() => {
+    if (!sectionIn) {
+      setRevealed(false);
+      return;
+    }
+    setRevealed(false);
+    const t = window.setTimeout(() => setRevealed(true), 220);
+    return () => window.clearTimeout(t);
+  }, [sectionIn, activeSub, shelf.id]);
 
   const updateArrows = useCallback(() => {
     const el = trackRef.current;
@@ -59,7 +73,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
       el.removeEventListener("scroll", updateArrows);
       ro.disconnect();
     };
-  }, [updateArrows, filtered.length, activeSub]);
+  }, [updateArrows, filtered.length, activeSub, revealed]);
 
   useEffect(() => {
     trackRef.current?.scrollTo({ left: 0 });
@@ -74,6 +88,8 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
     el.scrollBy({ left: -dir * step, behavior: "smooth" });
   };
 
+  const skeletonCount = Math.min(Math.max(filtered.length, 2), 6);
+
   return (
     <section
       ref={sectionRef as React.RefObject<HTMLElement>}
@@ -83,7 +99,6 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
       <div className="home-container">
         <div
           className={`mb-3 flex items-center justify-between gap-3 mq-rise${sectionIn ? " is-in" : ""}`}
-          style={{ transitionDelay: sectionIn ? "0ms" : "0ms" }}
         >
           <h2 className="text-lg font-bold text-[#14243A] sm:text-xl">{shelf.name}</h2>
           <Link
@@ -97,7 +112,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
         {shelf.subcategories.length > 0 && (
           <div
             className={`mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar mq-rise${sectionIn ? " is-in" : ""}`}
-            style={{ transitionDelay: sectionIn ? "60ms" : "0ms" }}
+            style={{ transitionDelay: sectionIn ? "50ms" : "0ms" }}
             role="tablist"
             aria-label={`تصنيفات ${shelf.name}`}
           >
@@ -142,7 +157,7 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
           </p>
         ) : (
           <div className="relative">
-            {(canPrev || canNext) && (
+            {(canPrev || canNext) && revealed && (
               <div className="pointer-events-none absolute inset-y-0 inset-x-0 z-10 hidden items-center justify-between md:flex">
                 <button
                   type="button"
@@ -166,19 +181,23 @@ export function CategoryProductShelf({ shelf }: { shelf: CategoryShelfData }) {
             )}
 
             <div ref={trackRef} className="category-product-track" dir="rtl">
-              {filtered.map((p, i) => (
-                <div
-                  key={`${activeSub || "all"}-${p.id}`}
-                  className={`category-product-slot snap-start mq-rise${sectionIn ? " is-in" : ""}`}
-                  style={{
-                    transitionDelay: sectionIn
-                      ? `${Math.min(i, 8) * 55}ms`
-                      : "0ms",
-                  }}
-                >
-                  <MarketplaceProductCard product={p} />
-                </div>
-              ))}
+              {!revealed
+                ? Array.from({ length: skeletonCount }).map((_, i) => (
+                    <div key={`sk-${i}`} className="category-product-slot">
+                      <ProductCardSkeleton />
+                    </div>
+                  ))
+                : filtered.map((p, i) => (
+                    <div
+                      key={`${activeSub || "all"}-${p.id}`}
+                      className="category-product-slot snap-start mq-product-rise is-in"
+                      style={{
+                        transitionDelay: `${Math.min(i, 10) * 70}ms`,
+                      }}
+                    >
+                      <MarketplaceProductCard product={p} />
+                    </div>
+                  ))}
             </div>
           </div>
         )}
