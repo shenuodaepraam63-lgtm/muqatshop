@@ -3,6 +3,7 @@ import {
   isSupabaseConfigured,
   type Category,
   type Product,
+  collectCategoryIdsWithDescendants,
 } from "@/lib/supabase";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -143,6 +144,11 @@ async function loadCampaignSlides(): Promise<{
   };
 }
 
+/**
+ * One horizontal shelf per root category (e.g. Laptops).
+ * Products from the root + all subcategories appear in the same rail.
+ * Subcategories become filter chips — same UI for every section.
+ */
 async function loadCategoryShelves(): Promise<{
   roots: Category[];
   shelves: CategoryShelfData[];
@@ -192,20 +198,68 @@ async function loadCategoryShelves(): Promise<{
     productsByCategory.set(product.category_id, current);
   }
 
-  const categoriesWithProducts = cats.filter((category) =>
-    productsByCategory.has(category.id)
+  const roots = cats.filter((c) => !c.parent_id);
+  const shelves: CategoryShelfData[] = [];
+
+  for (const root of roots) {
+    const treeIds = collectCategoryIdsWithDescendants(root.id, cats);
+    const merged: Product[] = [];
+    const seen = new Set<string>();
+
+    for (const cid of treeIds) {
+      for (const p of productsByCategory.get(cid) || []) {
+        if (seen.has(p.id)) continue;
+        seen.add(p.id);
+        merged.push(p);
+      }
+    }
+
+    if (!merged.length) continue;
+
+    const children = cats.filter((c) => c.parent_id === root.id);
+    const subcategories = children
+      .filter((c) => (productsByCategory.get(c.id) || []).length > 0)
+      .map((c) => ({ id: c.id, name: c.name, slug: c.slug }));
+
+    shelves.push({
+      id: root.id,
+      name: root.name,
+      slug: root.slug,
+      href: `/shop?category=${encodeURIComponent(root.slug)}`,
+      subcategories,
+      products: merged.slice(0, 24),
+    });
+  }
+
+  // Orphan products under a subcategory whose parent is missing/inactive:
+  // still show a horizontal shelf so nothing is lost.
+  const covered = new Set(
+    shelves.flatMap((s) =>
+      collectCategoryIdsWithDescendants(s.id, cats)
+    )
+  );
+  for (const cat of cats) {
+    if (covered.has(cat.id)) continue;
+    const list = productsByCategory.get(cat.id) || [];
+    if (!list.length) continue;
+    shelves.push({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      href: `/shop?category=${encodeURIComponent(cat.slug)}`,
+      subcategories: [],
+      products: list.slice(0, 24),
+    });
+  }
+
+  const rootIcons = roots.filter((r) =>
+    shelves.some((s) => s.id === r.id || s.slug === r.slug)
   );
 
-  const shelves: CategoryShelfData[] = categoriesWithProducts.map((category) => ({
-    id: category.id,
-    name: category.name,
-    slug: category.slug,
-    href: `/categories/${encodeURIComponent(category.slug)}`,
-    subcategories: [],
-    products: (productsByCategory.get(category.id) || []).slice(0, 16),
-  }));
-
-  return { roots: categoriesWithProducts, shelves };
+  return {
+    roots: rootIcons.length ? rootIcons : cats.filter((c) => shelves.some((s) => s.id === c.id)),
+    shelves,
+  };
 }
 
 async function loadHomeData() {
