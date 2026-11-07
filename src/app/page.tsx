@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { HomeAuthGate } from "@/components/home/HomeAuthGate";
-import MarketingHomePage from "@/components/home/MarketingHomePage";
 import StoreHomePage from "@/components/home/StoreHomePage";
 import "@/app/homepage.css";
 
@@ -21,16 +19,7 @@ export const metadata: Metadata = {
   },
 };
 
-/**
- * Root "/":
- * - anonymous → platform intro (existing HomeSections marketing page)
- * - signed in → current store homepage (unchanged)
- */
+/** Customer store homepage for all visitors (Dream2000-style shelves). */
 export default function HomePage() {
-  return (
-    <HomeAuthGate
-      marketing={<MarketingHomePage />}
-      store={<StoreHomePage />}
-    />
-  );
+  return <StoreHomePage />;
 }
