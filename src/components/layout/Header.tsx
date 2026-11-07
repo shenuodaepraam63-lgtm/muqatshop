@@ -21,6 +21,7 @@ const navLinks = [
   { href: "/shop", label: "المتجر" },
   { href: "/shop", label: "التصنيفات" },
   { href: "/shop?offers=true", label: "العروض" },
+  { href: "/account", label: "حسابي" },
 ];
 
 export function Header() {
@@ -78,8 +79,8 @@ export function Header() {
   };
 
   return (
-    <header className="relative z-40 border-b border-[#E5EAF1] bg-white text-[#14243A]">
-      <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-between gap-3 px-[4%] sm:h-[64px]">
+    <header className="sticky top-0 z-40 border-b border-[#E5EAF1] bg-white/95 text-[#14243A] shadow-[0_1px_0_rgba(20,36,58,0.04)] backdrop-blur-md">
+      <div className="mx-auto flex h-[60px] max-w-[1600px] items-center justify-between gap-3 px-[4%] sm:h-[64px]">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -129,24 +130,24 @@ export function Header() {
         </div>
       </div>
 
-      <div className="border-t border-[#E5EAF1] bg-[#F6F8FB]">
-        <div className="mx-auto max-w-[1440px] px-[4%] py-2.5">
-          <Suspense fallback={<div className="h-12 animate-pulse rounded-[10px] bg-white" />}>
+      <div className="border-t border-[#E5EAF1] bg-white">
+        <div className="mx-auto max-w-[1600px] px-[4%] py-2.5">
+          <Suspense fallback={<div className="h-12 animate-pulse rounded-[10px] bg-[#F6F8FB]" />}>
             <SearchBar />
           </Suspense>
         </div>
       </div>
 
-      <div className="hidden border-t border-[#E5EAF1] md:block">
+      <div className="hidden bg-[#14243A] md:block">
         <nav
-          className="mx-auto flex max-w-[1440px] items-center gap-1 px-[4%] py-2 text-sm font-semibold"
+          className="mx-auto flex max-w-[1600px] items-center gap-0.5 overflow-x-auto px-[4%] py-0 text-[13px] font-semibold"
           aria-label="أقسام المتجر"
         >
           {navLinks.map((link) => (
             <Link
               key={link.label}
-              href={link.href}
-              className="rounded-lg px-3 py-2 text-[#526174] transition hover:bg-[#F6F8FB] hover:text-[#3157D5]"
+              href={link.href === "/account" && !loggedIn ? "/login" : link.href}
+              className="whitespace-nowrap px-3.5 py-2.5 text-white/85 transition hover:bg-white/10 hover:text-white"
             >
               {link.label}
             </Link>
@@ -154,7 +155,7 @@ export function Header() {
           {loggedIn && (
             <button
               type="button"
-              className="mr-auto rounded-lg px-3 py-2 text-xs font-semibold text-[#D64C4C] hover:bg-red-50"
+              className="mr-auto whitespace-nowrap px-3.5 py-2.5 text-xs font-semibold text-red-300 hover:bg-white/10 hover:text-red-200"
               onClick={() => void logout()}
             >
               خروج
@@ -169,7 +170,7 @@ export function Header() {
             {navLinks.map((link) => (
               <Link
                 key={link.label}
-                href={link.href}
+                href={link.href === "/account" && !loggedIn ? "/login" : link.href}
                 onClick={() => setOpen(false)}
                 className="rounded-lg px-3 py-3 text-sm font-semibold text-[#526174] hover:bg-[#F6F8FB]"
               >
