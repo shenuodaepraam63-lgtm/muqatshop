@@ -57,7 +57,6 @@ export function MarketplaceProductCard({
   const saved = activeSale && compare != null ? Math.max(0, compare - price) : 0;
   const hasVariants = Boolean(product.variants?.length);
   const available = inStock(product);
-  // No ratings table yet — show honest empty state (0)
   const rating = 0;
 
   const onAdd = (e: React.MouseEvent) => {
@@ -93,14 +92,13 @@ export function MarketplaceProductCard({
 
   return (
     <article
-      className={`group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-[#EEF1F6] bg-white shadow-[0_2px_12px_rgba(20,36,58,0.06)] transition hover:shadow-[0_8px_24px_rgba(20,36,58,0.1)] ${
+      className={`group flex h-full min-w-0 flex-col overflow-hidden rounded-[10px] border border-[#EEF1F6] bg-white transition hover:border-[#D6DDEA] ${
         compact ? "w-[168px] shrink-0 sm:w-[200px]" : ""
       }`}
     >
-      {/* Media — package style */}
       <Link
         href={`/products/${encodeURIComponent(product.slug)}`}
-        className="relative block aspect-square overflow-hidden bg-gradient-to-b from-[#FAFBFD] to-[#F3F5F9]"
+        className="mq-product-media relative block aspect-square overflow-hidden bg-white"
         aria-label={product.name}
       >
         {image && !imgErr ? (
@@ -118,15 +116,14 @@ export function MarketplaceProductCard({
           </div>
         )}
 
-        {/* Savings badge — مثل وفر XX جنيه */}
         {activeSale && saved > 0 && (
-          <span className="absolute right-2 top-2 z-[1] max-w-[70%] truncate rounded-full bg-[#E11D48] px-2 py-0.5 text-[10px] font-bold text-white shadow-sm sm:text-[11px]">
+          <span className="absolute right-2 top-2 z-[1] max-w-[70%] truncate rounded-md bg-[#E11D48] px-2 py-0.5 text-[10px] font-bold text-white sm:text-[11px]">
             وفر {formatPrice(saved)}
           </span>
         )}
 
         {!activeSale && percent <= 0 && product.is_featured ? (
-          <span className="absolute right-2 top-2 z-[1] rounded-full bg-[#3157D5] px-2 py-0.5 text-[10px] font-bold text-white">
+          <span className="absolute right-2 top-2 z-[1] rounded-md bg-[#3157D5] px-2 py-0.5 text-[10px] font-bold text-white">
             مميز
           </span>
         ) : null}
@@ -140,7 +137,7 @@ export function MarketplaceProductCard({
         <button
           type="button"
           onClick={onWish}
-          className="absolute left-2 top-2 z-10 grid h-9 w-9 place-items-center rounded-full bg-white shadow-[0_2px_8px_rgba(20,36,58,0.12)]"
+          className="absolute left-2 top-2 z-10 grid h-9 w-9 place-items-center rounded-full bg-white/95 shadow-sm"
           aria-label={wished ? "إزالة من المفضلة" : "إضافة للمفضلة"}
         >
           <Heart
@@ -149,7 +146,6 @@ export function MarketplaceProductCard({
         </button>
       </Link>
 
-      {/* Body */}
       <div className="flex flex-1 flex-col gap-1.5 px-3 pb-3 pt-2.5 max-md:px-2.5 max-md:pb-2.5">
         <Link href={`/products/${encodeURIComponent(product.slug)}`} className="block space-y-1">
           <h3 className="line-clamp-2 min-h-[2.4rem] text-[13px] font-semibold leading-5 text-[#14243A] sm:text-sm">
@@ -176,15 +172,15 @@ export function MarketplaceProductCard({
 
         <p
           className={`flex items-center gap-1.5 text-[11px] font-medium ${
-            available ? "text-[#3157D5]" : "text-[#98A2B3]"
+            available ? "text-[#16A34A]" : "text-[#98A2B3]"
           }`}
         >
           <span
             className={`inline-block h-1.5 w-1.5 rounded-full ${
-              available ? "bg-[#3157D5]" : "bg-[#D0D5DD]"
+              available ? "bg-[#22C55E]" : "bg-[#D0D5DD]"
             }`}
           />
-          {available ? "في المخزن" : "غير متوفر"}
+          {available ? "متوفر" : "غير متوفر"}
         </p>
 
         <div className="mt-auto pt-1">
@@ -192,7 +188,7 @@ export function MarketplaceProductCard({
             type="button"
             disabled={!available}
             onClick={onAdd}
-            className={`flex h-10 w-full items-center justify-center gap-1.5 rounded-xl text-[13px] font-bold transition max-md:h-9 max-md:text-xs ${
+            className={`flex h-10 w-full items-center justify-center gap-1.5 rounded-md text-[13px] font-bold transition max-md:h-9 max-md:text-xs ${
               available
                 ? "bg-[#22C55E] text-white hover:bg-[#16A34A] active:bg-[#15803D]"
                 : "cursor-not-allowed bg-[#E5EAF1] text-[#98A2B3]"
