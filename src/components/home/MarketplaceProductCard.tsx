@@ -2,11 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Heart, ShoppingBag, Check, Star } from "lucide-react";
 import { useCartStore } from "@/lib/store";
 import { useWishlistStore } from "@/lib/wishlist";
 import { formatPrice, isSaleActive, salePercent } from "@/lib/utils";
+import { ProductCardSkeleton } from "@/components/home/ProductCardSkeleton";
 import type { Product } from "@/lib/supabase";
 
 function inStock(product: Product): boolean {
@@ -35,15 +36,22 @@ function Stars({ count = 0 }: { count?: number }) {
 export function MarketplaceProductCard({
   product,
   compact,
+  riseDelayMs = 0,
 }: {
   product: Product;
   compact?: boolean;
+  /** Stagger delay after image is ready (ms) */
+  riseDelayMs?: number;
 }) {
   const addItem = useCartStore((s) => s.addItem);
   const toggleWish = useWishlistStore((s) => s.toggle);
   const wished = useWishlistStore((s) => s.has(product.id));
   const [added, setAdded] = useState(false);
   const [imgErr, setImgErr] = useState(false);
+  /** Image finished loading (or failed / no image) */
+  const [mediaReady, setMediaReady] = useState(false);
+  /** Whole card visible + rise animation */
+  const [showCard, setShowCard] = useState(false);
 
   const idx = Math.min(
     Math.max(product.main_image_index ?? 0, 0),
@@ -58,6 +66,39 @@ export function MarketplaceProductCard({
   const hasVariants = Boolean(product.variants?.length);
   const available = inStock(product);
   const rating = 0;
+
+  // Reset when product or image changes
+  useEffect(() => {
+    setMediaReady(!image);
+    setShowCard(false);
+    setImgErr(false);
+  }, [product.id, image]);
+
+  // After media ready → reveal entire card (not image-only)
+  useEffect(() => {
+    if (!mediaReady) {
+      setShowCard(false);
+      return;
+    }
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setShowCard(true);
+      return;
+    }
+    const t = window.setTimeout(() => setShowCard(true), riseDelayMs);
+    return () => window.clearTimeout(t);
+  }, [mediaReady, riseDelayMs]);
+
+  // Safety: if onLoad never fires (rare), unstick after 8s
+  useEffect(() => {
+    if (!image || mediaReady) return;
+    const t = window.setTimeout(() => setMediaReady(true), 8000);
+    return () => window.clearTimeout(t);
+  }, [image, mediaReady, product.id]);
+
+  const markMediaReady = () => setMediaReady(true);
 
   const onAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -90,9 +131,34 @@ export function MarketplaceProductCard({
     });
   };
 
+  // Skeleton until image is loaded — product body not shown yet
+  if (!showCard) {
+    return (
+      <div className="relative w-full">
+        <ProductCardSkeleton />
+        {/* Preload image off-layout so we know when media is ready */}
+        {image && !imgErr ? (
+          <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden>
+            <Image
+              src={image}
+              alt=""
+              width={16}
+              height={16}
+              onLoad={markMediaReady}
+              onError={() => {
+                setImgErr(true);
+                markMediaReady();
+              }}
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <article
-      className={`group flex h-full min-w-0 flex-col overflow-hidden rounded-[10px] border border-[#EEF1F6] bg-white transition hover:border-[#D6DDEA] ${
+      className={`mq-product-rise is-in group flex h-full min-w-0 flex-col overflow-hidden rounded-[10px] border border-[#EEF1F6] bg-white transition hover:border-[#D6DDEA] ${
         compact ? "w-[168px] shrink-0 sm:w-[200px]" : ""
       }`}
     >
@@ -109,6 +175,7 @@ export function MarketplaceProductCard({
             sizes="(max-width:767px) 50vw, (max-width:1023px) 33vw, 20vw"
             className="object-contain p-3 sm:p-4"
             onError={() => setImgErr(true)}
+            priority={false}
           />
         ) : (
           <div className="absolute inset-0 grid place-items-center text-[#98A2B3]">
